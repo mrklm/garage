@@ -120,7 +120,7 @@ class GarageApp(tk.Tk):
         self.canvas_biche.pack()
         self.canvas_biche.create_image(0, 0, anchor="nw", image=self.tk_biche)
 
-        self.label_km_biche = tk.Label(frame_left, text="Dernier km : —")
+        self.label_km_biche = tk.Label(frame_left, text="—")
         self.label_km_biche.pack(pady=5)
 
         self.canvas_biche.bind("<Button-1>", lambda e: self.set_vehicule_actif(0))
@@ -151,7 +151,7 @@ class GarageApp(tk.Tk):
         self.canvas_titine.pack()
         self.canvas_titine.create_image(0, 0, anchor="nw", image=self.tk_titine)
 
-        self.label_km_titine = tk.Label(frame_right, text="Dernier km : —")
+        self.label_km_titine = tk.Label(frame_right, text="—")
         self.label_km_titine.pack(pady=5)
 
         self.canvas_titine.bind("<Button-1>", lambda e: self.set_vehicule_actif(1))
@@ -215,11 +215,12 @@ class GarageApp(tk.Tk):
         kt = dernier_kilometrage(1)
 
         self.label_km_biche.config(
-            text=f"Dernier km : {kb:,}".replace(",", " ") if kb else "Dernier km : —"
+            text=f"{kb:,} Km".replace(",", " ") if kb else "—"
         )
         self.label_km_titine.config(
-            text=f"Dernier km : {kt:,}".replace(",", " ") if kt else "Dernier km : —"
+            text=f"{kt:,} Km".replace(",", " ") if kt else "—"
         )
+
 
     def refresh_pleins(self):
         for item in self.tree.get_children():
@@ -237,8 +238,11 @@ class GarageApp(tk.Tk):
     def on_ajouter_plein(self):
         try:
             d = self.entries_plein["date"].get()
-            j, m, a = d.split("/")
-            date_iso = f"20{a}-{m}-{j}"
+            parts = d.split("/")
+            if len(parts) != 3:
+                raise ValueError("Date invalide : utilisez le format JJ/MM/AA")
+            j, m, a = parts
+            date_iso = f"20{a}-{m}-{j}"  # conversion en YYYY-MM-DD
 
             km = int(self.entries_plein["kilometrage"].get())
             litres = float(self.entries_plein["litres"].get().replace(",", "."))
@@ -265,6 +269,7 @@ class GarageApp(tk.Tk):
 
         except Exception as e:
             messagebox.showerror("Erreur", str(e))
+
 
     def on_effacer_plein(self):
         sel = self.tree.selection()
