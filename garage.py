@@ -5,6 +5,9 @@ from PIL import Image, ImageTk
 
 DB_FILE = "garage.db"
 
+APP_NAME = "Garage"
+APP_VERSION = "0.9.0"
+
 # =========================
 # Base de données (SQLite)
 # =========================
@@ -44,11 +47,11 @@ def init_db():
     cursor.execute(
         """
         INSERT OR IGNORE INTO lieux (nom) VALUES
-        ('St É'),
-        ('Avranches'),
-        ('Pontorson'),
-        ('Pleine Fougères'),
-        ('Lille')
+        ('Total'),
+        ('Carrefour'),
+        ('Intermarché'),
+        ('Leclerc'),
+        ('Auchan');
         """
     )
 
@@ -157,39 +160,33 @@ def supprimer_lieu(nom: str):
     conn.close()
 
 
-def lieux_frequents_non_catalogues(min_occurrences: int = 3):
-    """Suggestions: lieux fréquents présents dans pleins mais absents de la table lieux."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT t.nom, t.n
-        FROM (
-            SELECT TRIM(lieu) AS nom, COUNT(*) AS n
-            FROM pleins
-            WHERE lieu IS NOT NULL
-              AND TRIM(lieu) <> ''
-            GROUP BY TRIM(lieu)
-        ) AS t
-        WHERE t.n >= ?
-          AND t.nom NOT IN (SELECT nom FROM lieux)
-        ORDER BY t.n DESC, t.nom ASC
-        """,
-        (min_occurrences,),
-    )
-    rows = cursor.fetchall()
-    conn.close()
-    return rows
-
-
 # =========================
 # Interface graphique
 # =========================
 
 class GarageApp(tk.Tk):
+    def create_menu(self):
+        menubar = tk.Menu(self)
+
+        menu_aide = tk.Menu(menubar, tearoff=0)
+        menu_aide.add_command(label="À propos…", command=self.on_about)
+        menubar.add_cascade(label="Aide", menu=menu_aide)
+
+        self.config(menu=menubar)
+
+    def on_about(self):
+        messagebox.showinfo(
+            "À propos",
+            f"{APP_NAME} v{APP_VERSION}\n\n"
+            "Gestion des pleins, lieux et suivi kilométrique (2 véhicules).",
+        )
+
+
+
+
     def __init__(self):
         super().__init__()
-        self.title("Garage – gestion des véhicules")
+        self.title(f"{APP_NAME} v{APP_VERSION} – gestion des véhicules")
         self.geometry("1100x650")
 
         init_db()
@@ -206,6 +203,7 @@ class GarageApp(tk.Tk):
         self.notebook.add(self.tab_pleins, text="Pleins")
         self.notebook.add(self.tab_lieux, text="Lieux")
 
+        self.create_menu()
         self.create_top_bar()
         self.create_main_area()
         self.create_lieux_tab()
@@ -266,23 +264,35 @@ class GarageApp(tk.Tk):
         frame = tk.Frame(self.tab_pleins)
         frame.pack(fill=tk.BOTH, expand=True, padx=10)
 
-        columns = ("id", "date", "km", "litres", "prix", "total", "lieu", "usage", "commentaire")
+        columns = ("id", "date", "km", "litres", "prix", "total", "lieu", "type_usage", "commentaire")
         self.tree = ttk.Treeview(frame, columns=columns, show="headings")
 
         widths = {
             "id": 50,
             "date": 90,
-            "km": 90,
-            "litres": 70,
-            "prix": 80,
-            "total": 80,
-            "lieu": 130,
-            "usage": 120,
+            "km": 80,
+            "litres": 120,
+            "prix": 90,
+            "total": 90,
+            "lieu": 140,
+            "type_usage": 160,
             "commentaire": 260,
         }
 
+        headings = {
+            "id": "ID",
+            "date": "Date",
+            "km": "Km",
+            "litres": "Nbre de Litres",
+            "prix": "€ / Litre",
+            "total": "Total (€)",
+            "lieu": "Lieu",
+            "type_usage": "Type de Trajets",
+            "commentaire": "Commentaire",
+        }
+
         for col in columns:
-            self.tree.heading(col, text=col)
+            self.tree.heading(col, text=headings.get(col, col))
             self.tree.column(col, width=widths[col], stretch=False)
 
         self.tree.pack(fill=tk.BOTH, expand=True)
@@ -290,26 +300,49 @@ class GarageApp(tk.Tk):
         form = tk.Frame(self.tab_pleins)
         form.pack(fill=tk.X, pady=5)
 
-        labels = ["Jour", "Mois", "Année", "kilometrage", "litres", "prix_litre", "lieu", "type_usage", "commentaire"]
+        labels = [
+            ("Jour", "jour"),
+            ("Mois", "mois"),
+            ("Année", "année"),
+            ("Km", "kilometrage"),
+            ("Nbre de Litres", "litres"),
+            ("€ / Litre", "prix_litre"),
+            ("Lieu", "lieu"),
+            ("Type de Trajets", "type_usage"),
+            ("Commentaire", "commentaire"),
+        ]
         self.entries_plein = {}
 
-        for i, lab in enumerate(labels):
-            tk.Label(form, text=lab).grid(row=0, column=i)
+        for i, (label_text, key) in enumerate(labels):
+            if key == "prix_litre":
+                tk.Label(form, text=label_text, font=("Arial", 12, "bold")).grid(row=0, column=i)
+            else:
+                tk.Label(form, text=label_text).grid(row=0, column=i)
 
-            if lab in ["Jour", "Mois", "Année"]:
+            if key in ["jour", "mois", "année"]:
                 entry = tk.Entry(form, width=6)
                 entry.grid(row=1, column=i)
-                self.entries_plein[lab.lower()] = entry
+                self.entries_plein[key] = entry
 
-            elif lab == "lieu":
+            elif key == "lieu":
                 self.combo_lieu = ttk.Combobox(form, width=16, state="readonly")
                 self.combo_lieu.grid(row=1, column=i)
-                self.entries_plein["lieu"] = self.combo_lieu
+                self.entries_plein[key] = self.combo_lieu
+
+            elif key == "type_usage":
+                self.combo_usage = ttk.Combobox(
+                    form,
+                    width=18,
+                    state="readonly",
+                    values=["Trajets Quotidiens", "Longs Trajets"],
+                )
+                self.combo_usage.grid(row=1, column=i)
+                self.entries_plein[key] = self.combo_usage
 
             else:
                 entry = tk.Entry(form, width=12)
                 entry.grid(row=1, column=i)
-                self.entries_plein[lab.lower()] = entry
+                self.entries_plein[key] = entry
 
     # ---------------------
     # Onglet Lieux
@@ -319,39 +352,42 @@ class GarageApp(tk.Tk):
         container = tk.Frame(self.tab_lieux)
         container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
+        # Colonne principale : lieux
         col1 = tk.Frame(container)
         col1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        tk.Label(col1, text="Lieux enregistrés").pack(anchor="w")
-        self.listbox_lieux = tk.Listbox(col1, height=18, width=40)
+        tk.Label(col1, text="Lieux enregistrés", font=("Arial", 11, "bold")).pack(anchor="w")
+        self.listbox_lieux = tk.Listbox(col1, height=18)
         self.listbox_lieux.pack(fill=tk.BOTH, expand=True, pady=8)
 
-        col2 = tk.Frame(container)
-        col2.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(20, 0))
+        # Colonne actions + aide
+        col_actions = tk.Frame(container)
+        col_actions.pack(side=tk.LEFT, padx=30, fill=tk.Y)
 
-        tk.Label(col2, text="Suggestions (≥ 3 pleins)\nissus des données").pack(anchor="w")
-        self.listbox_suggestions = tk.Listbox(col2, height=18, width=45)
-        self.listbox_suggestions.pack(fill=tk.BOTH, expand=True, pady=8)
+        tk.Button(col_actions, text="Ajouter un lieu…", command=self.on_ajouter_lieu).pack(fill=tk.X, pady=5)
+        tk.Button(col_actions, text="Supprimer le lieu sélectionné", command=self.on_supprimer_lieu).pack(fill=tk.X, pady=5)
+        tk.Button(col_actions, text="Rafraîchir", command=self.refresh_lieux_ui).pack(fill=tk.X, pady=15)
 
-        col3 = tk.Frame(container)
-        col3.pack(side=tk.LEFT, padx=20, fill=tk.Y)
+    # Texte explicatif (vouvoiement + icônes)
+        aide_texte = (
+    "ℹ  Aide\n\n"
+    "➕  Utilisez « Ajouter un lieu… » pour créer\n"
+    "     un lieu réutilisable dans les Pleins.\n\n"
+    "🗑  Vous pouvez supprimer un lieu\n"
+    "     s’il n’est plus nécessaire.\n\n"
+    "✔  Les lieux enregistrés apparaissent\n"
+    "     automatiquement dans la liste\n"
+    "     déroulante des Pleins."
+)
 
-        tk.Button(col3, text="Ajouter un lieu…", command=self.on_ajouter_lieu).pack(fill=tk.X, pady=5)
-        tk.Button(col3, text="Ajouter la suggestion sélectionnée", command=self.on_ajouter_suggestion).pack(fill=tk.X, pady=5)
-        tk.Button(col3, text="Supprimer le lieu sélectionné", command=self.on_supprimer_lieu).pack(fill=tk.X, pady=5)
-        tk.Button(col3, text="Rafraîchir", command=self.refresh_lieux_ui).pack(fill=tk.X, pady=15)
+
+
 
         tk.Label(
-            col3,
-            text=(
-                "Astuce :\n"
-                "- Les suggestions viennent des pleins\n"
-                "  déjà saisis (champ 'lieu')\n"
-                "- Quand tu ajoutes une suggestion,\n"
-                "  elle devient disponible dans\n"
-                "  la liste déroulante des Pleins"
-            ),
+            col_actions,
+            text=aide_texte,
             justify="left",
+            fg="#2c3e50",
         ).pack(anchor="w", pady=10)
 
     # ---------------------
@@ -364,10 +400,6 @@ class GarageApp(tk.Tk):
         self.listbox_lieux.delete(0, tk.END)
         for nom in lieux:
             self.listbox_lieux.insert(tk.END, nom)
-
-        self.listbox_suggestions.delete(0, tk.END)
-        for nom, n in lieux_frequents_non_catalogues(3):
-            self.listbox_suggestions.insert(tk.END, f"{nom}  (×{n})")
 
         current = self.combo_lieu.get() if hasattr(self, "combo_lieu") else ""
         if hasattr(self, "combo_lieu"):
@@ -507,8 +539,12 @@ class GarageApp(tk.Tk):
         if hasattr(self, "combo_lieu"):
             self.combo_lieu.set(str(values[6]) if values[6] is not None else "")
 
-        self.entries_plein["type_usage"].delete(0, tk.END)
-        self.entries_plein["type_usage"].insert(0, values[7] if values[7] is not None else "")
+        # type_usage = combobox
+        if isinstance(self.entries_plein.get("type_usage"), ttk.Combobox):
+            self.entries_plein["type_usage"].set(values[7] if values[7] is not None else "")
+        else:
+            self.entries_plein["type_usage"].delete(0, tk.END)
+            self.entries_plein["type_usage"].insert(0, values[7] if values[7] is not None else "")
 
         self.entries_plein["commentaire"].delete(0, tk.END)
         self.entries_plein["commentaire"].insert(0, values[8] if values[8] is not None else "")
@@ -537,21 +573,6 @@ class GarageApp(tk.Tk):
             return
         supprimer_lieu(nom)
         self.refresh_lieux_ui()
-
-    def on_ajouter_suggestion(self):
-        sel = self.listbox_suggestions.curselection()
-        if not sel:
-            messagebox.showwarning("Sélection", "Sélectionne une suggestion à ajouter")
-            return
-
-        raw = self.listbox_suggestions.get(sel[0])
-        nom = raw.split("(×", 1)[0].strip()
-        if not nom:
-            return
-
-        ajouter_lieu(nom)
-        self.refresh_lieux_ui()
-
 
 if __name__ == "__main__":
     app = GarageApp()
