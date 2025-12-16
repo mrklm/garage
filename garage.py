@@ -47,11 +47,11 @@ def init_db():
     cursor.execute(
         """
         INSERT OR IGNORE INTO lieux (nom) VALUES
-        ('Total'),
-        ('Carrefour'),
-        ('Intermarché'),
-        ('Leclerc'),
-        ('Auchan');
+        ('St É'),
+        ('Avranches'),
+        ('Lille'),
+        ('Pontorson'),
+        ('Pleine Fougères');
         """
     )
 
