@@ -6,7 +6,7 @@ import shutil
 import time
 
 APP_NAME = "Garage"
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.3.0"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_FILE = str(SCRIPT_DIR / "garage.db")
@@ -15,6 +15,7 @@ ASSETS_DIR = SCRIPT_DIR / "assets"
 VEHICLES_DIR = ASSETS_DIR / "vehicles"
 
 MAX_VEHICLES = 5
+MISSED_FILL_KM_THRESHOLD = 1500  # utilisé uniquement pour fiabiliser les calculs
 
 # Pillow optionnel
 try:
@@ -23,6 +24,10 @@ try:
 except Exception:
     PIL_AVAILABLE = False
 
+
+# -----------------------------
+# Helpers
+# -----------------------------
 
 def safe_filename(name: str) -> str:
     name = (name or "").strip().lower()
@@ -75,6 +80,10 @@ def load_photo_or_placeholder(photo_filename: str | None, size=(220, 150), label
         return None, f"Pillow non disponible: impossible d'afficher {path.name}."
 
 
+# -----------------------------
+# DB
+# -----------------------------
+
 def connect():
     conn = sqlite3.connect(DB_FILE)
     conn.execute("PRAGMA foreign_keys = ON;")
@@ -87,7 +96,7 @@ def table_columns(conn, table: str) -> set[str]:
     return {row[1] for row in cur.fetchall()}
 
 
-def ensure_vehicle(conn, nom: str, marque=None, modele=None, motorisation=None, energie=None, immatriculation=None, photo_filename=None) -> int:
+def ensure_vehicle(conn, nom: str, marque=None, modele=None, motorisation=None, energie=None, annee=None, immatriculation=None, photo_filename=None) -> int:
     cur = conn.cursor()
     cur.execute("SELECT id FROM vehicules WHERE nom = ?", (nom,))
     row = cur.fetchone()
@@ -95,10 +104,10 @@ def ensure_vehicle(conn, nom: str, marque=None, modele=None, motorisation=None, 
         return int(row[0])
     cur.execute(
         """
-        INSERT INTO vehicules (nom, marque, modele, motorisation, energie, immatriculation, photo_filename)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO vehicules (nom, marque, modele, motorisation, energie, annee, immatriculation, photo_filename)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (nom, marque, modele, motorisation, energie, immatriculation, photo_filename),
+        (nom, marque, modele, motorisation, energie, annee, immatriculation, photo_filename),
     )
     conn.commit()
     return int(cur.lastrowid)
@@ -109,6 +118,7 @@ def init_db_and_migrate():
     conn = connect()
     cur = conn.cursor()
 
+    # Véhicules
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS vehicules (
@@ -118,12 +128,22 @@ def init_db_and_migrate():
             modele TEXT,
             motorisation TEXT,
             energie TEXT,
+            annee INTEGER,
             immatriculation TEXT,
             photo_filename TEXT
         )
         """
     )
+    # Migration: si colonne annee absente
+    cols_v = table_columns(conn, "vehicules")
+    if "annee" not in cols_v:
+        try:
+            cur.execute("ALTER TABLE vehicules ADD COLUMN annee INTEGER")
+            conn.commit()
+        except Exception:
+            pass
 
+    # Lieux
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS lieux (
@@ -133,6 +153,7 @@ def init_db_and_migrate():
         """
     )
 
+    # Pleins (compat: type_usage/commentaire existent peut-être déjà)
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS pleins (
@@ -151,6 +172,34 @@ def init_db_and_migrate():
         """
     )
 
+    # Entretien: enregistrements
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS entretien (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicule_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            intervention TEXT NOT NULL,
+            precision TEXT,
+            entretien_item TEXT,
+            effectue_par TEXT,
+            cout REAL,
+            FOREIGN KEY(vehicule_id) REFERENCES vehicules(id) ON DELETE RESTRICT
+        )
+        """
+    )
+
+    # Entretien: catalogue
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS entretien_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nom TEXT UNIQUE NOT NULL
+        )
+        """
+    )
+
+    # App config
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS app_config (
@@ -160,6 +209,7 @@ def init_db_and_migrate():
         """
     )
 
+    # Seeds lieux
     cur.execute(
         """
         INSERT OR IGNORE INTO lieux (nom) VALUES
@@ -170,10 +220,22 @@ def init_db_and_migrate():
         ('Pleine Fougères');
         """
     )
+
+    # Seeds entretien (minimaux)
+    cur.execute(
+        """
+        INSERT OR IGNORE INTO entretien_items (nom) VALUES
+        ('Vidange'),
+        ('Filtres'),
+        ('Pneus'),
+        ('Freins');
+        """
+    )
     conn.commit()
 
-    cols = table_columns(conn, "pleins")
-    if "vehicule" in cols and "vehicule_id" not in cols:
+    # Migration depuis v1 si pleins.vehicule existe
+    cols_p = table_columns(conn, "pleins")
+    if "vehicule" in cols_p and "vehicule_id" not in cols_p:
         cur.execute("ALTER TABLE pleins ADD COLUMN vehicule_id INTEGER")
         conn.commit()
 
@@ -185,12 +247,14 @@ def init_db_and_migrate():
         cur.execute("UPDATE pleins SET vehicule_id = ? WHERE vehicule_id IS NULL", (biche_id,))
         conn.commit()
 
+    # Base vierge: 2 véhicules
     cur.execute("SELECT COUNT(*) FROM vehicules")
     if (cur.fetchone()[0] or 0) == 0:
         ensure_vehicle(conn, nom="Biche")
         ensure_vehicle(conn, nom="Titine")
         conn.commit()
 
+    # Sécuriser vehicule_id non NULL
     cur.execute("SELECT COUNT(*) FROM pleins WHERE vehicule_id IS NULL")
     if (cur.fetchone()[0] or 0) > 0:
         cur.execute("SELECT id FROM vehicules ORDER BY id ASC LIMIT 1")
@@ -221,12 +285,16 @@ def set_config(key: str, value: str):
     conn.close()
 
 
+# -----------------------------
+# DB: véhicules
+# -----------------------------
+
 def list_vehicles():
     conn = connect()
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT id, nom, marque, modele, motorisation, energie, immatriculation, photo_filename
+        SELECT id, nom, marque, modele, motorisation, energie, annee, immatriculation, photo_filename
         FROM vehicules
         ORDER BY nom COLLATE NOCASE ASC
         """
@@ -241,7 +309,7 @@ def get_vehicle(vehicle_id: int):
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT id, nom, marque, modele, motorisation, energie, immatriculation, photo_filename
+        SELECT id, nom, marque, modele, motorisation, energie, annee, immatriculation, photo_filename
         FROM vehicules
         WHERE id = ?
         """,
@@ -261,15 +329,15 @@ def count_vehicles() -> int:
     return n
 
 
-def add_vehicle(nom, marque, modele, motorisation, energie, immatriculation, photo_filename):
+def add_vehicle(nom, marque, modele, motorisation, energie, annee, immatriculation, photo_filename):
     conn = connect()
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO vehicules (nom, marque, modele, motorisation, energie, immatriculation, photo_filename)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO vehicules (nom, marque, modele, motorisation, energie, annee, immatriculation, photo_filename)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (nom, marque, modele, motorisation, energie, immatriculation, photo_filename),
+        (nom, marque, modele, motorisation, energie, annee, immatriculation, photo_filename),
     )
     conn.commit()
     new_id = int(cur.lastrowid)
@@ -277,16 +345,16 @@ def add_vehicle(nom, marque, modele, motorisation, energie, immatriculation, pho
     return new_id
 
 
-def update_vehicle(vehicle_id, nom, marque, modele, motorisation, energie, immatriculation, photo_filename):
+def update_vehicle(vehicle_id, nom, marque, modele, motorisation, energie, annee, immatriculation, photo_filename):
     conn = connect()
     cur = conn.cursor()
     cur.execute(
         """
         UPDATE vehicules
-        SET nom = ?, marque = ?, modele = ?, motorisation = ?, energie = ?, immatriculation = ?, photo_filename = ?
+        SET nom = ?, marque = ?, modele = ?, motorisation = ?, energie = ?, annee = ?, immatriculation = ?, photo_filename = ?
         WHERE id = ?
         """,
-        (nom, marque, modele, motorisation, energie, immatriculation, photo_filename, vehicle_id),
+        (nom, marque, modele, motorisation, energie, annee, immatriculation, photo_filename, vehicle_id),
     )
     conn.commit()
     conn.close()
@@ -296,14 +364,20 @@ def delete_vehicle(vehicle_id: int):
     conn = connect()
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM pleins WHERE vehicule_id = ?", (vehicle_id,))
-    n = int(cur.fetchone()[0] or 0)
-    if n > 0:
+    n1 = int(cur.fetchone()[0] or 0)
+    cur.execute("SELECT COUNT(*) FROM entretien WHERE vehicule_id = ?", (vehicle_id,))
+    n2 = int(cur.fetchone()[0] or 0)
+    if n1 > 0 or n2 > 0:
         conn.close()
-        raise ValueError(f"Suppression impossible : {n} plein(s) référencent ce véhicule.")
+        raise ValueError(f"Suppression impossible : {n1} plein(s) et {n2} entretien(s) référencent ce véhicule.")
     cur.execute("DELETE FROM vehicules WHERE id = ?", (vehicle_id,))
     conn.commit()
     conn.close()
 
+
+# -----------------------------
+# DB: pleins
+# -----------------------------
 
 def last_km(vehicle_id: int, exclude_id=None):
     conn = connect()
@@ -325,7 +399,7 @@ def list_pleins(vehicle_id: int):
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire
+        SELECT id, date, kilometrage, litres, prix_litre, total, lieu
         FROM pleins
         WHERE vehicule_id = ?
         ORDER BY date DESC, kilometrage DESC, id DESC
@@ -337,31 +411,48 @@ def list_pleins(vehicle_id: int):
     return rows
 
 
-def add_plein(vehicle_id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire):
+def list_pleins_km_asc(vehicle_id: int):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, date, kilometrage, litres
+        FROM pleins
+        WHERE vehicule_id = ?
+        ORDER BY kilometrage ASC, date ASC, id ASC
+        """,
+        (vehicle_id,),
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def add_plein(vehicle_id, date, kilometrage, litres, prix_litre, total, lieu):
     conn = connect()
     cur = conn.cursor()
     cur.execute(
         """
         INSERT INTO pleins (vehicule_id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL)
         """,
-        (vehicle_id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire),
+        (vehicle_id, date, kilometrage, litres, prix_litre, total, lieu),
     )
     conn.commit()
     conn.close()
 
 
-def update_plein(plein_id, vehicle_id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire):
+def update_plein(plein_id, vehicle_id, date, kilometrage, litres, prix_litre, total, lieu):
     conn = connect()
     cur = conn.cursor()
     cur.execute(
         """
         UPDATE pleins
-        SET vehicule_id = ?, date = ?, kilometrage = ?, litres = ?, prix_litre = ?, total = ?,
-            lieu = ?, type_usage = ?, commentaire = ?
+        SET vehicule_id = ?, date = ?, kilometrage = ?, litres = ?, prix_litre = ?, total = ?, lieu = ?,
+            type_usage = NULL, commentaire = NULL
         WHERE id = ?
         """,
-        (vehicle_id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire, plein_id),
+        (vehicle_id, date, kilometrage, litres, prix_litre, total, lieu, plein_id),
     )
     conn.commit()
     conn.close()
@@ -375,13 +466,95 @@ def delete_plein(plein_id):
     conn.close()
 
 
+# -----------------------------
+# DB: entretien
+# -----------------------------
+
+def list_entretien(vehicle_id: int):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, date, intervention, precision, entretien_item, effectue_par, cout
+        FROM entretien
+        WHERE vehicule_id = ?
+        ORDER BY date DESC, id DESC
+        """,
+        (vehicle_id,),
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def add_entretien(vehicle_id: int, date: str, intervention: str, precision: str | None, entretien_item: str | None, effectue_par: str | None, cout: float | None):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO entretien (vehicule_id, date, intervention, precision, entretien_item, effectue_par, cout)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (vehicle_id, date, intervention, precision, entretien_item, effectue_par, cout),
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_entretien(entretien_id: int, vehicle_id: int, date: str, intervention: str, precision: str | None, entretien_item: str | None, effectue_par: str | None, cout: float | None):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE entretien
+        SET vehicule_id = ?, date = ?, intervention = ?, precision = ?, entretien_item = ?, effectue_par = ?, cout = ?
+        WHERE id = ?
+        """,
+        (vehicle_id, date, intervention, precision, entretien_item, effectue_par, cout, entretien_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_entretien(entretien_id: int):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM entretien WHERE id = ?", (entretien_id,))
+    conn.commit()
+    conn.close()
+
+
+def list_entretien_items():
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("SELECT nom FROM entretien_items ORDER BY nom COLLATE NOCASE ASC")
+    rows = [r[0] for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def add_entretien_item(nom: str):
+    nom = (nom or "").strip()
+    if not nom:
+        return
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("INSERT OR IGNORE INTO entretien_items (nom) VALUES (?)", (nom,))
+    conn.commit()
+    conn.close()
+
+
+# -----------------------------
+# DB: lieux
+# -----------------------------
+
 def list_lieux():
     conn = connect()
     cur = conn.cursor()
     cur.execute("SELECT nom FROM lieux ORDER BY nom COLLATE NOCASE ASC")
-    rows = cur.fetchall()
+    rows = [r[0] for r in cur.fetchall()]
     conn.close()
-    return [r[0] for r in rows]
+    return rows
 
 
 def add_lieu(nom: str):
@@ -436,6 +609,39 @@ def rename_lieu(ancien: str, nouveau: str):
         conn.close()
 
 
+# -----------------------------
+# Calculs
+# -----------------------------
+
+def compute_avg_consumption_l_100_robust(vehicle_id: int, threshold_km: int = MISSED_FILL_KM_THRESHOLD) -> float | None:
+    rows = list_pleins_km_asc(vehicle_id)
+    if len(rows) < 2:
+        return None
+
+    km_valid = 0
+    litres_valid = 0.0
+
+    for i in range(1, len(rows)):
+        km_prev = int(rows[i - 1][2])
+        km_cur = int(rows[i][2])
+        delta = km_cur - km_prev
+        if delta <= 0:
+            continue
+        if delta > threshold_km:
+            continue
+        litres_i = float(rows[i][3])
+        km_valid += delta
+        litres_valid += litres_i
+
+    if km_valid <= 0:
+        return None
+    return (litres_valid / km_valid) * 100.0
+
+
+# -----------------------------
+# UI
+# -----------------------------
+
 class GarageApp(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -446,20 +652,24 @@ class GarageApp(tk.Tk):
 
         self.vehicle_id_active: int | None = None
         self.plein_edit_id: int | None = None
+        self.entretien_edit_id: int | None = None
 
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill=tk.BOTH, expand=True)
 
         self.tab_pleins = ttk.Frame(self.notebook)
+        self.tab_entretien = ttk.Frame(self.notebook)
         self.tab_lieux = ttk.Frame(self.notebook)
         self.tab_vehicules = ttk.Frame(self.notebook)
 
         self.notebook.add(self.tab_pleins, text="Pleins")
+        self.notebook.add(self.tab_entretien, text="Entretien")
         self.notebook.add(self.tab_lieux, text="Lieux")
         self.notebook.add(self.tab_vehicules, text="Véhicules")
 
         self._create_menu()
         self._build_pleins_tab()
+        self._build_entretien_tab()
         self._build_lieux_tab()
         self._build_vehicules_tab()
 
@@ -477,13 +687,13 @@ class GarageApp(tk.Tk):
         messagebox.showinfo(
             "À propos",
             f"{APP_NAME} v{APP_VERSION}\n\n"
-            "Suivi des pleins multi-véhicules + gestion des lieux.\n\n"
+            "Suivi des pleins + entretien multi-véhicules + gestion des lieux.\n\n"
             f"Base: {DB_FILE}\n"
             f"Photos: {VEHICLES_DIR}\n"
             f"Pillow: {'OK' if PIL_AVAILABLE else 'non détecté'}",
         )
 
-    # ---- Pleins ----
+    # ------------------- Pleins -------------------
 
     def _build_pleins_tab(self):
         top = tk.Frame(self.tab_pleins)
@@ -500,8 +710,7 @@ class GarageApp(tk.Tk):
         self.canvas_photo = tk.Canvas(left, width=220, height=150, highlightthickness=1)
         self.canvas_photo.pack(pady=6)
 
-        # KM centered + bigger
-        self.lbl_km = tk.Label(left, text="— km", font=("Arial", 14, "bold"))
+        self.lbl_km = tk.Label(left, text="— km", font=("Arial", 18, "bold"), anchor="center")
         self.lbl_km.pack(fill=tk.X)
 
         center = tk.Frame(top)
@@ -516,24 +725,36 @@ class GarageApp(tk.Tk):
         right.pack(side=tk.RIGHT, padx=20)
 
         tk.Label(right, text="Infos véhicule").pack(anchor="w")
-        self.vehicle_info_text = tk.Text(right, width=36, height=8, wrap="word")
-        self.vehicle_info_text.pack()
-        self.vehicle_info_text.configure(state="disabled")
+        self.info_lines_frame = tk.Frame(right)
+        self.info_lines_frame.pack(anchor="w", fill=tk.X)
+
+        self.lbl_info_marque = ttk.Label(self.info_lines_frame, text="")
+        self.lbl_info_modele = ttk.Label(self.info_lines_frame, text="")
+        self.lbl_info_motorisation = ttk.Label(self.info_lines_frame, text="")
+        self.lbl_info_energie = ttk.Label(self.info_lines_frame, text="")
+        self.lbl_info_annee = ttk.Label(self.info_lines_frame, text="")
+        self.lbl_info_immat = ttk.Label(self.info_lines_frame, text="")
+        self.lbl_info_conso = ttk.Label(self.info_lines_frame, text="")
+
+        for w in [
+            self.lbl_info_marque, self.lbl_info_modele, self.lbl_info_motorisation, self.lbl_info_energie,
+            self.lbl_info_annee, self.lbl_info_immat, self.lbl_info_conso
+        ]:
+            w.pack(anchor="w")
 
         mid = tk.Frame(self.tab_pleins)
         mid.pack(fill=tk.BOTH, expand=True, padx=10)
 
-        columns = ("id", "date", "km", "litres", "prix", "total", "lieu", "type_usage", "commentaire")
+        columns = ("id", "date", "km", "litres", "prix", "total", "lieu")
         self.tree = ttk.Treeview(mid, columns=columns, show="headings")
 
-        widths = {"id": 50, "date": 90, "km": 80, "litres": 120, "prix": 90, "total": 90,
-                  "lieu": 140, "type_usage": 160, "commentaire": 360}
+        widths = {"id": 55, "date": 90, "km": 90, "litres": 120, "prix": 90, "total": 90, "lieu": 200}
         headings = {"id": "ID", "date": "Date", "km": "Km", "litres": "Nbre de Litres", "prix": "€ / Litre",
-                    "total": "Total (€)", "lieu": "Lieu", "type_usage": "Type de Trajets", "commentaire": "Commentaire"}
+                    "total": "Total (€)", "lieu": "Lieu"}
 
         for col in columns:
             self.tree.heading(col, text=headings[col])
-            self.tree.column(col, width=widths[col], stretch=(col == "commentaire"))
+            self.tree.column(col, width=widths[col], stretch=(col == "lieu"))
 
         self.tree.pack(fill=tk.BOTH, expand=True)
 
@@ -548,179 +769,212 @@ class GarageApp(tk.Tk):
             ("Km", "km", 10),
             ("Nbre de Litres", "litres", 12),
             ("€ / Litre", "prix", 12),
-            ("Lieu", "lieu", 18),
-            ("Type de Trajets", "type_usage", 18),
-            ("Commentaire", "commentaire", 26),
+            ("Lieu", "lieu", 22),
         ]
 
         for i, (label, key, width) in enumerate(fields):
-            tk.Label(form, text=label, font=("Arial", 12, "bold") if key == "prix" else None).grid(row=0, column=i, padx=3)
+            tk.Label(form, text=label, font=("Arial", 12, "bold") if key == "prix" else None).grid(row=0, column=i, padx=4)
             if key == "lieu":
                 cb = ttk.Combobox(form, state="readonly", width=width)
-                cb.grid(row=1, column=i, padx=3)
-                self.plein_entries[key] = cb
-            elif key == "type_usage":
-                cb = ttk.Combobox(form, state="readonly", width=width, values=["Trajets Quotidiens", "Longs Trajets"])
-                cb.grid(row=1, column=i, padx=3)
+                cb.grid(row=1, column=i, padx=4)
                 self.plein_entries[key] = cb
             else:
                 e = tk.Entry(form, width=width)
-                e.grid(row=1, column=i, padx=3)
+                e.grid(row=1, column=i, padx=4)
                 self.plein_entries[key] = e
 
         self._refresh_lieux_combo()
 
-    def _restore_active_vehicle(self):
-        vehicles = list_vehicles()
-        if not vehicles:
-            conn = connect()
-            ensure_vehicle(conn, nom="Véhicule 1")
-            conn.close()
-            vehicles = list_vehicles()
+    def _import_csv(self):
+        messagebox.showinfo("Importer CSV", "Fonction à venir.")
 
-        saved = get_config("active_vehicle_id")
-        saved_id = int(saved) if saved and saved.isdigit() else None
-        existing_ids = {int(v[0]) for v in vehicles}
+    # ------------------- Entretien -------------------
 
-        if saved_id in existing_ids:
-            self.vehicle_id_active = saved_id
-        else:
-            self.vehicle_id_active = int(vehicles[0][0])
+    def _build_entretien_tab(self):
+        top = tk.Frame(self.tab_entretien)
+        top.pack(fill=tk.X, pady=10, padx=10)
 
-        self._refresh_vehicle_selector()
-        self._apply_active_vehicle_to_ui()
+        left = tk.Frame(top)
+        left.pack(side=tk.LEFT, padx=10)
 
-    def _refresh_vehicle_selector(self):
-        vehicles = list_vehicles()
-        display = [row[1] for row in vehicles]  # nom seulement
-        self._vehicle_name_to_id = {row[1]: int(row[0]) for row in vehicles}
-        self.cb_vehicle["values"] = display
+        tk.Label(left, text="Véhicule").pack(anchor="w")
+        self.cb_vehicle_ent = ttk.Combobox(left, state="readonly", width=26)
+        self.cb_vehicle_ent.pack(anchor="w")
+        self.cb_vehicle_ent.bind("<<ComboboxSelected>>", self._on_vehicle_selected_from_combo_entretien)
 
-        current_name = None
-        for name, vid in self._vehicle_name_to_id.items():
-            if vid == self.vehicle_id_active:
-                current_name = name
-                break
-        if current_name is None and display:
-            current_name = display[0]
-            self.vehicle_id_active = self._vehicle_name_to_id[current_name]
-        if current_name:
-            self.cb_vehicle.set(current_name)
+        btns = tk.Frame(top)
+        btns.pack(side=tk.LEFT, padx=30)
+        tk.Button(btns, text="Ajouter / Enregistrer", command=self._on_save_entretien, width=24).pack(pady=4)
+        tk.Button(btns, text="Modifier sélection", command=self._on_load_selected_entretien, width=24).pack(pady=4)
+        tk.Button(btns, text="Supprimer sélection", command=self._on_delete_selected_entretien, width=24).pack(pady=4)
 
-    def _on_vehicle_selected_from_combo(self, _evt=None):
-        name = self.cb_vehicle.get()
-        vid = self._vehicle_name_to_id.get(name)
-        if vid is None:
+        mid = tk.Frame(self.tab_entretien)
+        mid.pack(fill=tk.BOTH, expand=True, padx=10)
+
+        cols = ("id", "date", "intervention", "detail", "effectue_par", "cout")
+        self.tree_ent = ttk.Treeview(mid, columns=cols, show="headings")
+        widths = {"id": 55, "date": 90, "intervention": 110, "detail": 380, "effectue_par": 220, "cout": 90}
+        heads = {"id": "ID", "date": "Date", "intervention": "Intervention", "detail": "Détail", "effectue_par": "Effectué par", "cout": "€"}
+
+        for c in cols:
+            self.tree_ent.heading(c, text=heads[c])
+            self.tree_ent.column(c, width=widths[c], stretch=(c in ("detail", "effectue_par")))
+
+        self.tree_ent.pack(fill=tk.BOTH, expand=True)
+
+        form = tk.Frame(self.tab_entretien)
+        form.pack(fill=tk.X, padx=10, pady=10)
+
+        self.ent_entries = {}
+
+        for i, (lab, key, w) in enumerate([("Jour", "jour", 6), ("Mois", "mois", 6), ("Année", "annee", 6)]):
+            tk.Label(form, text=lab).grid(row=0, column=i, padx=4)
+            e = tk.Entry(form, width=w)
+            e.grid(row=1, column=i, padx=4)
+            self.ent_entries[key] = e
+
+        tk.Label(form, text="Intervention").grid(row=0, column=3, padx=4)
+        cb_int = ttk.Combobox(form, state="readonly", width=14, values=["Réparation", "Entretien"])
+        cb_int.grid(row=1, column=3, padx=4)
+        cb_int.bind("<<ComboboxSelected>>", self._on_ent_intervention_changed)
+        self.ent_entries["intervention"] = cb_int
+
+        tk.Label(form, text="Préciser").grid(row=0, column=4, padx=4)
+        e_prec = tk.Entry(form, width=24)
+        e_prec.grid(row=1, column=4, padx=4)
+        self.ent_entries["precision"] = e_prec
+
+        tk.Label(form, text="Entretien").grid(row=0, column=5, padx=4)
+        cb_item = ttk.Combobox(form, state="readonly", width=20)
+        cb_item.grid(row=1, column=5, padx=4)
+        self.ent_entries["entretien_item"] = cb_item
+        tk.Button(form, text="Ajouter…", command=self._add_entretien_item_dialog).grid(row=1, column=6, padx=4)
+
+        tk.Label(form, text="Effectué par").grid(row=0, column=7, padx=4)
+        e_par = tk.Entry(form, width=22)
+        e_par.grid(row=1, column=7, padx=4)
+        self.ent_entries["effectue_par"] = e_par
+
+        tk.Label(form, text="€").grid(row=0, column=8, padx=4)
+        e_eur = tk.Entry(form, width=10)
+        e_eur.grid(row=1, column=8, padx=4)
+        self.ent_entries["cout"] = e_eur
+
+        self._refresh_entretien_items_combo()
+        self._set_entretien_mode("Réparation")
+
+    def _refresh_entretien_items_combo(self):
+        items = list_entretien_items()
+        cb: ttk.Combobox = self.ent_entries["entretien_item"]
+        cur = cb.get()
+        cb["values"] = items
+        cb.set(cur if cur in items else (items[0] if items else ""))
+
+    def _add_entretien_item_dialog(self):
+        nom = simpledialog.askstring("Ajouter un entretien", "Nom (ex: vidange, pneus...) :")
+        if not nom:
             return
-        self.vehicle_id_active = vid
-        set_config("active_vehicle_id", str(vid))
-        self.plein_edit_id = None
-        self._clear_plein_form()
-        self._apply_active_vehicle_to_ui()
+        add_entretien_item(nom)
+        self._refresh_entretien_items_combo()
 
-    def _apply_active_vehicle_to_ui(self):
-        self._refresh_vehicle_photo_and_info()
-        self._refresh_pleins()
-        self._refresh_km_label()
+    def _on_ent_intervention_changed(self, _evt=None):
+        mode = self.ent_entries["intervention"].get() or "Réparation"
+        self._set_entretien_mode(mode)
 
-    def _refresh_vehicle_photo_and_info(self):
-        v = get_vehicle(self.vehicle_id_active) if self.vehicle_id_active else None
-        if not v:
-            return
-        _, nom, marque, modele, motorisation, energie, immat, photo = v
+    def _set_entretien_mode(self, mode: str):
+        mode = (mode or "").strip()
+        if mode not in ("Réparation", "Entretien"):
+            mode = "Réparation"
+        self.ent_entries["intervention"].set(mode)
 
-        self.canvas_photo.delete("all")
-        tk_img, _err = load_photo_or_placeholder(photo, size=(220, 150), label=nom)
-        self._tk_vehicle_photo = tk_img
-        if tk_img is not None:
-            self.canvas_photo.create_image(0, 0, anchor="nw", image=tk_img)
+        e_prec: tk.Entry = self.ent_entries["precision"]
+        cb_item: ttk.Combobox = self.ent_entries["entretien_item"]
+
+        if mode == "Réparation":
+            e_prec.configure(state="normal")
+            cb_item.configure(state="disabled")
         else:
-            self.canvas_photo.create_rectangle(0, 0, 220, 150, fill="#c8c8c8", outline="#999999")
-            self.canvas_photo.create_text(110, 75, text=f"{nom}\nPhoto introuvable", justify="center")
+            e_prec.configure(state="disabled")
+            cb_item.configure(state="readonly")
 
-        lines = []
-        if marque: lines.append(f"Marque : {marque}")
-        if modele: lines.append(f"Modèle : {modele}")
-        if motorisation: lines.append(f"Motorisation : {motorisation}")
-        if energie: lines.append(f"Énergie : {energie}")
-        if immat: lines.append(f"Immatriculation : {immat}")
-
-        self.vehicle_info_text.configure(state="normal")
-        self.vehicle_info_text.delete("1.0", "end")
-        self.vehicle_info_text.insert("1.0", "\n".join(lines) if lines else "(aucune info renseignée)")
-        self.vehicle_info_text.configure(state="disabled")
-
-    def _refresh_km_label(self):
-        km = last_km(self.vehicle_id_active) if self.vehicle_id_active else None
-        self.lbl_km.config(text=f"{km if km is not None else '—'} km")
-
-    def _refresh_pleins(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+    def _refresh_entretien(self):
+        for item in self.tree_ent.get_children():
+            self.tree_ent.delete(item)
         if not self.vehicle_id_active:
             return
-        rows = list_pleins(self.vehicle_id_active)
-        for (pid, date_iso, km, litres, prix, total, lieu, type_usage, commentaire) in rows:
+
+        rows = list_entretien(self.vehicle_id_active)
+        for (eid, date_iso, intervention, precision, entretien_item, effectue_par, cout) in rows:
             try:
                 an, mois, jour = date_iso.split("-")
                 date_aff = f"{jour}/{mois}/{an[2:]}"
             except Exception:
                 date_aff = date_iso
-            self.tree.insert("", "end", values=(pid, date_aff, km, f"{litres:.2f}", f"{prix:.3f}", f"{total:.2f}",
-                                                lieu or "", type_usage or "", commentaire or ""))
+            detail = precision if intervention == "Réparation" else (entretien_item or "")
+            cout_str = "" if cout is None else f"{float(cout):.2f}"
+            self.tree_ent.insert("", "end", values=(eid, date_aff, intervention, detail, effectue_par or "", cout_str))
 
-    def _clear_plein_form(self):
-        for w in self.plein_entries.values():
-            if isinstance(w, ttk.Combobox):
-                w.set("")
-            else:
-                w.delete(0, tk.END)
+    def _clear_entretien_form(self):
+        for k in ("jour", "mois", "annee", "precision", "effectue_par", "cout"):
+            self.ent_entries[k].delete(0, tk.END)
+        self.ent_entries["intervention"].set("Réparation")
+        self._set_entretien_mode("Réparation")
+        self._refresh_entretien_items_combo()
 
-    def _on_save_plein(self):
+    def _on_save_entretien(self):
         if not self.vehicle_id_active:
             messagebox.showwarning("Véhicule", "Aucun véhicule sélectionné.")
             return
         try:
-            j = int((self.plein_entries["jour"].get() or "0").strip())
-            m = int((self.plein_entries["mois"].get() or "0").strip())
-            a = int((self.plein_entries["annee"].get() or "0").strip())
+            j = int((self.ent_entries["jour"].get() or "0").strip())
+            m = int((self.ent_entries["mois"].get() or "0").strip())
+            a = int((self.ent_entries["annee"].get() or "0").strip())
             if not (1 <= j <= 31 and 1 <= m <= 12 and 0 <= a <= 99):
                 raise ValueError("Date invalide : Jour 1-31, Mois 1-12, Année sur 2 chiffres.")
             date_iso = f"20{a:02d}-{m:02d}-{j:02d}"
 
-            km = int(self.plein_entries["km"].get())
-            last = last_km(self.vehicle_id_active, exclude_id=self.plein_edit_id)
-            if last is not None and km < last:
-                raise ValueError(f"Kilométrage incohérent : {km} km < dernier relevé ({last} km).")
+            intervention = (self.ent_entries["intervention"].get() or "").strip()
+            if intervention not in ("Réparation", "Entretien"):
+                raise ValueError("Intervention invalide.")
 
-            litres = float(self.plein_entries["litres"].get().replace(",", "."))
-            prix = float(self.plein_entries["prix"].get().replace(",", "."))
-            total = litres * prix
-
-            lieu = (self.plein_entries["lieu"].get() or "").strip()
-            type_usage = (self.plein_entries["type_usage"].get() or "").strip()
-            commentaire = (self.plein_entries["commentaire"].get() or "").strip()
-
-            if self.plein_edit_id is None:
-                add_plein(self.vehicle_id_active, date_iso, km, litres, prix, total, lieu, type_usage, commentaire)
+            precision = None
+            entretien_item = None
+            if intervention == "Réparation":
+                precision = (self.ent_entries["precision"].get() or "").strip()
+                if not precision:
+                    raise ValueError("Pour une réparation, précise ce qui a été réparé.")
             else:
-                update_plein(self.plein_edit_id, self.vehicle_id_active, date_iso, km, litres, prix, total, lieu, type_usage, commentaire)
-                self.plein_edit_id = None
+                entretien_item = (self.ent_entries["entretien_item"].get() or "").strip()
+                if not entretien_item:
+                    raise ValueError("Pour un entretien, sélectionne un élément dans la liste.")
+                add_entretien_item(entretien_item)
 
-            self._refresh_pleins()
-            self._refresh_km_label()
-            self._clear_plein_form()
+            effectue_par = (self.ent_entries["effectue_par"].get() or "").strip() or None
+
+            cout_txt = (self.ent_entries["cout"].get() or "").strip()
+            cout = None
+            if cout_txt:
+                cout = float(cout_txt.replace(",", "."))
+
+            if self.entretien_edit_id is None:
+                add_entretien(self.vehicle_id_active, date_iso, intervention, precision, entretien_item, effectue_par, cout)
+            else:
+                update_entretien(self.entretien_edit_id, self.vehicle_id_active, date_iso, intervention, precision, entretien_item, effectue_par, cout)
+                self.entretien_edit_id = None
+
+            self._refresh_entretien()
+            self._clear_entretien_form()
 
         except Exception as e:
             messagebox.showerror("Erreur", str(e))
 
-    def _on_load_selected_plein(self):
-        sel = self.tree.selection()
+    def _on_load_selected_entretien(self):
+        sel = self.tree_ent.selection()
         if not sel:
-            messagebox.showwarning("Sélection", "Sélectionne un plein à modifier.")
+            messagebox.showwarning("Sélection", "Sélectionne une ligne à modifier.")
             return
-        values = self.tree.item(sel, "values")
-        self.plein_edit_id = int(values[0])
+        values = self.tree_ent.item(sel, "values")
+        self.entretien_edit_id = int(values[0])
 
         date_val = str(values[1])
         try:
@@ -733,34 +987,41 @@ class GarageApp(tk.Tk):
             messagebox.showerror("Erreur", f"Format de date invalide : {date_val}")
             return
 
-        self._clear_plein_form()
-        self.plein_entries["jour"].insert(0, jour)
-        self.plein_entries["mois"].insert(0, mois)
-        self.plein_entries["annee"].insert(0, an)
-        self.plein_entries["km"].insert(0, values[2])
-        self.plein_entries["litres"].insert(0, values[3])
-        self.plein_entries["prix"].insert(0, values[4])
-        self.plein_entries["lieu"].set(values[6])
-        self.plein_entries["type_usage"].set(values[7])
-        self.plein_entries["commentaire"].insert(0, values[8])
+        self._clear_entretien_form()
+        self.ent_entries["jour"].insert(0, jour)
+        self.ent_entries["mois"].insert(0, mois)
+        self.ent_entries["annee"].insert(0, an)
 
-    def _on_delete_selected_plein(self):
-        sel = self.tree.selection()
+        intervention = str(values[2])
+        detail = str(values[3])
+
+        self.ent_entries["intervention"].set(intervention)
+        self._set_entretien_mode(intervention)
+
+        if intervention == "Réparation":
+            self.ent_entries["precision"].configure(state="normal")
+            self.ent_entries["precision"].insert(0, detail)
+        else:
+            self._refresh_entretien_items_combo()
+            self.ent_entries["entretien_item"].set(detail)
+
+        self.ent_entries["effectue_par"].insert(0, str(values[4]))
+        if str(values[5]).strip():
+            self.ent_entries["cout"].insert(0, str(values[5]))
+
+    def _on_delete_selected_entretien(self):
+        sel = self.tree_ent.selection()
         if not sel:
             return
-        pid = int(self.tree.item(sel, "values")[0])
-        if not messagebox.askyesno("Confirmation", f"Supprimer le plein ID {pid} ?"):
+        eid = int(self.tree_ent.item(sel, "values")[0])
+        if not messagebox.askyesno("Confirmation", f"Supprimer l'entretien ID {eid} ?"):
             return
-        delete_plein(pid)
-        self.plein_edit_id = None
-        self._refresh_pleins()
-        self._refresh_km_label()
-        self._clear_plein_form()
+        delete_entretien(eid)
+        self.entretien_edit_id = None
+        self._refresh_entretien()
+        self._clear_entretien_form()
 
-    def _import_csv(self):
-        messagebox.showinfo("Importer CSV", "Fonction à venir (v2+).")
-
-    # ---- Lieux ----
+    # ------------------- Lieux -------------------
 
     def _build_lieux_tab(self):
         container = tk.Frame(self.tab_lieux)
@@ -786,16 +1047,17 @@ class GarageApp(tk.Tk):
     def _refresh_lieux_combo(self):
         lieux = list_lieux()
         cb: ttk.Combobox = self.plein_entries["lieu"]
-        current = cb.get()
+        cur = cb.get()
         cb["values"] = lieux
-        cb.set(current if current in lieux else "")
+        cb.set(cur if cur in lieux else "")
 
     def _refresh_lieux_ui(self):
         lieux = list_lieux()
         self.listbox_lieux.delete(0, tk.END)
         for nom in lieux:
             self.listbox_lieux.insert(tk.END, nom)
-        self._refresh_lieux_combo()
+        if hasattr(self, "plein_entries"):
+            self._refresh_lieux_combo()
 
     def _on_add_lieu(self):
         nom = simpledialog.askstring("Ajouter un lieu", "Nom du lieu :")
@@ -841,7 +1103,7 @@ class GarageApp(tk.Tk):
             return
         self._refresh_lieux_ui()
 
-    # ---- Véhicules ----
+    # ------------------- Véhicules -------------------
 
     def _build_vehicules_tab(self):
         container = tk.Frame(self.tab_vehicules)
@@ -854,8 +1116,8 @@ class GarageApp(tk.Tk):
         right.pack(side=tk.LEFT, fill=tk.Y, padx=30)
 
         tk.Label(left, text=f"Véhicules (max {MAX_VEHICLES}) :").pack(anchor="w")
-        self.tree_vehicles = ttk.Treeview(left, columns=("id", "nom", "marque", "modele", "energie"), show="headings")
-        for c, w in [("id", 50), ("nom", 160), ("marque", 140), ("modele", 140), ("energie", 120)]:
+        self.tree_vehicles = ttk.Treeview(left, columns=("id", "nom", "marque", "modele", "annee", "energie"), show="headings")
+        for c, w in [("id", 50), ("nom", 150), ("marque", 130), ("modele", 130), ("annee", 70), ("energie", 110)]:
             self.tree_vehicles.heading(c, text=c.upper())
             self.tree_vehicles.column(c, width=w, stretch=(c == "nom"))
         self.tree_vehicles.pack(fill=tk.BOTH, expand=True, pady=6)
@@ -876,12 +1138,13 @@ class GarageApp(tk.Tk):
         add_field("Modèle", "modele", 2)
         add_field("Motorisation", "motorisation", 3)
         add_field("Énergie", "energie", 4)
-        add_field("Immatriculation", "immat", 5)
+        add_field("Année", "annee", 5)
+        add_field("Immatriculation", "immat", 6)
 
-        tk.Label(form, text="Photo").grid(row=6, column=0, sticky="w", pady=3)
+        tk.Label(form, text="Photo").grid(row=7, column=0, sticky="w", pady=3)
         self.lbl_photo = tk.Label(form, text="(aucune)")
-        self.lbl_photo.grid(row=6, column=1, sticky="w", pady=3)
-        tk.Button(form, text="Choisir…", command=self._pick_vehicle_photo).grid(row=7, column=1, sticky="w", pady=3)
+        self.lbl_photo.grid(row=7, column=1, sticky="w", pady=3)
+        tk.Button(form, text="Choisir…", command=self._pick_vehicle_photo).grid(row=8, column=1, sticky="w", pady=3)
 
         self.canvas_vehicle_preview = tk.Canvas(right, width=240, height=160, highlightthickness=1)
         self.canvas_vehicle_preview.pack(pady=10)
@@ -899,18 +1162,231 @@ class GarageApp(tk.Tk):
         self._vehicle_selected_photo_filename: str | None = None
         self._clear_vehicle_form()
 
+    # --- Véhicule: sélection/activité ---
+
+    def _restore_active_vehicle(self):
+        vehicles = list_vehicles()
+        if not vehicles:
+            conn = connect()
+            ensure_vehicle(conn, nom="Véhicule 1")
+            conn.close()
+            vehicles = list_vehicles()
+
+        saved = get_config("active_vehicle_id")
+        saved_id = int(saved) if saved and saved.isdigit() else None
+        existing_ids = {int(v[0]) for v in vehicles}
+
+        if saved_id in existing_ids:
+            self.vehicle_id_active = saved_id
+        else:
+            self.vehicle_id_active = int(vehicles[0][0])
+
+        self._refresh_vehicle_selectors()
+        self._apply_active_vehicle_to_ui()
+
+    def _refresh_vehicle_selectors(self):
+        vehicles = list_vehicles()
+        display = [row[1] for row in vehicles]
+        self._vehicle_name_to_id = {row[1]: int(row[0]) for row in vehicles}
+
+        self.cb_vehicle["values"] = display
+        self.cb_vehicle_ent["values"] = display
+
+        current_name = None
+        for name, vid in self._vehicle_name_to_id.items():
+            if vid == self.vehicle_id_active:
+                current_name = name
+                break
+        if current_name is None and display:
+            current_name = display[0]
+            self.vehicle_id_active = self._vehicle_name_to_id[current_name]
+
+        if current_name:
+            self.cb_vehicle.set(current_name)
+            self.cb_vehicle_ent.set(current_name)
+
+    def _on_vehicle_selected_from_combo(self, _evt=None):
+        name = self.cb_vehicle.get()
+        vid = self._vehicle_name_to_id.get(name)
+        if vid is None:
+            return
+        self._set_active_vehicle(vid)
+
+    def _on_vehicle_selected_from_combo_entretien(self, _evt=None):
+        name = self.cb_vehicle_ent.get()
+        vid = self._vehicle_name_to_id.get(name)
+        if vid is None:
+            return
+        self._set_active_vehicle(vid)
+
+    def _set_active_vehicle(self, vid: int):
+        self.vehicle_id_active = int(vid)
+        set_config("active_vehicle_id", str(self.vehicle_id_active))
+
+        self.plein_edit_id = None
+        self.entretien_edit_id = None
+
+        self._clear_plein_form()
+        self._clear_entretien_form()
+
+        self._refresh_vehicle_selectors()
+        self._apply_active_vehicle_to_ui()
+
+    def _apply_active_vehicle_to_ui(self):
+        self._refresh_vehicle_photo_and_info()
+        self._refresh_pleins()
+        self._refresh_km_label()
+        self._refresh_entretien()
+
+    # --- Véhicule: photo + infos ---
+
+    def _refresh_vehicle_photo_and_info(self):
+        v = get_vehicle(self.vehicle_id_active) if self.vehicle_id_active else None
+        if not v:
+            return
+        _, nom, marque, modele, motorisation, energie, annee, immat, photo = v
+
+        self.canvas_photo.delete("all")
+        tk_img, _err = load_photo_or_placeholder(photo, size=(220, 150), label=nom)
+        self._tk_vehicle_photo = tk_img
+        if tk_img is not None:
+            self.canvas_photo.create_image(0, 0, anchor="nw", image=tk_img)
+        else:
+            self.canvas_photo.create_rectangle(0, 0, 220, 150, fill="#c8c8c8", outline="#999999")
+            self.canvas_photo.create_text(110, 75, text=f"{nom}\nPhoto introuvable", justify="center")
+
+        self.lbl_info_marque.config(text=f"Marque : {marque}" if marque else "")
+        self.lbl_info_modele.config(text=f"Modèle : {modele}" if modele else "")
+        self.lbl_info_motorisation.config(text=f"Motorisation : {motorisation}" if motorisation else "")
+        self.lbl_info_energie.config(text=f"Énergie : {energie}" if energie else "")
+        self.lbl_info_annee.config(text=f"Année : {annee}" if annee else "")
+        self.lbl_info_immat.config(text=f"Immatriculation : {immat}" if immat else "")
+
+        conso = compute_avg_consumption_l_100_robust(self.vehicle_id_active)
+        self.lbl_info_conso.config(text=f"Conso moyenne : {conso:.2f} L/100" if conso is not None else "Conso moyenne : —")
+
+    def _refresh_km_label(self):
+        km = last_km(self.vehicle_id_active) if self.vehicle_id_active else None
+        self.lbl_km.config(text=f"{km if km is not None else '—'} km")
+
+    # --- Pleins CRUD ---
+
+    def _refresh_pleins(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        if not self.vehicle_id_active:
+            return
+        rows = list_pleins(self.vehicle_id_active)
+        for (pid, date_iso, km, litres, prix, total, lieu) in rows:
+            try:
+                an, mois, jour = date_iso.split("-")
+                date_aff = f"{jour}/{mois}/{an[2:]}"
+            except Exception:
+                date_aff = date_iso
+            self.tree.insert("", "end", values=(pid, date_aff, km, f"{litres:.2f}", f"{prix:.3f}", f"{total:.2f}", lieu or ""))
+
+    def _clear_plein_form(self):
+        if not hasattr(self, "plein_entries"):
+            return
+        for w in self.plein_entries.values():
+            if isinstance(w, ttk.Combobox):
+                w.set("")
+            else:
+                w.delete(0, tk.END)
+
+    def _on_save_plein(self):
+        if not self.vehicle_id_active:
+            messagebox.showwarning("Véhicule", "Aucun véhicule sélectionné.")
+            return
+        try:
+            j = int((self.plein_entries["jour"].get() or "0").strip())
+            m = int((self.plein_entries["mois"].get() or "0").strip())
+            a = int((self.plein_entries["annee"].get() or "0").strip())
+            if not (1 <= j <= 31 and 1 <= m <= 12 and 0 <= a <= 99):
+                raise ValueError("Date invalide : Jour 1-31, Mois 1-12, Année sur 2 chiffres.")
+            date_iso = f"20{a:02d}-{m:02d}-{j:02d}"
+
+            km = int(self.plein_entries["km"].get())
+            last = last_km(self.vehicle_id_active, exclude_id=self.plein_edit_id)
+            if last is not None and km < last:
+                raise ValueError(f"Kilométrage incohérent : {km} km < dernier relevé ({last} km).")
+
+            litres = float(self.plein_entries["litres"].get().replace(",", "."))
+            prix = float(self.plein_entries["prix"].get().replace(",", "."))
+            total = litres * prix
+            lieu = (self.plein_entries["lieu"].get() or "").strip()
+
+            if self.plein_edit_id is None:
+                add_plein(self.vehicle_id_active, date_iso, km, litres, prix, total, lieu)
+            else:
+                update_plein(self.plein_edit_id, self.vehicle_id_active, date_iso, km, litres, prix, total, lieu)
+                self.plein_edit_id = None
+
+            self._refresh_pleins()
+            self._refresh_vehicle_photo_and_info()
+            self._refresh_km_label()
+            self._clear_plein_form()
+
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
+
+    def _on_load_selected_plein(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showwarning("Sélection", "Sélectionne un plein à modifier.")
+            return
+        values = self.tree.item(sel, "values")
+        self.plein_edit_id = int(values[0])
+
+        date_val = str(values[1])
+        try:
+            if "/" in date_val:
+                jour, mois, an = date_val.split("/")
+            else:
+                an, mois, jour = date_val.split("-")
+                an = an[2:]
+        except Exception:
+            messagebox.showerror("Erreur", f"Format de date invalide : {date_val}")
+            return
+
+        self._clear_plein_form()
+        self.plein_entries["jour"].insert(0, jour)
+        self.plein_entries["mois"].insert(0, mois)
+        self.plein_entries["annee"].insert(0, an)
+        self.plein_entries["km"].insert(0, values[2])
+        self.plein_entries["litres"].insert(0, values[3])
+        self.plein_entries["prix"].insert(0, values[4])
+        self.plein_entries["lieu"].set(values[6])
+
+    def _on_delete_selected_plein(self):
+        sel = self.tree.selection()
+        if not sel:
+            return
+        pid = int(self.tree.item(sel, "values")[0])
+        if not messagebox.askyesno("Confirmation", f"Supprimer le plein ID {pid} ?"):
+            return
+        delete_plein(pid)
+        self.plein_edit_id = None
+        self._refresh_pleins()
+        self._refresh_vehicle_photo_and_info()
+        self._refresh_km_label()
+        self._clear_plein_form()
+
+    # ---------------- Véhicules: gestion ----------------
+
     def _refresh_all_vehicles_ui(self):
         for item in self.tree_vehicles.get_children():
             self.tree_vehicles.delete(item)
 
         vehicles = list_vehicles()
-        for (vid, nom, marque, modele, motorisation, energie, immat, photo) in vehicles:
-            self.tree_vehicles.insert("", "end", values=(vid, nom, marque or "", modele or "", energie or ""))
+        for (vid, nom, marque, modele, motorisation, energie, annee, immat, photo) in vehicles:
+            self.tree_vehicles.insert("", "end", values=(vid, nom, marque or "", modele or "", annee or "", energie or ""))
 
-        if hasattr(self, "cb_vehicle"):
-            if self.vehicle_id_active is None and vehicles:
-                self.vehicle_id_active = int(vehicles[0][0])
-            self._refresh_vehicle_selector()
+        if vehicles and self.vehicle_id_active is None:
+            self.vehicle_id_active = int(vehicles[0][0])
+
+        if hasattr(self, "cb_vehicle") and hasattr(self, "cb_vehicle_ent"):
+            self._refresh_vehicle_selectors()
             if self.vehicle_id_active is not None:
                 self._apply_active_vehicle_to_ui()
 
@@ -925,7 +1401,7 @@ class GarageApp(tk.Tk):
         v = get_vehicle(vid)
         if not v:
             return
-        _, nom, marque, modele, motorisation, energie, immat, photo = v
+        _, nom, marque, modele, motorisation, energie, annee, immat, photo = v
         self._vehicle_selected_photo_filename = photo
 
         self.vehicle_form["nom"].delete(0, tk.END); self.vehicle_form["nom"].insert(0, nom or "")
@@ -933,6 +1409,7 @@ class GarageApp(tk.Tk):
         self.vehicle_form["modele"].delete(0, tk.END); self.vehicle_form["modele"].insert(0, modele or "")
         self.vehicle_form["motorisation"].delete(0, tk.END); self.vehicle_form["motorisation"].insert(0, motorisation or "")
         self.vehicle_form["energie"].delete(0, tk.END); self.vehicle_form["energie"].insert(0, energie or "")
+        self.vehicle_form["annee"].delete(0, tk.END); self.vehicle_form["annee"].insert(0, str(annee) if annee else "")
         self.vehicle_form["immat"].delete(0, tk.END); self.vehicle_form["immat"].insert(0, immat or "")
 
         self._update_vehicle_photo_labels_and_preview(photo)
@@ -1004,18 +1481,29 @@ class GarageApp(tk.Tk):
         immat = (self.vehicle_form["immat"].get() or "").strip()
         photo = self._vehicle_selected_photo_filename
 
+        annee_txt = (self.vehicle_form["annee"].get() or "").strip()
+        annee = None
+        if annee_txt:
+            try:
+                annee = int(annee_txt)
+                if not (1900 <= annee <= 2100):
+                    raise ValueError
+            except Exception:
+                messagebox.showerror("Véhicule", "Année invalide (ex: 2012).")
+                return
+
         try:
             if self._vehicle_selected_id is None:
                 if count_vehicles() >= MAX_VEHICLES:
                     messagebox.showwarning("Véhicules", f"Limite atteinte ({MAX_VEHICLES}).")
                     return
-                new_id = add_vehicle(nom, marque, modele, motorisation, energie, immat, photo)
+                new_id = add_vehicle(nom, marque, modele, motorisation, energie, annee, immat, photo)
                 self._vehicle_selected_id = new_id
                 if self.vehicle_id_active is None:
                     self.vehicle_id_active = new_id
                     set_config("active_vehicle_id", str(new_id))
             else:
-                update_vehicle(self._vehicle_selected_id, nom, marque, modele, motorisation, energie, immat, photo)
+                update_vehicle(self._vehicle_selected_id, nom, marque, modele, motorisation, energie, annee, immat, photo)
 
         except sqlite3.IntegrityError:
             messagebox.showerror("Véhicule", "Ce nom existe déjà. Choisis un pseudo différent.")
@@ -1026,6 +1514,8 @@ class GarageApp(tk.Tk):
 
         self._refresh_all_vehicles_ui()
         self._update_vehicle_photo_labels_and_preview(photo)
+        if self.vehicle_id_active == self._vehicle_selected_id:
+            self._refresh_vehicle_photo_and_info()
 
     def _on_vehicle_delete(self):
         if self._vehicle_selected_id is None:
@@ -1055,10 +1545,7 @@ class GarageApp(tk.Tk):
         if self._vehicle_selected_id is None:
             messagebox.showwarning("Véhicule", "Sélectionne un véhicule à définir actif.")
             return
-        self.vehicle_id_active = self._vehicle_selected_id
-        set_config("active_vehicle_id", str(self.vehicle_id_active))
-        self._refresh_vehicle_selector()
-        self._apply_active_vehicle_to_ui()
+        self._set_active_vehicle(self._vehicle_selected_id)
         self.notebook.select(self.tab_pleins)
 
 
