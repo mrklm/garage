@@ -2,19 +2,21 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog, filedialog
 import sqlite3
 from pathlib import Path
-
-# Images (mettez vos fichiers ici)
-# Dossier attendu: ./assets à côté de ce script
-SCRIPT_DIR = Path(__file__).resolve().parent
-ASSETS_DIR = SCRIPT_DIR / "assets"
-
-# Base SQLite stockée à côté du script (chemin robuste)
-DB_FILE = str(SCRIPT_DIR / "garage.db")
+import shutil
+import time
 
 APP_NAME = "Garage"
-APP_VERSION = "0.9.2"
+APP_VERSION = "2.1.0"
 
-# Pillow optionnel (si absent, on affiche un placeholder texte)
+SCRIPT_DIR = Path(__file__).resolve().parent
+DB_FILE = str(SCRIPT_DIR / "garage.db")
+
+ASSETS_DIR = SCRIPT_DIR / "assets"
+VEHICLES_DIR = ASSETS_DIR / "vehicles"
+
+MAX_VEHICLES = 5
+
+# Pillow optionnel
 try:
     from PIL import Image, ImageTk, ImageDraw, ImageFont
     PIL_AVAILABLE = True
@@ -22,16 +24,32 @@ except Exception:
     PIL_AVAILABLE = False
 
 
-def load_photo_or_placeholder(filename: str, size=(180, 120), label="Véhicule"):
-    """
-    Charge une image depuis ASSETS_DIR/filename.
-    Si absent/illisible: renvoie un placeholder grisé avec message.
-    """
+def safe_filename(name: str) -> str:
+    name = (name or "").strip().lower()
+    name = "".join(c if c.isalnum() or c in "-_." else "_" for c in name)
+    name = name.strip("_")
+    return name or f"vehicule_{int(time.time())}"
+
+
+def ensure_dirs():
+    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    VEHICLES_DIR.mkdir(parents=True, exist_ok=True)
+    gitkeep = VEHICLES_DIR / ".gitkeep"
+    if not gitkeep.exists():
+        try:
+            gitkeep.write_text("", encoding="utf-8")
+        except Exception:
+            pass
+
+
+def load_photo_or_placeholder(photo_filename: str | None, size=(220, 150), label="Véhicule"):
     w, h = size
-    path = ASSETS_DIR / filename
+    path = (VEHICLES_DIR / photo_filename) if photo_filename else None
 
     if PIL_AVAILABLE:
         try:
+            if path is None or not path.exists():
+                raise FileNotFoundError("Photo introuvable")
             img = Image.open(path).convert("RGBA").resize((w, h))
             return ImageTk.PhotoImage(img), None
         except Exception as e:
@@ -39,7 +57,7 @@ def load_photo_or_placeholder(filename: str, size=(180, 120), label="Véhicule")
             draw = ImageDraw.Draw(img)
             draw.line((0, 0, w, h), fill=(150, 150, 150, 255), width=4)
             draw.line((0, h, w, 0), fill=(150, 150, 150, 255), width=4)
-            text = f"{label}\nImage introuvable"
+            text = f"{label}\nPhoto introuvable"
             try:
                 font = ImageFont.load_default()
             except Exception:
@@ -48,41 +66,65 @@ def load_photo_or_placeholder(filename: str, size=(180, 120), label="Véhicule")
             tw = bbox[2] - bbox[0]
             th = bbox[3] - bbox[1]
             draw.multiline_text(((w - tw) / 2, (h - th) / 2), text, fill=(60, 60, 60, 255), font=font, align="center")
-            return ImageTk.PhotoImage(img), f"{path} : {e}"
+            return ImageTk.PhotoImage(img), str(e)
     else:
-        # Fallback sans Pillow: on met un "visuel" simple sur Canvas
-        # On renverra None pour l'image, et l'appelant dessinera le texte.
-        if path.exists():
-            return None, f"Pillow n'est pas disponible: impossible d'afficher {path.name}."
-        return None, f"{path} introuvable (et Pillow non disponible)."
+        if path is None:
+            return None, "Pillow non disponible (et aucune photo définie)."
+        if not path.exists():
+            return None, f"{path} introuvable (et Pillow non disponible)."
+        return None, f"Pillow non disponible: impossible d'afficher {path.name}."
 
 
-# =========================
-# Base de données (SQLite)
-# =========================
-
-def init_db():
+def connect():
     conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
 
-    cursor.execute(
+
+def table_columns(conn, table: str) -> set[str]:
+    cur = conn.cursor()
+    cur.execute(f"PRAGMA table_info({table})")
+    return {row[1] for row in cur.fetchall()}
+
+
+def ensure_vehicle(conn, nom: str, marque=None, modele=None, motorisation=None, energie=None, immatriculation=None, photo_filename=None) -> int:
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM vehicules WHERE nom = ?", (nom,))
+    row = cur.fetchone()
+    if row:
+        return int(row[0])
+    cur.execute(
         """
-        CREATE TABLE IF NOT EXISTS pleins (
+        INSERT INTO vehicules (nom, marque, modele, motorisation, energie, immatriculation, photo_filename)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (nom, marque, modele, motorisation, energie, immatriculation, photo_filename),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def init_db_and_migrate():
+    ensure_dirs()
+    conn = connect()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS vehicules (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            vehicule INTEGER NOT NULL,
-            date TEXT NOT NULL,
-            kilometrage INTEGER NOT NULL,
-            litres REAL NOT NULL,
-            prix_litre REAL NOT NULL,
-            total REAL NOT NULL,
-            lieu TEXT,
-            type_usage TEXT,
-            commentaire TEXT
+            nom TEXT NOT NULL UNIQUE,
+            marque TEXT,
+            modele TEXT,
+            motorisation TEXT,
+            energie TEXT,
+            immatriculation TEXT,
+            photo_filename TEXT
         )
         """
     )
 
-    cursor.execute(
+    cur.execute(
         """
         CREATE TABLE IF NOT EXISTS lieux (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,7 +133,34 @@ def init_db():
         """
     )
 
-    cursor.execute(
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS pleins (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicule_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            kilometrage INTEGER NOT NULL,
+            litres REAL NOT NULL,
+            prix_litre REAL NOT NULL,
+            total REAL NOT NULL,
+            lieu TEXT,
+            type_usage TEXT,
+            commentaire TEXT,
+            FOREIGN KEY(vehicule_id) REFERENCES vehicules(id) ON DELETE RESTRICT
+        )
+        """
+    )
+
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_config (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+        """
+    )
+
+    cur.execute(
         """
         INSERT OR IGNORE INTO lieux (nom) VALUES
         ('St É'),
@@ -101,111 +170,233 @@ def init_db():
         ('Pleine Fougères');
         """
     )
+    conn.commit()
 
+    cols = table_columns(conn, "pleins")
+    if "vehicule" in cols and "vehicule_id" not in cols:
+        cur.execute("ALTER TABLE pleins ADD COLUMN vehicule_id INTEGER")
+        conn.commit()
+
+        biche_id = ensure_vehicle(conn, nom="Biche")
+        titine_id = ensure_vehicle(conn, nom="Titine")
+
+        cur.execute("UPDATE pleins SET vehicule_id = ? WHERE vehicule = 0", (biche_id,))
+        cur.execute("UPDATE pleins SET vehicule_id = ? WHERE vehicule = 1", (titine_id,))
+        cur.execute("UPDATE pleins SET vehicule_id = ? WHERE vehicule_id IS NULL", (biche_id,))
+        conn.commit()
+
+    cur.execute("SELECT COUNT(*) FROM vehicules")
+    if (cur.fetchone()[0] or 0) == 0:
+        ensure_vehicle(conn, nom="Biche")
+        ensure_vehicle(conn, nom="Titine")
+        conn.commit()
+
+    cur.execute("SELECT COUNT(*) FROM pleins WHERE vehicule_id IS NULL")
+    if (cur.fetchone()[0] or 0) > 0:
+        cur.execute("SELECT id FROM vehicules ORDER BY id ASC LIMIT 1")
+        first_id = int(cur.fetchone()[0])
+        cur.execute("UPDATE pleins SET vehicule_id = ? WHERE vehicule_id IS NULL", (first_id,))
+        conn.commit()
+
+    conn.close()
+
+
+def get_config(key: str) -> str | None:
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("SELECT value FROM app_config WHERE key = ?", (key,))
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
+def set_config(key: str, value: str):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO app_config(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (key, value),
+    )
     conn.commit()
     conn.close()
 
 
-def dernier_kilometrage(vehicule: int, exclude_id=None):
-    """Retourne le dernier kilométrage (MAX) pour un véhicule, en excluant éventuellement un plein."""
-    conn = sqlite3.connect(DB_FILE)
+def list_vehicles():
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, nom, marque, modele, motorisation, energie, immatriculation, photo_filename
+        FROM vehicules
+        ORDER BY nom COLLATE NOCASE ASC
+        """
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def get_vehicle(vehicle_id: int):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, nom, marque, modele, motorisation, energie, immatriculation, photo_filename
+        FROM vehicules
+        WHERE id = ?
+        """,
+        (vehicle_id,),
+    )
+    row = cur.fetchone()
+    conn.close()
+    return row
+
+
+def count_vehicles() -> int:
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM vehicules")
+    n = int(cur.fetchone()[0] or 0)
+    conn.close()
+    return n
+
+
+def add_vehicle(nom, marque, modele, motorisation, energie, immatriculation, photo_filename):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO vehicules (nom, marque, modele, motorisation, energie, immatriculation, photo_filename)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (nom, marque, modele, motorisation, energie, immatriculation, photo_filename),
+    )
+    conn.commit()
+    new_id = int(cur.lastrowid)
+    conn.close()
+    return new_id
+
+
+def update_vehicle(vehicle_id, nom, marque, modele, motorisation, energie, immatriculation, photo_filename):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE vehicules
+        SET nom = ?, marque = ?, modele = ?, motorisation = ?, energie = ?, immatriculation = ?, photo_filename = ?
+        WHERE id = ?
+        """,
+        (nom, marque, modele, motorisation, energie, immatriculation, photo_filename, vehicle_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_vehicle(vehicle_id: int):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM pleins WHERE vehicule_id = ?", (vehicle_id,))
+    n = int(cur.fetchone()[0] or 0)
+    if n > 0:
+        conn.close()
+        raise ValueError(f"Suppression impossible : {n} plein(s) référencent ce véhicule.")
+    cur.execute("DELETE FROM vehicules WHERE id = ?", (vehicle_id,))
+    conn.commit()
+    conn.close()
+
+
+def last_km(vehicle_id: int, exclude_id=None):
+    conn = connect()
     cur = conn.cursor()
     if exclude_id is None:
-        cur.execute("SELECT MAX(kilometrage) FROM pleins WHERE vehicule = ?", (vehicule,))
+        cur.execute("SELECT MAX(kilometrage) FROM pleins WHERE vehicule_id = ?", (vehicle_id,))
     else:
         cur.execute(
-            "SELECT MAX(kilometrage) FROM pleins WHERE vehicule = ? AND id <> ?",
-            (vehicule, exclude_id),
+            "SELECT MAX(kilometrage) FROM pleins WHERE vehicule_id = ? AND id <> ?",
+            (vehicle_id, exclude_id),
         )
     res = cur.fetchone()
     conn.close()
     return int(res[0]) if res and res[0] is not None else None
 
 
-def ajouter_plein(vehicule, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        INSERT INTO pleins (vehicule, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (vehicule, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire),
-    )
-    conn.commit()
-    conn.close()
-
-
-def modifier_plein(plein_id, vehicule, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        UPDATE pleins
-        SET vehicule = ?,
-            date = ?,
-            kilometrage = ?,
-            litres = ?,
-            prix_litre = ?,
-            total = ?,
-            lieu = ?,
-            type_usage = ?,
-            commentaire = ?
-        WHERE id = ?
-        """,
-        (vehicule, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire, plein_id),
-    )
-    conn.commit()
-    conn.close()
-
-
-def lister_pleins(vehicule):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute(
+def list_pleins(vehicle_id: int):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
         """
         SELECT id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire
         FROM pleins
-        WHERE vehicule = ?
+        WHERE vehicule_id = ?
         ORDER BY date DESC, kilometrage DESC, id DESC
         """,
-        (vehicule,),
+        (vehicle_id,),
     )
-    rows = cursor.fetchall()
+    rows = cur.fetchall()
     conn.close()
     return rows
 
 
-def supprimer_plein(plein_id):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM pleins WHERE id = ?", (plein_id,))
+def add_plein(vehicle_id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO pleins (vehicule_id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (vehicle_id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire),
+    )
     conn.commit()
     conn.close()
 
 
-def lister_lieux():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT nom FROM lieux ORDER BY nom ASC")
-    rows = cursor.fetchall()
+def update_plein(plein_id, vehicle_id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE pleins
+        SET vehicule_id = ?, date = ?, kilometrage = ?, litres = ?, prix_litre = ?, total = ?,
+            lieu = ?, type_usage = ?, commentaire = ?
+        WHERE id = ?
+        """,
+        (vehicle_id, date, kilometrage, litres, prix_litre, total, lieu, type_usage, commentaire, plein_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_plein(plein_id):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM pleins WHERE id = ?", (plein_id,))
+    conn.commit()
+    conn.close()
+
+
+def list_lieux():
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("SELECT nom FROM lieux ORDER BY nom COLLATE NOCASE ASC")
+    rows = cur.fetchall()
     conn.close()
     return [r[0] for r in rows]
 
 
-def ajouter_lieu(nom: str):
+def add_lieu(nom: str):
     nom = (nom or "").strip()
     if not nom:
         return
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO lieux (nom) VALUES (?)", (nom,))
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("INSERT OR IGNORE INTO lieux (nom) VALUES (?)", (nom,))
     conn.commit()
     conn.close()
 
 
-def compter_pleins_pour_lieu(nom: str) -> int:
-    conn = sqlite3.connect(DB_FILE)
+def count_pleins_for_lieu(nom: str) -> int:
+    conn = connect()
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM pleins WHERE lieu = ?", (nom,))
     n = int(cur.fetchone()[0] or 0)
@@ -213,15 +404,15 @@ def compter_pleins_pour_lieu(nom: str) -> int:
     return n
 
 
-def supprimer_lieu(nom: str):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM lieux WHERE nom = ?", (nom,))
+def delete_lieu(nom: str):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM lieux WHERE nom = ?", (nom,))
     conn.commit()
     conn.close()
 
 
-def renommer_lieu(ancien: str, nouveau: str):
+def rename_lieu(ancien: str, nouveau: str):
     ancien = (ancien or "").strip()
     nouveau = (nouveau or "").strip()
     if not ancien or not nouveau:
@@ -229,15 +420,13 @@ def renommer_lieu(ancien: str, nouveau: str):
     if ancien == nouveau:
         return
 
-    conn = sqlite3.connect(DB_FILE)
+    conn = connect()
     cur = conn.cursor()
     try:
         cur.execute("BEGIN")
-        # Met à jour la table lieux
         cur.execute("UPDATE lieux SET nom = ? WHERE nom = ?", (nouveau, ancien))
         if cur.rowcount == 0:
             cur.execute("INSERT OR IGNORE INTO lieux (nom) VALUES (?)", (nouveau,))
-        # Met à jour les pleins existants
         cur.execute("UPDATE pleins SET lieu = ? WHERE lieu = ?", (nouveau, ancien))
         conn.commit()
     except sqlite3.IntegrityError:
@@ -247,357 +436,291 @@ def renommer_lieu(ancien: str, nouveau: str):
         conn.close()
 
 
-# =========================
-# Interface graphique
-# =========================
-
 class GarageApp(tk.Tk):
-    def create_menu(self):
-        menubar = tk.Menu(self)
-
-        menu_aide = tk.Menu(menubar, tearoff=0)
-        menu_aide.add_command(label="À propos…", command=self.on_about)
-        menubar.add_cascade(label="Aide", menu=menu_aide)
-
-        self.config(menu=menubar)
-
-    def on_about(self):
-        messagebox.showinfo(
-            "À propos",
-            f"{APP_NAME} v{APP_VERSION}\n\n"
-            "Gestion des pleins, lieux et suivi kilométrique (2 véhicules).\n\n"
-            f"Base: {DB_FILE}\n"
-            f"Images: {ASSETS_DIR}",
-        )
-
     def __init__(self):
         super().__init__()
+        init_db_and_migrate()
+
         self.title(f"{APP_NAME} v{APP_VERSION}")
-        self.geometry("1200x650")
+        self.geometry("1300x720")
 
-        init_db()
-
-        self.vehicule_actif = 0
-        self.plein_en_cours = None  # id du plein en cours de modification
+        self.vehicle_id_active: int | None = None
+        self.plein_edit_id: int | None = None
 
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill=tk.BOTH, expand=True)
 
         self.tab_pleins = ttk.Frame(self.notebook)
         self.tab_lieux = ttk.Frame(self.notebook)
+        self.tab_vehicules = ttk.Frame(self.notebook)
 
         self.notebook.add(self.tab_pleins, text="Pleins")
         self.notebook.add(self.tab_lieux, text="Lieux")
+        self.notebook.add(self.tab_vehicules, text="Véhicules")
 
-        self.create_menu()
-        self.create_top_bar()     # photos gauche/droite + boutons au centre
-        self.create_main_area()   # tableau + champs en bas (comme l'ancienne version)
-        self.create_lieux_tab()
+        self._create_menu()
+        self._build_pleins_tab()
+        self._build_lieux_tab()
+        self._build_vehicules_tab()
 
-        self.refresh_lieux_ui()
-        self.set_vehicule_actif(0)
+        self._refresh_all_vehicles_ui()
+        self._restore_active_vehicle()
 
-        # Alerte si dossier assets absent
-        if not ASSETS_DIR.exists():
-            messagebox.showwarning(
-                "Images",
-                f"Dossier images introuvable:\n{ASSETS_DIR}\n\n"
-                "Créez-le et ajoutez:\n"
-                "- Biche.png\n"
-                "- Titine.png",
-            )
+    def _create_menu(self):
+        menubar = tk.Menu(self)
+        menu_aide = tk.Menu(menubar, tearoff=0)
+        menu_aide.add_command(label="À propos…", command=self._about)
+        menubar.add_cascade(label="Aide", menu=menu_aide)
+        self.config(menu=menubar)
 
-    # ---------------------
-    # Onglet Pleins - Haut
-    # ---------------------
+    def _about(self):
+        messagebox.showinfo(
+            "À propos",
+            f"{APP_NAME} v{APP_VERSION}\n\n"
+            "Suivi des pleins multi-véhicules + gestion des lieux.\n\n"
+            f"Base: {DB_FILE}\n"
+            f"Photos: {VEHICLES_DIR}\n"
+            f"Pillow: {'OK' if PIL_AVAILABLE else 'non détecté'}",
+        )
 
-    def create_top_bar(self):
+    # ---- Pleins ----
+
+    def _build_pleins_tab(self):
         top = tk.Frame(self.tab_pleins)
         top.pack(fill=tk.X, pady=10)
 
-        # Biche (gauche)
-        frame_left = tk.Frame(top)
-        frame_left.pack(side=tk.LEFT, padx=30)
+        left = tk.Frame(top)
+        left.pack(side=tk.LEFT, padx=20)
 
-        self.tk_biche, err_biche = load_photo_or_placeholder("Biche.png", (180, 120), "Biche")
-        self._img_error_biche = err_biche
+        tk.Label(left, text="Véhicule").pack(anchor="w")
+        self.cb_vehicle = ttk.Combobox(left, state="readonly", width=26)
+        self.cb_vehicle.pack(anchor="w")
+        self.cb_vehicle.bind("<<ComboboxSelected>>", self._on_vehicle_selected_from_combo)
 
-        self.canvas_biche = tk.Canvas(frame_left, width=180, height=120, highlightthickness=3)
-        self.canvas_biche.pack()
-        if self.tk_biche is not None:
-            self.canvas_biche.create_image(0, 0, anchor="nw", image=self.tk_biche)
-        else:
-            self.canvas_biche.create_rectangle(0, 0, 180, 120, fill="#c8c8c8", outline="#999999")
-            self.canvas_biche.create_text(90, 60, text="Biche\nImage introuvable", justify="center")
+        self.canvas_photo = tk.Canvas(left, width=220, height=150, highlightthickness=1)
+        self.canvas_photo.pack(pady=6)
 
-        self.label_km_biche = tk.Label(frame_left, text="—")
-        self.label_km_biche.pack(pady=5)
-        self.canvas_biche.bind("<Button-1>", lambda e: self.set_vehicule_actif(0))
+        # KM centered + bigger
+        self.lbl_km = tk.Label(left, text="— km", font=("Arial", 14, "bold"))
+        self.lbl_km.pack(fill=tk.X)
 
-        # Boutons (centre)
-        frame_center = tk.Frame(top)
-        frame_center.pack(side=tk.LEFT, expand=True)
+        center = tk.Frame(top)
+        center.pack(side=tk.LEFT, expand=True)
 
-        tk.Button(frame_center, text="Ajouter / Enregistrer", command=self.on_ajouter_plein).pack(pady=5)
-        tk.Button(frame_center, text="Supprimer le plein sélectionné", command=self.on_effacer_plein).pack(pady=5)
-        tk.Button(frame_center, text="Modifier le plein sélectionné", command=self.on_modifier_plein).pack(pady=5)
-        tk.Button(frame_center, text="Importer un fichier (CSV)", command=self.import_csv).pack(pady=5)
+        tk.Button(center, text="Ajouter / Enregistrer", command=self._on_save_plein, width=28).pack(pady=4)
+        tk.Button(center, text="Modifier le plein sélectionné", command=self._on_load_selected_plein, width=28).pack(pady=4)
+        tk.Button(center, text="Supprimer le plein sélectionné", command=self._on_delete_selected_plein, width=28).pack(pady=4)
+        tk.Button(center, text="Importer un fichier (CSV)", command=self._import_csv, width=28).pack(pady=4)
 
-        # Titine (droite)
-        frame_right = tk.Frame(top)
-        frame_right.pack(side=tk.RIGHT, padx=30)
+        right = tk.Frame(top)
+        right.pack(side=tk.RIGHT, padx=20)
 
-        self.tk_titine, err_titine = load_photo_or_placeholder("Titine.png", (180, 120), "Titine")
-        self._img_error_titine = err_titine
+        tk.Label(right, text="Infos véhicule").pack(anchor="w")
+        self.vehicle_info_text = tk.Text(right, width=36, height=8, wrap="word")
+        self.vehicle_info_text.pack()
+        self.vehicle_info_text.configure(state="disabled")
 
-        self.canvas_titine = tk.Canvas(frame_right, width=180, height=120, highlightthickness=3)
-        self.canvas_titine.pack()
-        if self.tk_titine is not None:
-            self.canvas_titine.create_image(0, 0, anchor="nw", image=self.tk_titine)
-        else:
-            self.canvas_titine.create_rectangle(0, 0, 180, 120, fill="#c8c8c8", outline="#999999")
-            self.canvas_titine.create_text(90, 60, text="Titine\nImage introuvable", justify="center")
-
-        self.label_km_titine = tk.Label(frame_right, text="—")
-        self.label_km_titine.pack(pady=5)
-        self.canvas_titine.bind("<Button-1>", lambda e: self.set_vehicule_actif(1))
-
-        # Si erreur image, on la conserve (utile si vous voulez l'afficher)
-        # (On n'affiche pas automatiquement une erreur bloquante.)
-
-    # ---------------------
-    # Onglet Pleins - Tableau + formulaire bas
-    # ---------------------
-
-    def create_main_area(self):
-        frame = tk.Frame(self.tab_pleins)
-        frame.pack(fill=tk.BOTH, expand=True, padx=10)
+        mid = tk.Frame(self.tab_pleins)
+        mid.pack(fill=tk.BOTH, expand=True, padx=10)
 
         columns = ("id", "date", "km", "litres", "prix", "total", "lieu", "type_usage", "commentaire")
-        self.tree = ttk.Treeview(frame, columns=columns, show="headings")
+        self.tree = ttk.Treeview(mid, columns=columns, show="headings")
 
-        widths = {
-            "id": 50,
-            "date": 90,
-            "km": 80,
-            "litres": 120,
-            "prix": 90,
-            "total": 90,
-            "lieu": 140,
-            "type_usage": 160,
-            "commentaire": 300,
-        }
-
-        headings = {
-            "id": "ID",
-            "date": "Date",
-            "km": "Km",
-            "litres": "Nbre de Litres",
-            "prix": "€ / Litre",
-            "total": "Total (€)",
-            "lieu": "Lieu",
-            "type_usage": "Type de Trajets",
-            "commentaire": "Commentaire",
-        }
+        widths = {"id": 50, "date": 90, "km": 80, "litres": 120, "prix": 90, "total": 90,
+                  "lieu": 140, "type_usage": 160, "commentaire": 360}
+        headings = {"id": "ID", "date": "Date", "km": "Km", "litres": "Nbre de Litres", "prix": "€ / Litre",
+                    "total": "Total (€)", "lieu": "Lieu", "type_usage": "Type de Trajets", "commentaire": "Commentaire"}
 
         for col in columns:
-            self.tree.heading(col, text=headings.get(col, col))
+            self.tree.heading(col, text=headings[col])
             self.tree.column(col, width=widths[col], stretch=(col == "commentaire"))
 
         self.tree.pack(fill=tk.BOTH, expand=True)
 
-        # Formulaire en bas (comme la version précédente)
         form = tk.Frame(self.tab_pleins)
         form.pack(fill=tk.X, padx=10, pady=10)
 
-        labels = [
-            ("Jour", "jour"),
-            ("Mois", "mois"),
-            ("Année", "année"),
-            ("Km", "kilometrage"),
-            ("Nbre de Litres", "litres"),
-            ("€ / Litre", "prix_litre"),
-            ("Lieu", "lieu"),
-            ("Type de Trajets", "type_usage"),
-            ("Commentaire", "commentaire"),
+        self.plein_entries = {}
+        fields = [
+            ("Jour", "jour", 6),
+            ("Mois", "mois", 6),
+            ("Année", "annee", 6),
+            ("Km", "km", 10),
+            ("Nbre de Litres", "litres", 12),
+            ("€ / Litre", "prix", 12),
+            ("Lieu", "lieu", 18),
+            ("Type de Trajets", "type_usage", 18),
+            ("Commentaire", "commentaire", 26),
         ]
-        self.entries_plein = {}
 
-        for i, (label_text, key) in enumerate(labels):
-            if key == "prix_litre":
-                tk.Label(form, text=label_text, font=("Arial", 12, "bold")).grid(row=0, column=i)
-            else:
-                tk.Label(form, text=label_text).grid(row=0, column=i)
-
-            if key in ["jour", "mois", "année"]:
-                entry = tk.Entry(form, width=6)
-                entry.grid(row=1, column=i)
-                self.entries_plein[key] = entry
-
-            elif key == "lieu":
-                self.combo_lieu = ttk.Combobox(form, width=16, state="readonly")
-                self.combo_lieu.grid(row=1, column=i)
-                self.entries_plein[key] = self.combo_lieu
-
+        for i, (label, key, width) in enumerate(fields):
+            tk.Label(form, text=label, font=("Arial", 12, "bold") if key == "prix" else None).grid(row=0, column=i, padx=3)
+            if key == "lieu":
+                cb = ttk.Combobox(form, state="readonly", width=width)
+                cb.grid(row=1, column=i, padx=3)
+                self.plein_entries[key] = cb
             elif key == "type_usage":
-                self.combo_usage = ttk.Combobox(
-                    form,
-                    width=18,
-                    state="readonly",
-                    values=["Trajets Quotidiens", "Longs Trajets"],
-                )
-                self.combo_usage.grid(row=1, column=i)
-                self.entries_plein[key] = self.combo_usage
-
+                cb = ttk.Combobox(form, state="readonly", width=width, values=["Trajets Quotidiens", "Longs Trajets"])
+                cb.grid(row=1, column=i, padx=3)
+                self.plein_entries[key] = cb
             else:
-                entry = tk.Entry(form, width=18 if key == "commentaire" else 12)
-                entry.grid(row=1, column=i)
-                self.entries_plein[key] = entry
+                e = tk.Entry(form, width=width)
+                e.grid(row=1, column=i, padx=3)
+                self.plein_entries[key] = e
 
-        self.refresh_pleins()
-        self.refresh_kilometrages()
+        self._refresh_lieux_combo()
 
-    def refresh_pleins(self):
-        for r in self.tree.get_children():
-            self.tree.delete(r)
+    def _restore_active_vehicle(self):
+        vehicles = list_vehicles()
+        if not vehicles:
+            conn = connect()
+            ensure_vehicle(conn, nom="Véhicule 1")
+            conn.close()
+            vehicles = list_vehicles()
 
-        rows = lister_pleins(self.vehicule_actif)
+        saved = get_config("active_vehicle_id")
+        saved_id = int(saved) if saved and saved.isdigit() else None
+        existing_ids = {int(v[0]) for v in vehicles}
 
-        for row in rows:
-            (plein_id, date_iso, km, litres, prix, total, lieu, type_usage, commentaire) = row
+        if saved_id in existing_ids:
+            self.vehicle_id_active = saved_id
+        else:
+            self.vehicle_id_active = int(vehicles[0][0])
 
+        self._refresh_vehicle_selector()
+        self._apply_active_vehicle_to_ui()
+
+    def _refresh_vehicle_selector(self):
+        vehicles = list_vehicles()
+        display = [row[1] for row in vehicles]  # nom seulement
+        self._vehicle_name_to_id = {row[1]: int(row[0]) for row in vehicles}
+        self.cb_vehicle["values"] = display
+
+        current_name = None
+        for name, vid in self._vehicle_name_to_id.items():
+            if vid == self.vehicle_id_active:
+                current_name = name
+                break
+        if current_name is None and display:
+            current_name = display[0]
+            self.vehicle_id_active = self._vehicle_name_to_id[current_name]
+        if current_name:
+            self.cb_vehicle.set(current_name)
+
+    def _on_vehicle_selected_from_combo(self, _evt=None):
+        name = self.cb_vehicle.get()
+        vid = self._vehicle_name_to_id.get(name)
+        if vid is None:
+            return
+        self.vehicle_id_active = vid
+        set_config("active_vehicle_id", str(vid))
+        self.plein_edit_id = None
+        self._clear_plein_form()
+        self._apply_active_vehicle_to_ui()
+
+    def _apply_active_vehicle_to_ui(self):
+        self._refresh_vehicle_photo_and_info()
+        self._refresh_pleins()
+        self._refresh_km_label()
+
+    def _refresh_vehicle_photo_and_info(self):
+        v = get_vehicle(self.vehicle_id_active) if self.vehicle_id_active else None
+        if not v:
+            return
+        _, nom, marque, modele, motorisation, energie, immat, photo = v
+
+        self.canvas_photo.delete("all")
+        tk_img, _err = load_photo_or_placeholder(photo, size=(220, 150), label=nom)
+        self._tk_vehicle_photo = tk_img
+        if tk_img is not None:
+            self.canvas_photo.create_image(0, 0, anchor="nw", image=tk_img)
+        else:
+            self.canvas_photo.create_rectangle(0, 0, 220, 150, fill="#c8c8c8", outline="#999999")
+            self.canvas_photo.create_text(110, 75, text=f"{nom}\nPhoto introuvable", justify="center")
+
+        lines = []
+        if marque: lines.append(f"Marque : {marque}")
+        if modele: lines.append(f"Modèle : {modele}")
+        if motorisation: lines.append(f"Motorisation : {motorisation}")
+        if energie: lines.append(f"Énergie : {energie}")
+        if immat: lines.append(f"Immatriculation : {immat}")
+
+        self.vehicle_info_text.configure(state="normal")
+        self.vehicle_info_text.delete("1.0", "end")
+        self.vehicle_info_text.insert("1.0", "\n".join(lines) if lines else "(aucune info renseignée)")
+        self.vehicle_info_text.configure(state="disabled")
+
+    def _refresh_km_label(self):
+        km = last_km(self.vehicle_id_active) if self.vehicle_id_active else None
+        self.lbl_km.config(text=f"{km if km is not None else '—'} km")
+
+    def _refresh_pleins(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        if not self.vehicle_id_active:
+            return
+        rows = list_pleins(self.vehicle_id_active)
+        for (pid, date_iso, km, litres, prix, total, lieu, type_usage, commentaire) in rows:
             try:
                 an, mois, jour = date_iso.split("-")
                 date_aff = f"{jour}/{mois}/{an[2:]}"
             except Exception:
                 date_aff = date_iso
+            self.tree.insert("", "end", values=(pid, date_aff, km, f"{litres:.2f}", f"{prix:.3f}", f"{total:.2f}",
+                                                lieu or "", type_usage or "", commentaire or ""))
 
-            self.tree.insert(
-                "",
-                "end",
-                values=(
-                    plein_id,
-                    date_aff,
-                    km,
-                    f"{litres:.2f}",
-                    f"{prix:.3f}",
-                    f"{total:.2f}",
-                    lieu or "",
-                    type_usage or "",
-                    commentaire or "",
-                ),
-            )
+    def _clear_plein_form(self):
+        for w in self.plein_entries.values():
+            if isinstance(w, ttk.Combobox):
+                w.set("")
+            else:
+                w.delete(0, tk.END)
 
-    def refresh_kilometrages(self):
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT MAX(kilometrage) FROM pleins WHERE vehicule = 0")
-        km_biche = cursor.fetchone()[0]
-        cursor.execute("SELECT MAX(kilometrage) FROM pleins WHERE vehicule = 1")
-        km_titine = cursor.fetchone()[0]
-
-        conn.close()
-
-        self.label_km_biche.config(text=f"{km_biche if km_biche is not None else '—'} km")
-        self.label_km_titine.config(text=f"{km_titine if km_titine is not None else '—'} km")
-
-    def refresh_lieux_ui(self):
-        lieux = lister_lieux()
-
-        self.listbox_lieux.delete(0, tk.END)
-        for nom in lieux:
-            self.listbox_lieux.insert(tk.END, nom)
-
-        # Met à jour la combo dans l'onglet pleins
-        if hasattr(self, "combo_lieu"):
-            current = self.combo_lieu.get()
-            self.combo_lieu["values"] = lieux
-            self.combo_lieu.set(current if current in lieux else "")
-
-    def set_vehicule_actif(self, index: int):
-        self.vehicule_actif = index
-        self.canvas_biche.config(highlightbackground="red" if index == 0 else "gray")
-        self.canvas_titine.config(highlightbackground="red" if index == 1 else "gray")
-        self.refresh_pleins()
-
-    # ---------------------
-    # Actions Pleins
-    # ---------------------
-
-    def on_ajouter_plein(self):
+    def _on_save_plein(self):
+        if not self.vehicle_id_active:
+            messagebox.showwarning("Véhicule", "Aucun véhicule sélectionné.")
+            return
         try:
-            j = int((self.entries_plein["jour"].get() or "0").strip())
-            m = int((self.entries_plein["mois"].get() or "0").strip())
-            a = int((self.entries_plein["année"].get() or "0").strip())
-
+            j = int((self.plein_entries["jour"].get() or "0").strip())
+            m = int((self.plein_entries["mois"].get() or "0").strip())
+            a = int((self.plein_entries["annee"].get() or "0").strip())
             if not (1 <= j <= 31 and 1 <= m <= 12 and 0 <= a <= 99):
                 raise ValueError("Date invalide : Jour 1-31, Mois 1-12, Année sur 2 chiffres.")
-
             date_iso = f"20{a:02d}-{m:02d}-{j:02d}"
 
-            km = int(self.entries_plein["kilometrage"].get())
+            km = int(self.plein_entries["km"].get())
+            last = last_km(self.vehicle_id_active, exclude_id=self.plein_edit_id)
+            if last is not None and km < last:
+                raise ValueError(f"Kilométrage incohérent : {km} km < dernier relevé ({last} km).")
 
-            # Contrôle kilométrage: refuse une entrée inférieure au dernier relevé
-            last_km = dernier_kilometrage(self.vehicule_actif, exclude_id=self.plein_en_cours)
-            if last_km is not None and km < last_km:
-                raise ValueError(f"Kilométrage incohérent : {km} km < dernier relevé ({last_km} km).")
-
-            litres = float(self.entries_plein["litres"].get().replace(",", "."))
-            prix = float(self.entries_plein["prix_litre"].get().replace(",", "."))
+            litres = float(self.plein_entries["litres"].get().replace(",", "."))
+            prix = float(self.plein_entries["prix"].get().replace(",", "."))
             total = litres * prix
 
-            lieu = (self.entries_plein["lieu"].get() or "").strip()
-            type_usage = (self.entries_plein["type_usage"].get() or "").strip()
-            commentaire = (self.entries_plein["commentaire"].get() or "").strip()
+            lieu = (self.plein_entries["lieu"].get() or "").strip()
+            type_usage = (self.plein_entries["type_usage"].get() or "").strip()
+            commentaire = (self.plein_entries["commentaire"].get() or "").strip()
 
-            if self.plein_en_cours is not None:
-                modifier_plein(
-                    self.plein_en_cours,
-                    self.vehicule_actif,
-                    date_iso,
-                    km,
-                    litres,
-                    prix,
-                    total,
-                    lieu,
-                    type_usage,
-                    commentaire,
-                )
-                self.plein_en_cours = None
+            if self.plein_edit_id is None:
+                add_plein(self.vehicle_id_active, date_iso, km, litres, prix, total, lieu, type_usage, commentaire)
             else:
-                ajouter_plein(self.vehicule_actif, date_iso, km, litres, prix, total, lieu, type_usage, commentaire)
+                update_plein(self.plein_edit_id, self.vehicle_id_active, date_iso, km, litres, prix, total, lieu, type_usage, commentaire)
+                self.plein_edit_id = None
 
-            self.refresh_pleins()
-            self.refresh_kilometrages()
-
-            # Clear fields
-            for key, widget in self.entries_plein.items():
-                if isinstance(widget, ttk.Combobox):
-                    widget.set("")
-                else:
-                    widget.delete(0, tk.END)
+            self._refresh_pleins()
+            self._refresh_km_label()
+            self._clear_plein_form()
 
         except Exception as e:
             messagebox.showerror("Erreur", str(e))
 
-    def on_effacer_plein(self):
+    def _on_load_selected_plein(self):
         sel = self.tree.selection()
         if not sel:
+            messagebox.showwarning("Sélection", "Sélectionne un plein à modifier.")
             return
-        plein_id = self.tree.item(sel, "values")[0]
-        supprimer_plein(plein_id)
-        self.refresh_pleins()
-        self.refresh_kilometrages()
-
-    def on_modifier_plein(self):
-        sel = self.tree.selection()
-        if not sel:
-            messagebox.showwarning("Sélection", "Veuillez sélectionner un plein à modifier.")
-            return
-
         values = self.tree.item(sel, "values")
-        plein_id = values[0]
+        self.plein_edit_id = int(values[0])
 
         date_val = str(values[1])
         try:
@@ -610,41 +733,36 @@ class GarageApp(tk.Tk):
             messagebox.showerror("Erreur", f"Format de date invalide : {date_val}")
             return
 
-        # Pré-remplissage
-        self.entries_plein["jour"].delete(0, tk.END)
-        self.entries_plein["jour"].insert(0, jour)
+        self._clear_plein_form()
+        self.plein_entries["jour"].insert(0, jour)
+        self.plein_entries["mois"].insert(0, mois)
+        self.plein_entries["annee"].insert(0, an)
+        self.plein_entries["km"].insert(0, values[2])
+        self.plein_entries["litres"].insert(0, values[3])
+        self.plein_entries["prix"].insert(0, values[4])
+        self.plein_entries["lieu"].set(values[6])
+        self.plein_entries["type_usage"].set(values[7])
+        self.plein_entries["commentaire"].insert(0, values[8])
 
-        self.entries_plein["mois"].delete(0, tk.END)
-        self.entries_plein["mois"].insert(0, mois)
+    def _on_delete_selected_plein(self):
+        sel = self.tree.selection()
+        if not sel:
+            return
+        pid = int(self.tree.item(sel, "values")[0])
+        if not messagebox.askyesno("Confirmation", f"Supprimer le plein ID {pid} ?"):
+            return
+        delete_plein(pid)
+        self.plein_edit_id = None
+        self._refresh_pleins()
+        self._refresh_km_label()
+        self._clear_plein_form()
 
-        self.entries_plein["année"].delete(0, tk.END)
-        self.entries_plein["année"].insert(0, an)
+    def _import_csv(self):
+        messagebox.showinfo("Importer CSV", "Fonction à venir (v2+).")
 
-        self.entries_plein["kilometrage"].delete(0, tk.END)
-        self.entries_plein["kilometrage"].insert(0, values[2])
+    # ---- Lieux ----
 
-        self.entries_plein["litres"].delete(0, tk.END)
-        self.entries_plein["litres"].insert(0, values[3])
-
-        self.entries_plein["prix_litre"].delete(0, tk.END)
-        self.entries_plein["prix_litre"].insert(0, values[4])
-
-        self.entries_plein["lieu"].set(values[6])
-        self.entries_plein["type_usage"].set(values[7])
-
-        self.entries_plein["commentaire"].delete(0, tk.END)
-        self.entries_plein["commentaire"].insert(0, values[8])
-
-        self.plein_en_cours = plein_id
-
-    def import_csv(self):
-        messagebox.showinfo("Importer CSV", "Fonction à venir.")
-
-    # ---------------------
-    # Onglet Lieux
-    # ---------------------
-
-    def create_lieux_tab(self):
+    def _build_lieux_tab(self):
         container = tk.Frame(self.tab_lieux)
         container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
@@ -658,49 +776,53 @@ class GarageApp(tk.Tk):
         self.listbox_lieux = tk.Listbox(col_list, height=22)
         self.listbox_lieux.pack(fill=tk.BOTH, expand=True, pady=5)
 
-        tk.Button(col_actions, text="Ajouter un lieu…", command=self.on_ajouter_lieu).pack(fill=tk.X, pady=5)
-        tk.Button(col_actions, text="Supprimer le lieu sélectionné", command=self.on_supprimer_lieu).pack(fill=tk.X, pady=5)
-        tk.Button(col_actions, text="Renommer le lieu sélectionné…", command=self.on_renommer_lieu).pack(fill=tk.X, pady=5)
-        tk.Button(col_actions, text="Rafraîchir", command=self.refresh_lieux_ui).pack(fill=tk.X, pady=15)
+        tk.Button(col_actions, text="Ajouter un lieu…", command=self._on_add_lieu).pack(fill=tk.X, pady=5)
+        tk.Button(col_actions, text="Supprimer le lieu sélectionné", command=self._on_delete_lieu).pack(fill=tk.X, pady=5)
+        tk.Button(col_actions, text="Renommer le lieu sélectionné…", command=self._on_rename_lieu).pack(fill=tk.X, pady=5)
+        tk.Button(col_actions, text="Rafraîchir", command=self._refresh_lieux_ui).pack(fill=tk.X, pady=15)
 
-        aide_texte = (
-            "ℹ  Aide\n\n"
-            "➕  Ajoutez un lieu pour le réutiliser dans les Pleins.\n\n"
-            "🗑  La suppression est bloquée si le lieu est déjà utilisé\n"
-            "     dans des pleins.\n\n"
-            "✏️  Pour corriger une faute d’orthographe, utilisez « Renommer… » :\n"
-            "     cela mettra à jour les pleins existants."
-        )
-        tk.Label(col_actions, text=aide_texte, justify="left").pack(anchor="w", pady=10)
+        self._refresh_lieux_ui()
 
-    def on_ajouter_lieu(self):
+    def _refresh_lieux_combo(self):
+        lieux = list_lieux()
+        cb: ttk.Combobox = self.plein_entries["lieu"]
+        current = cb.get()
+        cb["values"] = lieux
+        cb.set(current if current in lieux else "")
+
+    def _refresh_lieux_ui(self):
+        lieux = list_lieux()
+        self.listbox_lieux.delete(0, tk.END)
+        for nom in lieux:
+            self.listbox_lieux.insert(tk.END, nom)
+        self._refresh_lieux_combo()
+
+    def _on_add_lieu(self):
         nom = simpledialog.askstring("Ajouter un lieu", "Nom du lieu :")
         if not nom:
             return
-        ajouter_lieu(nom)
-        self.refresh_lieux_ui()
+        add_lieu(nom)
+        self._refresh_lieux_ui()
 
-    def on_supprimer_lieu(self):
+    def _on_delete_lieu(self):
         sel = self.listbox_lieux.curselection()
         if not sel:
             return
         nom = self.listbox_lieux.get(sel[0])
-
-        n = compter_pleins_pour_lieu(nom)
+        n = count_pleins_for_lieu(nom)
         if n > 0:
             messagebox.showwarning(
                 "Suppression impossible",
                 f"Le lieu '{nom}' est utilisé dans {n} plein(s).\n\n"
-                "Pour corriger une faute d’orthographe, utilisez plutôt « Renommer… ».",
+                "Pour corriger une faute d’orthographe, utilise « Renommer… ».",
             )
             return
-
         if not messagebox.askyesno("Confirmation", f"Supprimer '{nom}' ?"):
             return
-        supprimer_lieu(nom)
-        self.refresh_lieux_ui()
+        delete_lieu(nom)
+        self._refresh_lieux_ui()
 
-    def on_renommer_lieu(self):
+    def _on_rename_lieu(self):
         sel = self.listbox_lieux.curselection()
         if not sel:
             return
@@ -713,11 +835,231 @@ class GarageApp(tk.Tk):
             messagebox.showwarning("Renommer", "Le nouveau nom ne peut pas être vide.")
             return
         try:
-            renommer_lieu(ancien, nouveau)
+            rename_lieu(ancien, nouveau)
         except Exception as e:
             messagebox.showerror("Erreur", str(e))
             return
-        self.refresh_lieux_ui()
+        self._refresh_lieux_ui()
+
+    # ---- Véhicules ----
+
+    def _build_vehicules_tab(self):
+        container = tk.Frame(self.tab_vehicules)
+        container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        left = tk.Frame(container)
+        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        right = tk.Frame(container)
+        right.pack(side=tk.LEFT, fill=tk.Y, padx=30)
+
+        tk.Label(left, text=f"Véhicules (max {MAX_VEHICLES}) :").pack(anchor="w")
+        self.tree_vehicles = ttk.Treeview(left, columns=("id", "nom", "marque", "modele", "energie"), show="headings")
+        for c, w in [("id", 50), ("nom", 160), ("marque", 140), ("modele", 140), ("energie", 120)]:
+            self.tree_vehicles.heading(c, text=c.upper())
+            self.tree_vehicles.column(c, width=w, stretch=(c == "nom"))
+        self.tree_vehicles.pack(fill=tk.BOTH, expand=True, pady=6)
+        self.tree_vehicles.bind("<<TreeviewSelect>>", self._on_vehicle_row_selected)
+
+        self.vehicle_form = {}
+        form = tk.Frame(right)
+        form.pack(fill=tk.X)
+
+        def add_field(label, key, row, width=26):
+            tk.Label(form, text=label).grid(row=row, column=0, sticky="w", pady=3)
+            e = tk.Entry(form, width=width)
+            e.grid(row=row, column=1, pady=3)
+            self.vehicle_form[key] = e
+
+        add_field("Nom (pseudo)", "nom", 0)
+        add_field("Marque", "marque", 1)
+        add_field("Modèle", "modele", 2)
+        add_field("Motorisation", "motorisation", 3)
+        add_field("Énergie", "energie", 4)
+        add_field("Immatriculation", "immat", 5)
+
+        tk.Label(form, text="Photo").grid(row=6, column=0, sticky="w", pady=3)
+        self.lbl_photo = tk.Label(form, text="(aucune)")
+        self.lbl_photo.grid(row=6, column=1, sticky="w", pady=3)
+        tk.Button(form, text="Choisir…", command=self._pick_vehicle_photo).grid(row=7, column=1, sticky="w", pady=3)
+
+        self.canvas_vehicle_preview = tk.Canvas(right, width=240, height=160, highlightthickness=1)
+        self.canvas_vehicle_preview.pack(pady=10)
+
+        actions = tk.Frame(right)
+        actions.pack(fill=tk.X, pady=10)
+
+        tk.Button(actions, text="Ajouter", command=self._on_vehicle_add, width=18).grid(row=0, column=0, pady=4, padx=4)
+        tk.Button(actions, text="Enregistrer", command=self._on_vehicle_save, width=18).grid(row=0, column=1, pady=4, padx=4)
+        tk.Button(actions, text="Supprimer", command=self._on_vehicle_delete, width=18).grid(row=1, column=0, pady=4, padx=4)
+        tk.Button(actions, text="Définir actif", command=self._on_vehicle_set_active, width=18).grid(row=1, column=1, pady=4, padx=4)
+        tk.Button(actions, text="Rafraîchir", command=self._refresh_all_vehicles_ui, width=18).grid(row=2, column=0, pady=4, padx=4)
+
+        self._vehicle_selected_id: int | None = None
+        self._vehicle_selected_photo_filename: str | None = None
+        self._clear_vehicle_form()
+
+    def _refresh_all_vehicles_ui(self):
+        for item in self.tree_vehicles.get_children():
+            self.tree_vehicles.delete(item)
+
+        vehicles = list_vehicles()
+        for (vid, nom, marque, modele, motorisation, energie, immat, photo) in vehicles:
+            self.tree_vehicles.insert("", "end", values=(vid, nom, marque or "", modele or "", energie or ""))
+
+        if hasattr(self, "cb_vehicle"):
+            if self.vehicle_id_active is None and vehicles:
+                self.vehicle_id_active = int(vehicles[0][0])
+            self._refresh_vehicle_selector()
+            if self.vehicle_id_active is not None:
+                self._apply_active_vehicle_to_ui()
+
+    def _on_vehicle_row_selected(self, _evt=None):
+        sel = self.tree_vehicles.selection()
+        if not sel:
+            return
+        values = self.tree_vehicles.item(sel, "values")
+        vid = int(values[0])
+        self._vehicle_selected_id = vid
+
+        v = get_vehicle(vid)
+        if not v:
+            return
+        _, nom, marque, modele, motorisation, energie, immat, photo = v
+        self._vehicle_selected_photo_filename = photo
+
+        self.vehicle_form["nom"].delete(0, tk.END); self.vehicle_form["nom"].insert(0, nom or "")
+        self.vehicle_form["marque"].delete(0, tk.END); self.vehicle_form["marque"].insert(0, marque or "")
+        self.vehicle_form["modele"].delete(0, tk.END); self.vehicle_form["modele"].insert(0, modele or "")
+        self.vehicle_form["motorisation"].delete(0, tk.END); self.vehicle_form["motorisation"].insert(0, motorisation or "")
+        self.vehicle_form["energie"].delete(0, tk.END); self.vehicle_form["energie"].insert(0, energie or "")
+        self.vehicle_form["immat"].delete(0, tk.END); self.vehicle_form["immat"].insert(0, immat or "")
+
+        self._update_vehicle_photo_labels_and_preview(photo)
+
+    def _update_vehicle_photo_labels_and_preview(self, photo_filename):
+        self.lbl_photo.config(text=photo_filename or "(aucune)")
+        self.canvas_vehicle_preview.delete("all")
+        name = self.vehicle_form["nom"].get().strip() or "Véhicule"
+        tk_img, _err = load_photo_or_placeholder(photo_filename, size=(240, 160), label=name)
+        self._tk_vehicle_preview = tk_img
+        if tk_img is not None:
+            self.canvas_vehicle_preview.create_image(0, 0, anchor="nw", image=tk_img)
+        else:
+            self.canvas_vehicle_preview.create_rectangle(0, 0, 240, 160, fill="#c8c8c8", outline="#999999")
+            self.canvas_vehicle_preview.create_text(120, 80, text=f"{name}\nPhoto introuvable", justify="center")
+
+    def _clear_vehicle_form(self):
+        self._vehicle_selected_id = None
+        self._vehicle_selected_photo_filename = None
+        for w in self.vehicle_form.values():
+            w.delete(0, tk.END)
+        self._update_vehicle_photo_labels_and_preview(None)
+
+    def _pick_vehicle_photo(self):
+        path = filedialog.askopenfilename(
+            title="Choisir une photo",
+            filetypes=[("Images", "*.png *.jpg *.jpeg *.webp *.bmp"), ("Tous fichiers", "*.*")],
+        )
+        if not path:
+            return
+        src = Path(path)
+        if not src.exists():
+            messagebox.showerror("Photo", "Fichier introuvable.")
+            return
+
+        name_hint = safe_filename(self.vehicle_form["nom"].get())
+        ext = src.suffix.lower() if src.suffix else ".png"
+        dest_name = f"{name_hint}{ext}"
+        dest = VEHICLES_DIR / dest_name
+        if dest.exists():
+            dest_name = f"{name_hint}_{int(time.time())}{ext}"
+            dest = VEHICLES_DIR / dest_name
+
+        try:
+            shutil.copy2(src, dest)
+        except Exception as e:
+            messagebox.showerror("Photo", f"Impossible de copier la photo:\n{e}")
+            return
+
+        self._vehicle_selected_photo_filename = dest_name
+        self._update_vehicle_photo_labels_and_preview(dest_name)
+
+    def _on_vehicle_add(self):
+        if count_vehicles() >= MAX_VEHICLES:
+            messagebox.showwarning("Véhicules", f"Limite atteinte ({MAX_VEHICLES}). Supprime un véhicule pour en ajouter un nouveau.")
+            return
+        self._clear_vehicle_form()
+
+    def _on_vehicle_save(self):
+        nom = (self.vehicle_form["nom"].get() or "").strip()
+        if not nom:
+            messagebox.showerror("Véhicule", "Le champ 'Nom' est obligatoire.")
+            return
+
+        marque = (self.vehicle_form["marque"].get() or "").strip()
+        modele = (self.vehicle_form["modele"].get() or "").strip()
+        motorisation = (self.vehicle_form["motorisation"].get() or "").strip()
+        energie = (self.vehicle_form["energie"].get() or "").strip()
+        immat = (self.vehicle_form["immat"].get() or "").strip()
+        photo = self._vehicle_selected_photo_filename
+
+        try:
+            if self._vehicle_selected_id is None:
+                if count_vehicles() >= MAX_VEHICLES:
+                    messagebox.showwarning("Véhicules", f"Limite atteinte ({MAX_VEHICLES}).")
+                    return
+                new_id = add_vehicle(nom, marque, modele, motorisation, energie, immat, photo)
+                self._vehicle_selected_id = new_id
+                if self.vehicle_id_active is None:
+                    self.vehicle_id_active = new_id
+                    set_config("active_vehicle_id", str(new_id))
+            else:
+                update_vehicle(self._vehicle_selected_id, nom, marque, modele, motorisation, energie, immat, photo)
+
+        except sqlite3.IntegrityError:
+            messagebox.showerror("Véhicule", "Ce nom existe déjà. Choisis un pseudo différent.")
+            return
+        except Exception as e:
+            messagebox.showerror("Véhicule", str(e))
+            return
+
+        self._refresh_all_vehicles_ui()
+        self._update_vehicle_photo_labels_and_preview(photo)
+
+    def _on_vehicle_delete(self):
+        if self._vehicle_selected_id is None:
+            messagebox.showwarning("Véhicule", "Sélectionne un véhicule à supprimer.")
+            return
+        v = get_vehicle(self._vehicle_selected_id)
+        if not v:
+            return
+        nom = v[1]
+        if not messagebox.askyesno("Confirmation", f"Supprimer le véhicule '{nom}' ?"):
+            return
+        try:
+            delete_vehicle(self._vehicle_selected_id)
+        except Exception as e:
+            messagebox.showerror("Suppression", str(e))
+            return
+
+        if self.vehicle_id_active == self._vehicle_selected_id:
+            self.vehicle_id_active = None
+            set_config("active_vehicle_id", "")
+
+        self._clear_vehicle_form()
+        self._refresh_all_vehicles_ui()
+        self._restore_active_vehicle()
+
+    def _on_vehicle_set_active(self):
+        if self._vehicle_selected_id is None:
+            messagebox.showwarning("Véhicule", "Sélectionne un véhicule à définir actif.")
+            return
+        self.vehicle_id_active = self._vehicle_selected_id
+        set_config("active_vehicle_id", str(self.vehicle_id_active))
+        self._refresh_vehicle_selector()
+        self._apply_active_vehicle_to_ui()
+        self.notebook.select(self.tab_pleins)
 
 
 if __name__ == "__main__":
