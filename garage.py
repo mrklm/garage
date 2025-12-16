@@ -6,7 +6,7 @@ import shutil
 import time
 
 APP_NAME = "Garage"
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.4.0"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_FILE = str(SCRIPT_DIR / "garage.db")
@@ -15,7 +15,9 @@ ASSETS_DIR = SCRIPT_DIR / "assets"
 VEHICLES_DIR = ASSETS_DIR / "vehicles"
 
 MAX_VEHICLES = 5
-MISSED_FILL_KM_THRESHOLD = 1500  # utilisé uniquement pour fiabiliser les calculs
+MISSED_FILL_KM_THRESHOLD = 1500  # utilisé uniquement pour fiabiliser les calculs conso
+
+INTERVENTIONS = ["Réparation", "Entretien", "Entretien + Réparation"]
 
 # Pillow optionnel
 try:
@@ -134,7 +136,6 @@ def init_db_and_migrate():
         )
         """
     )
-    # Migration: si colonne annee absente
     cols_v = table_columns(conn, "vehicules")
     if "annee" not in cols_v:
         try:
@@ -172,13 +173,14 @@ def init_db_and_migrate():
         """
     )
 
-    # Entretien: enregistrements
+    # Entretien (v2.4: + kilometrage)
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS entretien (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             vehicule_id INTEGER NOT NULL,
             date TEXT NOT NULL,
+            kilometrage INTEGER,
             intervention TEXT NOT NULL,
             precision TEXT,
             entretien_item TEXT,
@@ -188,6 +190,13 @@ def init_db_and_migrate():
         )
         """
     )
+    cols_e = table_columns(conn, "entretien")
+    if "kilometrage" not in cols_e:
+        try:
+            cur.execute("ALTER TABLE entretien ADD COLUMN kilometrage INTEGER")
+            conn.commit()
+        except Exception:
+            pass
 
     # Entretien: catalogue
     cur.execute(
@@ -475,7 +484,7 @@ def list_entretien(vehicle_id: int):
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT id, date, intervention, precision, entretien_item, effectue_par, cout
+        SELECT id, date, kilometrage, intervention, precision, entretien_item, effectue_par, cout
         FROM entretien
         WHERE vehicule_id = ?
         ORDER BY date DESC, id DESC
@@ -487,30 +496,32 @@ def list_entretien(vehicle_id: int):
     return rows
 
 
-def add_entretien(vehicle_id: int, date: str, intervention: str, precision: str | None, entretien_item: str | None, effectue_par: str | None, cout: float | None):
+def add_entretien(vehicle_id: int, date: str, kilometrage: int | None, intervention: str,
+                  precision: str | None, entretien_item: str | None, effectue_par: str | None, cout: float | None):
     conn = connect()
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO entretien (vehicule_id, date, intervention, precision, entretien_item, effectue_par, cout)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO entretien (vehicule_id, date, kilometrage, intervention, precision, entretien_item, effectue_par, cout)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (vehicle_id, date, intervention, precision, entretien_item, effectue_par, cout),
+        (vehicle_id, date, kilometrage, intervention, precision, entretien_item, effectue_par, cout),
     )
     conn.commit()
     conn.close()
 
 
-def update_entretien(entretien_id: int, vehicle_id: int, date: str, intervention: str, precision: str | None, entretien_item: str | None, effectue_par: str | None, cout: float | None):
+def update_entretien(entretien_id: int, vehicle_id: int, date: str, kilometrage: int | None, intervention: str,
+                     precision: str | None, entretien_item: str | None, effectue_par: str | None, cout: float | None):
     conn = connect()
     cur = conn.cursor()
     cur.execute(
         """
         UPDATE entretien
-        SET vehicule_id = ?, date = ?, intervention = ?, precision = ?, entretien_item = ?, effectue_par = ?, cout = ?
+        SET vehicule_id = ?, date = ?, kilometrage = ?, intervention = ?, precision = ?, entretien_item = ?, effectue_par = ?, cout = ?
         WHERE id = ?
         """,
-        (vehicle_id, date, intervention, precision, entretien_item, effectue_par, cout, entretien_id),
+        (vehicle_id, date, kilometrage, intervention, precision, entretien_item, effectue_par, cout, entretien_id),
     )
     conn.commit()
     conn.close()
@@ -648,7 +659,7 @@ class GarageApp(tk.Tk):
         init_db_and_migrate()
 
         self.title(f"{APP_NAME} v{APP_VERSION}")
-        self.geometry("1300x720")
+        self.geometry("1350x740")
 
         self.vehicle_id_active: int | None = None
         self.plein_edit_id: int | None = None
@@ -811,10 +822,10 @@ class GarageApp(tk.Tk):
         mid = tk.Frame(self.tab_entretien)
         mid.pack(fill=tk.BOTH, expand=True, padx=10)
 
-        cols = ("id", "date", "intervention", "detail", "effectue_par", "cout")
+        cols = ("id", "date", "km", "intervention", "detail", "effectue_par", "cout")
         self.tree_ent = ttk.Treeview(mid, columns=cols, show="headings")
-        widths = {"id": 55, "date": 90, "intervention": 110, "detail": 380, "effectue_par": 220, "cout": 90}
-        heads = {"id": "ID", "date": "Date", "intervention": "Intervention", "detail": "Détail", "effectue_par": "Effectué par", "cout": "€"}
+        widths = {"id": 55, "date": 90, "km": 90, "intervention": 170, "detail": 420, "effectue_par": 220, "cout": 90}
+        heads = {"id": "ID", "date": "Date", "km": "Km", "intervention": "Intervention", "detail": "Détail", "effectue_par": "Effectué par", "cout": "€"}
 
         for c in cols:
             self.tree_ent.heading(c, text=heads[c])
@@ -833,35 +844,40 @@ class GarageApp(tk.Tk):
             e.grid(row=1, column=i, padx=4)
             self.ent_entries[key] = e
 
-        tk.Label(form, text="Intervention").grid(row=0, column=3, padx=4)
-        cb_int = ttk.Combobox(form, state="readonly", width=14, values=["Réparation", "Entretien"])
-        cb_int.grid(row=1, column=3, padx=4)
+        tk.Label(form, text="Km").grid(row=0, column=3, padx=4)
+        e_km = tk.Entry(form, width=10)
+        e_km.grid(row=1, column=3, padx=4)
+        self.ent_entries["km"] = e_km
+
+        tk.Label(form, text="Intervention").grid(row=0, column=4, padx=4)
+        cb_int = ttk.Combobox(form, state="readonly", width=22, values=INTERVENTIONS)
+        cb_int.grid(row=1, column=4, padx=4)
         cb_int.bind("<<ComboboxSelected>>", self._on_ent_intervention_changed)
         self.ent_entries["intervention"] = cb_int
 
-        tk.Label(form, text="Préciser").grid(row=0, column=4, padx=4)
-        e_prec = tk.Entry(form, width=24)
-        e_prec.grid(row=1, column=4, padx=4)
+        tk.Label(form, text="Préciser (réparation)").grid(row=0, column=5, padx=4)
+        e_prec = tk.Entry(form, width=28)
+        e_prec.grid(row=1, column=5, padx=4)
         self.ent_entries["precision"] = e_prec
 
-        tk.Label(form, text="Entretien").grid(row=0, column=5, padx=4)
+        tk.Label(form, text="Entretien").grid(row=0, column=6, padx=4)
         cb_item = ttk.Combobox(form, state="readonly", width=20)
-        cb_item.grid(row=1, column=5, padx=4)
+        cb_item.grid(row=1, column=6, padx=4)
         self.ent_entries["entretien_item"] = cb_item
-        tk.Button(form, text="Ajouter…", command=self._add_entretien_item_dialog).grid(row=1, column=6, padx=4)
+        tk.Button(form, text="Ajouter…", command=self._add_entretien_item_dialog).grid(row=1, column=7, padx=4)
 
-        tk.Label(form, text="Effectué par").grid(row=0, column=7, padx=4)
+        tk.Label(form, text="Effectué par").grid(row=0, column=8, padx=4)
         e_par = tk.Entry(form, width=22)
-        e_par.grid(row=1, column=7, padx=4)
+        e_par.grid(row=1, column=8, padx=4)
         self.ent_entries["effectue_par"] = e_par
 
-        tk.Label(form, text="€").grid(row=0, column=8, padx=4)
+        tk.Label(form, text="€").grid(row=0, column=9, padx=4)
         e_eur = tk.Entry(form, width=10)
-        e_eur.grid(row=1, column=8, padx=4)
+        e_eur.grid(row=1, column=9, padx=4)
         self.ent_entries["cout"] = e_eur
 
         self._refresh_entretien_items_combo()
-        self._set_entretien_mode("Réparation")
+        self._set_entretien_mode("Entretien + Réparation")
 
     def _refresh_entretien_items_combo(self):
         items = list_entretien_items()
@@ -878,13 +894,13 @@ class GarageApp(tk.Tk):
         self._refresh_entretien_items_combo()
 
     def _on_ent_intervention_changed(self, _evt=None):
-        mode = self.ent_entries["intervention"].get() or "Réparation"
+        mode = self.ent_entries["intervention"].get() or "Entretien + Réparation"
         self._set_entretien_mode(mode)
 
     def _set_entretien_mode(self, mode: str):
         mode = (mode or "").strip()
-        if mode not in ("Réparation", "Entretien"):
-            mode = "Réparation"
+        if mode not in INTERVENTIONS:
+            mode = "Entretien + Réparation"
         self.ent_entries["intervention"].set(mode)
 
         e_prec: tk.Entry = self.ent_entries["precision"]
@@ -893,9 +909,28 @@ class GarageApp(tk.Tk):
         if mode == "Réparation":
             e_prec.configure(state="normal")
             cb_item.configure(state="disabled")
-        else:
+        elif mode == "Entretien":
             e_prec.configure(state="disabled")
             cb_item.configure(state="readonly")
+        else:  # Entretien + Réparation
+            e_prec.configure(state="normal")
+            cb_item.configure(state="readonly")
+
+    def _format_entretien_detail(self, intervention: str, precision: str | None, entretien_item: str | None) -> str:
+        precision = (precision or "").strip()
+        entretien_item = (entretien_item or "").strip()
+
+        if intervention == "Réparation":
+            return precision
+        if intervention == "Entretien":
+            return entretien_item
+
+        parts = []
+        if entretien_item:
+            parts.append(f"Entretien: {entretien_item}")
+        if precision:
+            parts.append(f"Réparation: {precision}")
+        return " | ".join(parts)
 
     def _refresh_entretien(self):
         for item in self.tree_ent.get_children():
@@ -904,21 +939,23 @@ class GarageApp(tk.Tk):
             return
 
         rows = list_entretien(self.vehicle_id_active)
-        for (eid, date_iso, intervention, precision, entretien_item, effectue_par, cout) in rows:
+        for (eid, date_iso, km, intervention, precision, entretien_item, effectue_par, cout) in rows:
             try:
                 an, mois, jour = date_iso.split("-")
                 date_aff = f"{jour}/{mois}/{an[2:]}"
             except Exception:
                 date_aff = date_iso
-            detail = precision if intervention == "Réparation" else (entretien_item or "")
+
+            detail = self._format_entretien_detail(intervention, precision, entretien_item)
             cout_str = "" if cout is None else f"{float(cout):.2f}"
-            self.tree_ent.insert("", "end", values=(eid, date_aff, intervention, detail, effectue_par or "", cout_str))
+            km_str = "" if km is None else str(int(km))
+            self.tree_ent.insert("", "end", values=(eid, date_aff, km_str, intervention, detail, effectue_par or "", cout_str))
 
     def _clear_entretien_form(self):
-        for k in ("jour", "mois", "annee", "precision", "effectue_par", "cout"):
+        for k in ("jour", "mois", "annee", "km", "precision", "effectue_par", "cout"):
             self.ent_entries[k].delete(0, tk.END)
-        self.ent_entries["intervention"].set("Réparation")
-        self._set_entretien_mode("Réparation")
+        self.ent_entries["intervention"].set("Entretien + Réparation")
+        self._set_entretien_mode("Entretien + Réparation")
         self._refresh_entretien_items_combo()
 
     def _on_save_entretien(self):
@@ -933,20 +970,41 @@ class GarageApp(tk.Tk):
                 raise ValueError("Date invalide : Jour 1-31, Mois 1-12, Année sur 2 chiffres.")
             date_iso = f"20{a:02d}-{m:02d}-{j:02d}"
 
+            km_txt = (self.ent_entries["km"].get() or "").strip()
+            km = None
+            if km_txt:
+                km = int(km_txt)
+                if km < 0:
+                    raise ValueError("Km entretien invalide (doit être positif).")
+                last = last_km(self.vehicle_id_active)
+                if last is not None and km > last:
+                    if not messagebox.askyesno(
+                        "Km élevé",
+                        f"Le dernier km enregistré dans les pleins est {last} km.\n"
+                        f"Tu veux vraiment enregistrer un entretien à {km} km ?"
+                    ):
+                        return
+
             intervention = (self.ent_entries["intervention"].get() or "").strip()
-            if intervention not in ("Réparation", "Entretien"):
+            if intervention not in INTERVENTIONS:
                 raise ValueError("Intervention invalide.")
 
-            precision = None
-            entretien_item = None
+            precision = (self.ent_entries["precision"].get() or "").strip() or None
+            entretien_item = (self.ent_entries["entretien_item"].get() or "").strip() or None
+
             if intervention == "Réparation":
-                precision = (self.ent_entries["precision"].get() or "").strip()
                 if not precision:
                     raise ValueError("Pour une réparation, précise ce qui a été réparé.")
-            else:
-                entretien_item = (self.ent_entries["entretien_item"].get() or "").strip()
+                entretien_item = None
+            elif intervention == "Entretien":
                 if not entretien_item:
                     raise ValueError("Pour un entretien, sélectionne un élément dans la liste.")
+                precision = None
+            else:  # Entretien + Réparation
+                if not precision and not entretien_item:
+                    raise ValueError("Renseigne au moins un type d’entretien et/ou une réparation.")
+
+            if entretien_item:
                 add_entretien_item(entretien_item)
 
             effectue_par = (self.ent_entries["effectue_par"].get() or "").strip() or None
@@ -957,9 +1015,9 @@ class GarageApp(tk.Tk):
                 cout = float(cout_txt.replace(",", "."))
 
             if self.entretien_edit_id is None:
-                add_entretien(self.vehicle_id_active, date_iso, intervention, precision, entretien_item, effectue_par, cout)
+                add_entretien(self.vehicle_id_active, date_iso, km, intervention, precision, entretien_item, effectue_par, cout)
             else:
-                update_entretien(self.entretien_edit_id, self.vehicle_id_active, date_iso, intervention, precision, entretien_item, effectue_par, cout)
+                update_entretien(self.entretien_edit_id, self.vehicle_id_active, date_iso, km, intervention, precision, entretien_item, effectue_par, cout)
                 self.entretien_edit_id = None
 
             self._refresh_entretien()
@@ -976,38 +1034,46 @@ class GarageApp(tk.Tk):
         values = self.tree_ent.item(sel, "values")
         self.entretien_edit_id = int(values[0])
 
-        date_val = str(values[1])
+        conn = connect()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT date, kilometrage, intervention, precision, entretien_item, effectue_par, cout FROM entretien WHERE id = ?",
+            (self.entretien_edit_id,),
+        )
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return
+
+        date_iso, km, intervention, precision, entretien_item, effectue_par, cout = row
+
         try:
-            if "/" in date_val:
-                jour, mois, an = date_val.split("/")
-            else:
-                an, mois, jour = date_val.split("-")
-                an = an[2:]
+            an, mois, jour = date_iso.split("-")
         except Exception:
-            messagebox.showerror("Erreur", f"Format de date invalide : {date_val}")
+            messagebox.showerror("Erreur", f"Date invalide en base: {date_iso}")
             return
 
         self._clear_entretien_form()
         self.ent_entries["jour"].insert(0, jour)
         self.ent_entries["mois"].insert(0, mois)
-        self.ent_entries["annee"].insert(0, an)
+        self.ent_entries["annee"].insert(0, an[2:])
 
-        intervention = str(values[2])
-        detail = str(values[3])
+        if km is not None:
+            self.ent_entries["km"].insert(0, str(int(km)))
 
         self.ent_entries["intervention"].set(intervention)
         self._set_entretien_mode(intervention)
 
-        if intervention == "Réparation":
-            self.ent_entries["precision"].configure(state="normal")
-            self.ent_entries["precision"].insert(0, detail)
-        else:
+        if precision:
+            self.ent_entries["precision"].insert(0, precision)
+        if entretien_item:
             self._refresh_entretien_items_combo()
-            self.ent_entries["entretien_item"].set(detail)
+            self.ent_entries["entretien_item"].set(entretien_item)
 
-        self.ent_entries["effectue_par"].insert(0, str(values[4]))
-        if str(values[5]).strip():
-            self.ent_entries["cout"].insert(0, str(values[5]))
+        if effectue_par:
+            self.ent_entries["effectue_par"].insert(0, effectue_par)
+        if cout is not None:
+            self.ent_entries["cout"].insert(0, f"{float(cout):.2f}")
 
     def _on_delete_selected_entretien(self):
         sel = self.tree_ent.selection()
