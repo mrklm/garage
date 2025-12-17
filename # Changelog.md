@@ -5,6 +5,8 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 ---
 
+
+
 ## [2.5.4] – 2025-12-17
 ### Ajouté
 - Rappels d’entretien intelligents :

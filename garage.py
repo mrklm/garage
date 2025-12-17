@@ -8,7 +8,7 @@ import datetime as _dt
 import re
 
 APP_NAME = "Garage"
-APP_VERSION = "2.5.3"
+APP_VERSION = "3.0.1"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_FILE = str(SCRIPT_DIR / "garage.db")
@@ -916,19 +916,32 @@ def compute_reminders_status(vehicle_id: int):
                 continue
 
             interval_days = int(r.get("interval_days", 30))
-            overdue = _days_since(last_date) > interval_days
-
-            if overdue:
+            overdue_month = _days_since(last_date) > interval_days
+            if overdue_month:
                 results.append({"label": r["label"], "overdue": True, "message": r.get("todo_text") or "À faire", "display": r.get("todo_text") or "À faire"})
                 continue
 
-            # Tente d'extraire la tension depuis l'item ou la précision (selon comment l'utilisateur l'a enregistré)
+            # Mesure récente -> interprétation de la tension
             v = _parse_voltage_from_text(f"{item} {prec}")
             if v is None:
-                msg = f"Fait le {last_date.strftime('%d/%m/%Y')} (tension non renseignée)"
+                # Mesure non renseignée: on préfère alerter
+                results.append({"label": r["label"], "overdue": True, "message": "Tension batterie non renseignée", "display": "Tension batterie non renseignée"})
+                continue
+
+            if v <= 12.0:
+                disp = "Prévoir remplacement Batterie"
+                is_bad = True
+            elif 12.1 <= v <= 12.3:
+                disp = "Batterie à recharger"
+                is_bad = True
+            elif 12.4 <= v <= 12.5:
+                disp = "Tension batterie OK"
+                is_bad = False
             else:
-                msg = f"Fait le {last_date.strftime('%d/%m/%Y')} — {_battery_state(v)}"
-            results.append({"label": r["label"], "overdue": False, "message": msg, "display": msg})
+                disp = "Batterie en bonne santé"
+                is_bad = False
+
+            results.append({"label": r["label"], "overdue": is_bad, "message": disp, "display": disp})
             continue
 
         # --- Contrôle Technique (2 ans, + imminent à 1 mois)
@@ -952,7 +965,7 @@ def compute_reminders_status(vehicle_id: int):
             elif days_left <= int(r.get("imminent_days", 30)):
                 results.append({"label": r["label"], "overdue": True, "message": f"Contrôle Technique imminent: {due_str}", "display": f"Contrôle Technique imminent: {due_str}"})
             else:
-                results.append({"label": r["label"], "overdue": False, "message": "Contrôle Technique OK", "display": "Contrôle Technique OK"})
+                results.append({"label": r["label"], "overdue": False, "message": f"Contrôle Technique OK prochain le {due_str}", "display": f"Contrôle Technique OK prochain le {due_str}"})
             continue
 
         # --- Par défaut: km + années (logique historique)
@@ -1014,21 +1027,25 @@ class GarageApp(tk.Tk):
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill=tk.BOTH, expand=True)
 
+        self.tab_general = ttk.Frame(self.notebook)
         self.tab_pleins = ttk.Frame(self.notebook)
         self.tab_entretien = ttk.Frame(self.notebook)
-        self.tab_lieux = ttk.Frame(self.notebook)
+        self.tab_options = ttk.Frame(self.notebook)
+        self.tab_lieux = self.tab_options  # compat: ancien onglet "Lieux"
         self.tab_vehicules = ttk.Frame(self.notebook)
 
-        self.notebook.add(self.tab_pleins, text="Pleins")
+        self.notebook.add(self.tab_general, text="Général")
         self.notebook.add(self.tab_entretien, text="Entretien")
-        self.notebook.add(self.tab_lieux, text="Lieux")
+        self.notebook.add(self.tab_pleins, text="Pleins")
         self.notebook.add(self.tab_vehicules, text="Véhicules")
+        self.notebook.add(self.tab_options, text="Options")
 
         self._create_menu()
-        self._build_pleins_tab()
+        self._build_general_tab()
         self._build_entretien_tab()
-        self._build_lieux_tab()
+        self._build_pleins_tab()
         self._build_vehicules_tab()
+        self._build_lieux_tab()  # contient la gestion des lieux + futurs réglages
 
         self._refresh_all_vehicles_ui()
         self._restore_active_vehicle()
@@ -1045,11 +1062,214 @@ class GarageApp(tk.Tk):
             "À propos",
             f"{APP_NAME} v{APP_VERSION}\n\n"
             "Suivi des pleins + entretien multi-véhicules + gestion des lieux.\n"
-            "v2.5.3: mise en page (coûts sous KM, rappels sous boutons) + migrations robustes.\n\n"
+            "v3.0.1: onglet Général (vue flotte) + Pleins simplifié + Options.\n\n"
             f"Base: {DB_FILE}\n"
             f"Photos: {VEHICLES_DIR}\n"
             f"Pillow: {'OK' if PIL_AVAILABLE else 'non détecté'}",
         )
+
+
+    # ------------------- Général -------------------
+
+    def _build_general_tab(self):
+        """Construit l'onglet Général (vue flotte)."""
+        root = tk.Frame(self.tab_general)
+        root.pack(fill=tk.BOTH, expand=True)
+
+        # Canvas pour scroll horizontal si beaucoup de véhicules
+        self.general_canvas = tk.Canvas(root, highlightthickness=0)
+        self.general_canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        xscroll = ttk.Scrollbar(root, orient="horizontal", command=self.general_canvas.xview)
+        xscroll.pack(side=tk.BOTTOM, fill=tk.X)
+        self.general_canvas.configure(xscrollcommand=xscroll.set)
+
+        self.general_inner = tk.Frame(self.general_canvas)
+        self.general_window = self.general_canvas.create_window((0, 0), window=self.general_inner, anchor="nw")
+
+        self.general_cards = {}          # vehicle_id -> dict widgets
+        self.general_photo_refs = {}     # vehicle_id -> PhotoImage (référence)
+        self._general_vehicle_order = [] # ordre d'affichage
+
+        def _on_inner_configure(event=None):
+            self.general_canvas.configure(scrollregion=self.general_canvas.bbox("all"))
+
+        def _on_canvas_configure(event):
+            # Ajuste la largeur du "window" au canvas (hauteur libre, scroll sur X)
+            self.general_canvas.itemconfigure(self.general_window, height=event.height)
+            self._update_general_card_widths()
+
+        self.general_inner.bind("<Configure>", _on_inner_configure)
+        self.general_canvas.bind("<Configure>", _on_canvas_configure)
+
+    def _update_general_card_widths(self):
+        """Répartit l'espace en parts égales quand c'est possible."""
+        if not hasattr(self, "general_canvas") or not hasattr(self, "general_inner"):
+            return
+        vids = getattr(self, "_general_vehicle_order", [])
+        if not vids:
+            return
+        try:
+            cw = int(self.general_canvas.winfo_width())
+        except Exception:
+            return
+        # largeur mini pour rester lisible
+        min_w = 380
+        target = max(min_w, cw // max(1, len(vids)))
+        for vid in vids:
+            card = self.general_cards.get(vid, {}).get("card")
+            if card is not None:
+                card.configure(width=target)
+
+    def _refresh_general_tab(self, vehicles_rows):
+        """Reconstruit/rafraîchit toutes les cartes véhicules dans l'onglet Général."""
+        if not hasattr(self, "general_inner"):
+            return
+
+        # Nettoyage si la flotte a changé
+        wanted_ids = [int(r[0]) for r in vehicles_rows]
+        existing_ids = set(self.general_cards.keys())
+
+        for vid in list(existing_ids):
+            if vid not in wanted_ids:
+                try:
+                    self.general_cards[vid]["card"].destroy()
+                except Exception:
+                    pass
+                self.general_cards.pop(vid, None)
+                self.general_photo_refs.pop(vid, None)
+
+        # Construire les cartes manquantes, dans l'ordre
+        self._general_vehicle_order = wanted_ids
+
+        for col, row in enumerate(vehicles_rows):
+            (vid, nom, marque, modele, motorisation, energie, annee, immat, photo_filename) = row
+            vid = int(vid)
+
+            if vid not in self.general_cards:
+                card = tk.Frame(self.general_inner, bd=1, relief=tk.GROOVE)
+                card.grid(row=0, column=col, sticky="nsew", padx=8, pady=8)
+                card.grid_propagate(False)  # permet width fixe
+
+                # Titre
+                lbl_title = tk.Label(card, text=nom or "—", font=("Arial", 16, "bold"))
+                lbl_title.pack(anchor="center", pady=(8, 6))
+
+                top = tk.Frame(card)
+                top.pack(fill=tk.X, padx=10)
+
+                left = tk.Frame(top)
+                left.pack(side=tk.LEFT, padx=(0, 10), anchor="n")
+
+                right = tk.Frame(top)
+                right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, anchor="n")
+
+                # Photo
+                canvas = tk.Canvas(left, width=220, height=150, highlightthickness=1)
+                canvas.pack()
+
+                # KM
+                lbl_km = tk.Label(left, text="— km", font=("Arial", 20, "bold"), anchor="center")
+                lbl_km.pack(fill=tk.X, pady=(6, 0))
+
+                # Coûts moy/an
+                lbl_fuel = tk.Label(left, text="Carburant (moy/an): —", font=("Arial", 13, "bold"), anchor="center")
+                lbl_fuel.pack(fill=tk.X, pady=(6, 0))
+                lbl_maint = tk.Label(left, text="Entretien (moy/an): —", font=("Arial", 13, "bold"), anchor="center")
+                lbl_maint.pack(fill=tk.X, pady=(2, 0))
+
+                # Infos véhicule (comme l'ancien onglet Pleins)
+                tk.Label(right, text="Infos Véhicule", font=("Arial", 12, "bold", "underline")).pack(anchor="w")
+                info = tk.Frame(right)
+                info.pack(anchor="w", fill=tk.X, pady=(2, 6))
+
+                lbl_marque = ttk.Label(info, text="")
+                lbl_modele = ttk.Label(info, text="")
+                lbl_motor = ttk.Label(info, text="")
+                lbl_energie = ttk.Label(info, text="")
+                lbl_annee = ttk.Label(info, text="")
+                lbl_immat = ttk.Label(info, text="")
+
+                for w in (lbl_marque, lbl_modele, lbl_motor, lbl_energie, lbl_annee, lbl_immat):
+                    w.pack(anchor="w")
+
+                # Alertes/rappels
+                alerts = tk.Frame(card)
+                alerts.pack(fill=tk.BOTH, expand=True, padx=10, pady=(8, 10))
+
+                tk.Label(alerts, text="Alertes", font=("Arial", 12, "bold", "underline")).pack(anchor="center")
+                reminder_lines = []
+                for _ in range(len(REMINDERS)):
+                    lbl = tk.Label(alerts, text="—", font=("Arial", 12), anchor="w", justify="left")
+                    lbl.pack(anchor="w")
+                    reminder_lines.append(lbl)
+
+                # clic = sélectionner véhicule actif
+                def _make_onclick(v=vid):
+                    return lambda e=None: self._on_vehicle_set_active(v)
+
+                card.bind("<Button-1>", _make_onclick())
+                for child in card.winfo_children():
+                    child.bind("<Button-1>", _make_onclick())
+
+                self.general_cards[vid] = {
+                    "card": card,
+                    "title": lbl_title,
+                    "canvas": canvas,
+                    "lbl_km": lbl_km,
+                    "lbl_fuel": lbl_fuel,
+                    "lbl_maint": lbl_maint,
+                    "lbl_marque": lbl_marque,
+                    "lbl_modele": lbl_modele,
+                    "lbl_motor": lbl_motor,
+                    "lbl_energie": lbl_energie,
+                    "lbl_annee": lbl_annee,
+                    "lbl_immat": lbl_immat,
+                    "reminders": reminder_lines,
+                }
+
+            # (re)positionner la carte (au cas où l'ordre change)
+            self.general_cards[vid]["card"].grid(row=0, column=col, sticky="nsew", padx=8, pady=8)
+            self.general_inner.grid_columnconfigure(col, weight=1, uniform="fleet")
+
+            # Rafraîchir contenu (photo, km, coûts, infos, alertes)
+            widgets = self.general_cards[vid]
+
+            widgets["title"].config(text=nom or "—")
+
+            photo_img, _err = load_photo_or_placeholder(photo_filename, size=(220, 150), label=nom or "Véhicule")
+            widgets["canvas"].delete("all")
+            widgets["canvas"].create_image(0, 0, image=photo_img, anchor="nw")
+            self.general_photo_refs[vid] = photo_img  # garder référence
+
+            km = last_km(vid) or 0
+            widgets["lbl_km"].config(text=f"{int(km):,} km".replace(",", " "))
+
+            fuel = compute_fuel_avg_per_year(vid)
+            maint = compute_maintenance_avg_per_year(vid)
+            fuel = 0.0 if fuel is None else float(fuel)
+            maint = 0.0 if maint is None else float(maint)
+
+            widgets["lbl_fuel"].config(text=f"Carburant (moy/an): {fuel:,.0f} €".replace(",", " "))
+            widgets["lbl_maint"].config(text=f"Entretien (moy/an): {maint:,.0f} €".replace(",", " "))
+
+
+            widgets["lbl_marque"].config(text=f"Marque : {marque or '—'}")
+            widgets["lbl_modele"].config(text=f"Modèle : {modele or '—'}")
+            widgets["lbl_motor"].config(text=f"Motorisation : {motorisation or '—'}")
+            widgets["lbl_energie"].config(text=f"Énergie : {energie or '—'}")
+            widgets["lbl_annee"].config(text=f"Année : {annee or '—'}")
+            widgets["lbl_immat"].config(text=f"Immat. : {immat or '—'}")
+
+            statuses = compute_reminders_status(vid)
+            for i, st in enumerate(statuses):
+                line = st.get("display") or f"{st['label']}: {st['message']}"
+                symbol = "✗ " if st.get("overdue") else "✓ "
+                txt = f"{symbol}{line}"
+                if i < len(widgets["reminders"]):
+                    widgets["reminders"][i].config(text=txt, fg=("red" if st.get("overdue") else "green"))
+
+        self._update_general_card_widths()
 
     # ------------------- Pleins -------------------
 
@@ -1091,17 +1311,13 @@ class GarageApp(tk.Tk):
         tk.Button(buttons, text="Importer un fichier (CSV)", command=self._import_csv, width=28).pack(pady=4)
 
         self.reminders_big_frame = tk.Frame(center)
-        self.reminders_big_frame.pack(fill=tk.X, pady=(16, 0))
-
+        # v3: rappels déplacés dans l'onglet "Général"
         self.reminder_big_lines = []
-        for _ in range(len(REMINDERS)):
-            lbl = tk.Label(self.reminders_big_frame, text="—", font=("Arial", 20), anchor="center", justify="center")
-            lbl.pack(anchor="center")
-            self.reminder_big_lines.append(lbl)
 
         # RIGHT: infos véhicule
         right = tk.Frame(top)
-        right.pack(side=tk.RIGHT, padx=20)
+        # v3: infos véhicule déplacées dans l'onglet "Général"
+        # (on conserve les widgets pour compat, mais on ne les affiche pas ici)
 
         tk.Label(right, text="Infos Véhicule", font=("Arial", 14, "bold", "underline")).pack(anchor="w")
         self.info_lines_frame = tk.Frame(right)
@@ -1225,6 +1441,16 @@ class GarageApp(tk.Tk):
         cb_int.bind("<<ComboboxSelected>>", self._on_ent_intervention_changed)
         self.ent_entries["intervention"] = cb_int
 
+        # Tension batterie (##V#) - activée uniquement si l'entretien sélectionné est "Tension de la Batterie"
+        tk.Label(form, text="Tension Batterie").grid(row=0, column=5, padx=4, sticky="w")
+        e_bi = tk.Entry(form, width=4)
+        e_bi.grid(row=1, column=5, padx=2, sticky="w")
+        tk.Label(form, text="V").grid(row=1, column=6, padx=2, sticky="w")
+        e_bd = tk.Entry(form, width=3)
+        e_bd.grid(row=1, column=7, padx=2, sticky="w")
+        self.ent_entries["batt_i"] = e_bi
+        self.ent_entries["batt_d"] = e_bd
+
         # Ligne 2 : détails + acteur + coût (réparti sur 2 lignes pour éviter le débordement)
         tk.Label(form, text="Préciser (réparation)").grid(row=2, column=0, columnspan=3, padx=4, sticky="w")
         e_prec = tk.Entry(form, width=46)
@@ -1234,6 +1460,7 @@ class GarageApp(tk.Tk):
         tk.Label(form, text="Entretien").grid(row=2, column=3, padx=4, sticky="w")
         cb_item = ttk.Combobox(form, state="readonly", width=22)
         cb_item.grid(row=3, column=3, padx=4, sticky="w")
+        cb_item.bind("<<ComboboxSelected>>", self._on_entretien_item_changed)
         self.ent_entries["entretien_item"] = cb_item
         cb_item.bind("<<ComboboxSelected>>", self._on_entretien_item_selected)
 
@@ -1255,6 +1482,7 @@ class GarageApp(tk.Tk):
 
         self._refresh_entretien_items_combo()
         self._set_entretien_mode("Entretien + Réparation")
+        self._update_battery_fields_state()
 
     def _refresh_entretien_items_combo(self):
         items = list_entretien_items()
@@ -1294,17 +1522,33 @@ class GarageApp(tk.Tk):
             e_prec.configure(state="normal")
             cb_item.configure(state="readonly")
 
-    
-    def _on_entretien_item_selected(self, _evt=None):
-        """Gestion des items d'entretien nécessitant une saisie guidée."""
-        cb_item: ttk.Combobox = self.ent_entries.get("entretien_item")
-        if not cb_item:
-            return
-        val = (cb_item.get() or "").strip()
+        self._update_battery_fields_state()
 
-        # Saisie guidée: tension batterie
-        if val.strip().lower() == "tension de la batterie":
-            self._open_battery_voltage_dialog()
+    
+    def _on_entretien_item_changed(self, _evt=None):
+        self._update_battery_fields_state()
+
+    def _update_battery_fields_state(self):
+        # Active les champs tension uniquement pour l'entretien "Tension de la Batterie"
+        mode = (self.ent_entries.get("intervention").get() or "").strip()
+        item = (self.ent_entries.get("entretien_item").get() or "").strip().lower()
+
+        enable = (mode in ("Entretien", "Entretien + Réparation")) and (item == "tension de la batterie")
+        for k in ("batt_i", "batt_d"):
+            w = self.ent_entries.get(k)
+            if not w:
+                continue
+            w.configure(state=("normal" if enable else "disabled"))
+            if not enable:
+                w.delete(0, tk.END)
+
+    def _on_entretien_item_selected(self, _evt=None):
+        """Gestion des items d'entretien nécessitant une saisie guidée.
+
+        Désormais, la tension batterie se saisit directement dans le formulaire.
+        """
+        return
+
 
     def _open_battery_voltage_dialog(self):
         win = tk.Toplevel(self.root)
@@ -1381,7 +1625,7 @@ class GarageApp(tk.Tk):
         if intervention == "Réparation":
             return precision
         if intervention == "Entretien":
-            return entretien_item
+            return entretien_item if not precision else f"{entretien_item} — {precision}"
 
         parts = []
         if entretien_item:
@@ -1408,7 +1652,7 @@ class GarageApp(tk.Tk):
             self.tree_ent.insert("", "end", values=(eid, date_aff, km_str, intervention, detail, effectue_par or "", cout_str))
 
     def _clear_entretien_form(self):
-        for k in ("jour", "mois", "annee", "km", "precision", "effectue_par", "cout"):
+        for k in ("jour", "mois", "annee", "km", "precision", "effectue_par", "cout", "batt_i", "batt_d"):
             self.ent_entries[k].delete(0, tk.END)
         self.ent_entries["intervention"].set("Entretien + Réparation")
         self._set_entretien_mode("Entretien + Réparation")
@@ -1442,12 +1686,6 @@ class GarageApp(tk.Tk):
 
             entretien_item = (self.ent_entries["entretien_item"].get() or "").strip() or None
 
-            # Si l'utilisateur choisit "Tension de la Batterie" sans déclencher l'évènement de sélection,
-            # on ouvre automatiquement la fenêtre de mesure.
-            if entretien_item and entretien_item.strip().lower() == "tension de la batterie" and not self._battery_last_state_message:
-                self._open_battery_voltage_dialog()
-                return
-
             if intervention == "Réparation":
                 if not precision:
                     raise ValueError("Pour une réparation, précise ce qui a été réparé.")
@@ -1460,11 +1698,33 @@ class GarageApp(tk.Tk):
                 if not precision and not entretien_item:
                     raise ValueError("Renseigne au moins un type d’entretien et/ou une réparation.")
 
-            # Cas spécial: Tension batterie -> on conserve la tension + l'état sans polluer la liste déroulante
-            if entretien_item and entretien_item.lower().startswith("tension de la batterie"):
-                if self._battery_last_state_message:
-                    entretien_item = f"{entretien_item} — {self._battery_last_state_message}"
+            # Cas spécial: Tension batterie -> interprétation depuis les champs "Tension Batterie"
+            if entretien_item and entretien_item.strip().lower() == "tension de la batterie":
+                bi = (self.ent_entries.get("batt_i").get() or "").strip() if self.ent_entries.get("batt_i") else ""
+                bd = (self.ent_entries.get("batt_d").get() or "").strip() if self.ent_entries.get("batt_d") else ""
+                if not (bi.isdigit() and len(bi) in (1, 2) and bd.isdigit() and len(bd) == 1):
+                    raise ValueError("Renseigne la tension batterie au format ##V# (ex: 12V6).")
+                v = float(f"{int(bi)}.{int(bd)}")
+
+                # Interprétation demandée (messages courts pour les alertes)
+                if v <= 12.0:
+                    batt_msg = "Prévoir remplacement batterie"
+                elif 12.1 <= v <= 12.3:
+                    batt_msg = "Batterie à recharger"
+                elif 12.4 <= v <= 12.5:
+                    batt_msg = "Tension batterie OK"
+                else:
+                    batt_msg = "Batterie en bonne santé"
+
+                # On stocke la mesure dans "precision" (sans polluer la liste déroulante)
+                precision = (precision or None)
+                stored = f"{v:.1f}V — {batt_msg}".replace(".", ",")
+                precision = stored
+
                 # ne pas ajouter dans entretien_items (sinon on accumule des variantes)
+            elif entretien_item and entretien_item.lower().startswith("tension de la batterie"):
+                # Compatibilité: anciennes entrées
+                pass
             elif entretien_item:
                 add_entretien_item(entretien_item)
 
@@ -1927,6 +2187,9 @@ class GarageApp(tk.Tk):
             self.tree_vehicles.delete(item)
 
         vehicles = list_vehicles()
+        # Met à jour la vue "Général" (vue flotte)
+        if hasattr(self, "_refresh_general_tab"):
+            self._refresh_general_tab(vehicles)
         for (vid, nom, marque, modele, motorisation, energie, annee, immat, photo) in vehicles:
             self.tree_vehicles.insert("", "end", values=(vid, nom, marque or "", modele or "", annee or "", energie or ""))
 
