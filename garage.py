@@ -868,9 +868,9 @@ def compute_reminders_status(vehicle_id: int):
         if voltage <= 12.0:
             return "Tension en dessous de 12V : Attention décharge critique, prévoir remplacement"
         if 12.1 <= voltage <= 12.3:
-            return "Tension de batterie faible : À Recharger"
+            return "Tension de batterie faible : À recharger"
         if 12.4 <= voltage <= 12.5:
-            return "Batterie OK"
+            return "Batterie limitte mais ça passe"
         # >= 12.6
         return "Batterie en bonne santé"
 
@@ -991,7 +991,7 @@ def compute_reminders_status(vehicle_id: int):
             parts = []
             if due_km is not None:
                 km_over = max(0, int(current_km) - int(due_km))
-                parts.append(f"Aurait du être fait depuis {_format_km(km_over)} KM")
+                parts.append(f"à faire depuis {_format_km(km_over)} KM")
             parts.append(f"le {due_date_str}")
             msg = " ou ".join(parts)
         else:
@@ -1197,10 +1197,10 @@ class GarageApp(tk.Tk):
                 alerts = tk.Frame(card)
                 alerts.pack(fill=tk.BOTH, expand=True, padx=10, pady=(8, 10))
 
-                tk.Label(alerts, text="Alertes", font=("Arial", 12, "bold", "underline")).pack(anchor="center")
+                tk.Label(alerts, text="- - - Entretiens - - -", font=("Arial", 20, "bold",)).pack(anchor="center")
                 reminder_lines = []
                 for _ in range(len(REMINDERS)):
-                    lbl = tk.Label(alerts, text="—", font=("Arial", 12), anchor="w", justify="left")
+                    lbl = tk.Label(alerts, text="—", font=("Arial", 18), anchor="w", justify="left")
                     lbl.pack(anchor="w")
                     reminder_lines.append(lbl)
 
