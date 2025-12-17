@@ -7,7 +7,7 @@ import time
 import datetime as _dt
 
 APP_NAME = "Garage"
-APP_VERSION = "2.5.0"
+APP_VERSION = "2.5.3"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_FILE = str(SCRIPT_DIR / "garage.db")
@@ -16,33 +16,21 @@ ASSETS_DIR = SCRIPT_DIR / "assets"
 VEHICLES_DIR = ASSETS_DIR / "vehicles"
 
 MAX_VEHICLES = 5
-MISSED_FILL_KM_THRESHOLD = 1500  # utilisé uniquement pour fiabiliser les calculs conso
+
+# Utilisé uniquement pour fiabiliser le calcul de conso (si un plein a été oublié)
+MISSED_FILL_KM_THRESHOLD = 1500
 
 INTERVENTIONS = ["Réparation", "Entretien", "Entretien + Réparation"]
 
-# Rappels (v2.5) - premières règles
+# Rappels (premiers items)
 REMINDERS = [
-    {
-        "key": "courroie",
-        "label": "Courroie",
-        "interval_km": 120_000,
-        "interval_years": 5,
-        "match_terms": ["courroie", "distribution"],
-        "help": "Tous les 120 000 km ou tous les 5 ans",
-    },
-    {
-        "key": "vidange",
-        "label": "Vidange",
-        "interval_km": 20_000,
-        "interval_years": 1,
-        "match_terms": ["vidange"],
-        "help": "20 000 km maxi ou 1 fois/an",
-    },
+    {"key": "courroie", "label": "Courroie", "interval_km": 120_000, "interval_years": 5, "match_terms": ["courroie", "distribution"]},
+    {"key": "vidange", "label": "Vidange", "interval_km": 20_000, "interval_years": 1, "match_terms": ["vidange"]},
 ]
 
-# Pillow optionnel
+# Pillow optionnel (affichage images)
 try:
-    from PIL import Image, ImageTk, ImageDraw, ImageFont
+    from PIL import Image, ImageTk, ImageDraw, ImageFont  # type: ignore
     PIL_AVAILABLE = True
 except Exception:
     PIL_AVAILABLE = False
@@ -70,7 +58,7 @@ def ensure_dirs():
             pass
 
 
-def _try_parse_iso_date(s: str) -> _dt.date | None:
+def _try_parse_iso_date(s: str):
     try:
         y, m, d = s.split("-")
         return _dt.date(int(y), int(m), int(d))
@@ -114,15 +102,12 @@ def load_photo_or_placeholder(photo_filename: str | None, size=(220, 150), label
             draw.multiline_text(((w - tw) / 2, (h - th) / 2), text, fill=(60, 60, 60, 255), font=font, align="center")
             return ImageTk.PhotoImage(img), str(e)
     else:
-        if path is None:
-            return None, "Pillow non disponible (et aucune photo définie)."
-        if not path.exists():
-            return None, f"{path} introuvable (et Pillow non disponible)."
-        return None, f"Pillow non disponible: impossible d'afficher {path.name}."
+        # Sans pillow on n'affiche pas d'image, on garde une zone grise
+        return None, "Pillow non disponible"
 
 
 # -----------------------------
-# DB
+# DB utils / migrations
 # -----------------------------
 
 def connect():
@@ -131,10 +116,16 @@ def connect():
     return conn
 
 
-def table_columns(conn, table: str) -> set[str]:
+def table_exists(conn, table: str) -> bool:
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
+    return cur.fetchone() is not None
+
+
+def table_columns(conn, table: str) -> list[str]:
     cur = conn.cursor()
     cur.execute(f"PRAGMA table_info({table})")
-    return {row[1] for row in cur.fetchall()}
+    return [row[1] for row in cur.fetchall()]
 
 
 def ensure_vehicle(conn, nom: str, marque=None, modele=None, motorisation=None, energie=None, annee=None, immatriculation=None, photo_filename=None) -> int:
@@ -152,6 +143,63 @@ def ensure_vehicle(conn, nom: str, marque=None, modele=None, motorisation=None, 
     )
     conn.commit()
     return int(cur.lastrowid)
+
+
+def migrate_entretien_missing_id(conn: sqlite3.Connection):
+    """
+    Certains historiques ont une table entretien sans colonne id (ou avec schéma incomplet).
+    On recrée une table propre et on recopie les données.
+    """
+    if not table_exists(conn, "entretien"):
+        return
+    cols = set(table_columns(conn, "entretien"))
+    if "id" in cols:
+        return
+
+    cur = conn.cursor()
+    cur.execute("BEGIN")
+    # Table cible
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS entretien_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicule_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            kilometrage INTEGER,
+            intervention TEXT NOT NULL,
+            precision TEXT,
+            entretien_item TEXT,
+            effectue_par TEXT,
+            cout REAL,
+            FOREIGN KEY(vehicule_id) REFERENCES vehicules(id) ON DELETE RESTRICT
+        )
+        """
+    )
+
+    # Détermine les colonnes disponibles à copier
+    def col_or_null(name: str) -> str:
+        return name if name in cols else "NULL"
+
+    # Copie (sans id)
+    cur.execute(
+        f"""
+        INSERT INTO entretien_new (vehicule_id, date, kilometrage, intervention, precision, entretien_item, effectue_par, cout)
+        SELECT
+            {col_or_null('vehicule_id')},
+            {col_or_null('date')},
+            {col_or_null('kilometrage')},
+            {col_or_null('intervention')},
+            {col_or_null('precision')},
+            {col_or_null('entretien_item')},
+            {col_or_null('effectue_par')},
+            {col_or_null('cout')}
+        FROM entretien
+        """
+    )
+
+    cur.execute("DROP TABLE entretien")
+    cur.execute("ALTER TABLE entretien_new RENAME TO entretien")
+    conn.commit()
 
 
 def init_db_and_migrate():
@@ -205,7 +253,7 @@ def init_db_and_migrate():
         """
     )
 
-    # Entretien
+    # Entretien (schéma cible)
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS entretien (
@@ -266,8 +314,8 @@ def init_db_and_migrate():
     )
     conn.commit()
 
-    # Migration depuis v1 si pleins.vehicule existe
-    cols_p = table_columns(conn, "pleins")
+    # Migration: ancien champ pleins.vehicule -> vehicule_id
+    cols_p = set(table_columns(conn, "pleins"))
     if "vehicule" in cols_p and "vehicule_id" not in cols_p:
         cur.execute("ALTER TABLE pleins ADD COLUMN vehicule_id INTEGER")
         conn.commit()
@@ -279,6 +327,9 @@ def init_db_and_migrate():
         cur.execute("UPDATE pleins SET vehicule_id = ? WHERE vehicule = 1", (titine_id,))
         cur.execute("UPDATE pleins SET vehicule_id = ? WHERE vehicule_id IS NULL", (biche_id,))
         conn.commit()
+
+    # Migration: entretien sans id
+    migrate_entretien_missing_id(conn)
 
     # Base vierge: 2 véhicules
     cur.execute("SELECT COUNT(*) FROM vehicules")
@@ -520,8 +571,8 @@ def list_entretien(vehicle_id: int):
     return rows
 
 
-def add_entretien(vehicle_id: int, date: str, kilometrage: int | None, intervention: str,
-                  precision: str | None, entretien_item: str | None, effectue_par: str | None, cout: float | None):
+def add_entretien(vehicle_id: int, date: str, kilometrage, intervention: str,
+                  precision: str | None, entretien_item: str | None, effectue_par: str | None, cout):
     conn = connect()
     cur = conn.cursor()
     cur.execute(
@@ -535,8 +586,8 @@ def add_entretien(vehicle_id: int, date: str, kilometrage: int | None, intervent
     conn.close()
 
 
-def update_entretien(entretien_id: int, vehicle_id: int, date: str, kilometrage: int | None, intervention: str,
-                     precision: str | None, entretien_item: str | None, effectue_par: str | None, cout: float | None):
+def update_entretien(entretien_id: int, vehicle_id: int, date: str, kilometrage, intervention: str,
+                     precision: str | None, entretien_item: str | None, effectue_par: str | None, cout):
     conn = connect()
     cur = conn.cursor()
     cur.execute(
@@ -674,7 +725,7 @@ def rename_lieu(ancien: str, nouveau: str):
 # Calculs
 # -----------------------------
 
-def compute_avg_consumption_l_100_robust(vehicle_id: int, threshold_km: int = MISSED_FILL_KM_THRESHOLD) -> float | None:
+def compute_avg_consumption_l_100_robust(vehicle_id: int, threshold_km: int = MISSED_FILL_KM_THRESHOLD):
     rows = list_pleins_km_asc(vehicle_id)
     if len(rows) < 2:
         return None
@@ -699,7 +750,7 @@ def compute_avg_consumption_l_100_robust(vehicle_id: int, threshold_km: int = MI
     return (litres_valid / km_valid) * 100.0
 
 
-def _avg_per_year_from_records(dates: list[_dt.date], total_amount: float) -> float | None:
+def _avg_per_year_from_records(dates: list[_dt.date], total_amount: float):
     if total_amount <= 0:
         return None
     if len(dates) < 2:
@@ -712,7 +763,7 @@ def _avg_per_year_from_records(dates: list[_dt.date], total_amount: float) -> fl
     return total_amount / years
 
 
-def compute_fuel_avg_per_year(vehicle_id: int) -> float | None:
+def compute_fuel_avg_per_year(vehicle_id: int):
     conn = connect()
     cur = conn.cursor()
     cur.execute("SELECT date, total FROM pleins WHERE vehicule_id = ?", (vehicle_id,))
@@ -731,7 +782,7 @@ def compute_fuel_avg_per_year(vehicle_id: int) -> float | None:
     return _avg_per_year_from_records(dates, total)
 
 
-def compute_maintenance_avg_per_year(vehicle_id: int) -> float | None:
+def compute_maintenance_avg_per_year(vehicle_id: int):
     conn = connect()
     cur = conn.cursor()
     cur.execute("SELECT date, cout FROM entretien WHERE vehicule_id = ?", (vehicle_id,))
@@ -753,6 +804,12 @@ def compute_maintenance_avg_per_year(vehicle_id: int) -> float | None:
 
 
 def compute_reminders_status(vehicle_id: int):
+    """
+    Affichage demandé:
+    - Si pas dépassé: "à faire dans ##### KM, ou avant le ##/##/####"
+    - Si dépassé: "Aurait du être fait(e) depuis #### KM ou le ##/##/####"
+    (la partie KM est omise si l'entretien n'a pas de kilométrage enregistré).
+    """
     today = _dt.date.today()
     current_km = last_km(vehicle_id) or 0
 
@@ -760,60 +817,45 @@ def compute_reminders_status(vehicle_id: int):
     for r in REMINDERS:
         match = find_last_maintenance_match(vehicle_id, r["match_terms"])
         if not match:
-            results.append({
-                "label": r["label"],
-                "help": r["help"],
-                "overdue": True,
-                "message": "Aucun entretien enregistré",
-            })
+            results.append({"label": r["label"], "overdue": True, "message": "Aucun entretien enregistré"})
             continue
 
         last_date_iso, last_km_value, _item, _prec = match
         last_date = _try_parse_iso_date(last_date_iso)
         if last_date is None:
-            results.append({
-                "label": r["label"],
-                "help": r["help"],
-                "overdue": True,
-                "message": f"Date invalide en base: {last_date_iso}",
-            })
+            results.append({"label": r["label"], "overdue": True, "message": f"Date invalide: {last_date_iso}"})
             continue
 
+        # calc échéances
         due_km = None
         if last_km_value is not None:
             due_km = int(last_km_value) + int(r["interval_km"])
 
-        # + années (sans dépendance externe)
         try:
             due_date = last_date.replace(year=last_date.year + int(r["interval_years"]))
         except ValueError:
-            # 29/02 -> 28/02
             due_date = last_date.replace(month=2, day=28, year=last_date.year + int(r["interval_years"]))
 
-        overdue_by_date = today > due_date
-        overdue_by_km = (due_km is not None) and (current_km >= due_km)
-        overdue = overdue_by_date or overdue_by_km
+        overdue = (today > due_date) or ((due_km is not None) and (current_km >= due_km))
+
+        due_date_str = due_date.strftime("%d/%m/%Y")
 
         if overdue:
-            msg_parts = []
+            parts = []
             if due_km is not None:
-                msg_parts.append(f"KM dû: {_format_km(due_km)}")
-            msg_parts.append(f"Date dûe: {due_date.strftime('%d/%m/%Y')}")
-            message = "À faire (dépassé) — " + " | ".join(msg_parts)
+                km_over = max(0, int(current_km) - int(due_km))
+                parts.append(f"Aurait du être fait depuis {_format_km(km_over)} KM")
+            parts.append(f"le {due_date_str}")
+            msg = " ou ".join(parts)
         else:
-            days_left = (due_date - today).days
-            msg_parts = [f"Temps restant: {_format_days(days_left)}"]
+            parts = []
             if due_km is not None:
-                km_left = due_km - current_km
-                msg_parts.append(f"Km restants: {_format_km(km_left)}")
-            message = "OK — " + " | ".join(msg_parts)
+                km_left = max(0, int(due_km) - int(current_km))
+                parts.append(f"à faire dans {_format_km(km_left)} KM")
+            parts.append(f"le {due_date_str}")
+            msg = ", ou ".join(parts) if len(parts) == 2 and parts[0].startswith("à faire") else " ou ".join(parts)
 
-        results.append({
-            "label": r["label"],
-            "help": r["help"],
-            "overdue": overdue,
-            "message": message,
-        })
+        results.append({"label": r["label"], "overdue": overdue, "message": msg})
 
     return results
 
@@ -830,9 +872,9 @@ class GarageApp(tk.Tk):
         self.title(f"{APP_NAME} v{APP_VERSION}")
         self.geometry("1350x760")
 
-        self.vehicle_id_active: int | None = None
-        self.plein_edit_id: int | None = None
-        self.entretien_edit_id: int | None = None
+        self.vehicle_id_active = None
+        self.plein_edit_id = None
+        self.entretien_edit_id = None
 
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill=tk.BOTH, expand=True)
@@ -868,7 +910,7 @@ class GarageApp(tk.Tk):
             "À propos",
             f"{APP_NAME} v{APP_VERSION}\n\n"
             "Suivi des pleins + entretien multi-véhicules + gestion des lieux.\n"
-            "v2.5: coûts moyens/an + rappels (vidange/courroie).\n\n"
+            "v2.5.3: mise en page (coûts sous KM, rappels sous boutons) + migrations robustes.\n\n"
             f"Base: {DB_FILE}\n"
             f"Photos: {VEHICLES_DIR}\n"
             f"Pillow: {'OK' if PIL_AVAILABLE else 'non détecté'}",
@@ -880,6 +922,7 @@ class GarageApp(tk.Tk):
         top = tk.Frame(self.tab_pleins)
         top.pack(fill=tk.X, pady=10)
 
+        # LEFT: véhicule + photo + km + coûts
         left = tk.Frame(top)
         left.pack(side=tk.LEFT, padx=20)
 
@@ -891,19 +934,18 @@ class GarageApp(tk.Tk):
         self.canvas_photo = tk.Canvas(left, width=220, height=150, highlightthickness=1)
         self.canvas_photo.pack(pady=6)
 
-        self.lbl_km = tk.Label(left, text="— km", font=("Arial", 20, "bold"), anchor="center")
+        self.lbl_km = tk.Label(left, text="— km", font=("Arial", 24, "bold"), anchor="center")
         self.lbl_km.pack(fill=tk.X)
 
+        # Coûts moyens/an sous KM
+        self.lbl_fuel_year = tk.Label(left, text="Carburant (moy/an): —", font=("Arial", 17, "bold"), anchor="center")
+        self.lbl_fuel_year.pack(fill=tk.X, pady=(6, 0))
+        self.lbl_maint_year = tk.Label(left, text="Entretien (moy/an): —", font=("Arial", 17, "bold"), anchor="center")
+        self.lbl_maint_year.pack(fill=tk.X, pady=(2, 0))
+
+        # CENTER: boutons + rappels (centrés sous les boutons)
         center = tk.Frame(top)
         center.pack(side=tk.LEFT, expand=True, fill=tk.X)
-
-        self.stats_frame = tk.Frame(center)
-        self.stats_frame.pack(fill=tk.X, pady=(0, 8))
-
-        self.lbl_fuel_year = tk.Label(self.stats_frame, text="Carburant (moy/an): —", font=("Arial", 11, "bold"))
-        self.lbl_fuel_year.pack(anchor="center")
-        self.lbl_maint_year = tk.Label(self.stats_frame, text="Entretien (moy/an): —", font=("Arial", 11, "bold"))
-        self.lbl_maint_year.pack(anchor="center")
 
         buttons = tk.Frame(center)
         buttons.pack()
@@ -913,18 +955,18 @@ class GarageApp(tk.Tk):
         tk.Button(buttons, text="Supprimer le plein sélectionné", command=self._on_delete_selected_plein, width=28).pack(pady=4)
         tk.Button(buttons, text="Importer un fichier (CSV)", command=self._import_csv, width=28).pack(pady=4)
 
+        self.reminders_big_frame = tk.Frame(center)
+        self.reminders_big_frame.pack(fill=tk.X, pady=(16, 0))
+
+        self.reminder_big_lines = []
+        for _ in range(len(REMINDERS)):
+            lbl = tk.Label(self.reminders_big_frame, text="—", font=("Arial", 20), anchor="center", justify="center")
+            lbl.pack(anchor="center")
+            self.reminder_big_lines.append(lbl)
+
+        # RIGHT: infos véhicule
         right = tk.Frame(top)
         right.pack(side=tk.RIGHT, padx=20)
-
-        self.reminders_frame = tk.Frame(right)
-        self.reminders_frame.pack(fill=tk.X, pady=(0, 10))
-
-        tk.Label(self.reminders_frame, text="Rappels entretiens", font=("Arial", 11, "bold")).pack(anchor="w")
-        self.reminder_lines = []
-        for _ in range(len(REMINDERS)):
-            lbl = tk.Label(self.reminders_frame, text="—", anchor="w", justify="left")
-            lbl.pack(anchor="w")
-            self.reminder_lines.append(lbl)
 
         tk.Label(right, text="Infos véhicule", font=("Arial", 11, "bold")).pack(anchor="w")
         self.info_lines_frame = tk.Frame(right)
@@ -944,6 +986,7 @@ class GarageApp(tk.Tk):
         ]:
             w.pack(anchor="w")
 
+        # TABLE
         mid = tk.Frame(self.tab_pleins)
         mid.pack(fill=tk.BOTH, expand=True, padx=10)
 
@@ -960,6 +1003,7 @@ class GarageApp(tk.Tk):
 
         self.tree.pack(fill=tk.BOTH, expand=True)
 
+        # FORM
         form = tk.Frame(self.tab_pleins)
         form.pack(fill=tk.X, padx=10, pady=10)
 
@@ -1129,15 +1173,13 @@ class GarageApp(tk.Tk):
             self.tree_ent.delete(item)
         if not self.vehicle_id_active:
             return
-
-        rows = list_entretien(self.vehicle_id_active)
+        rows = list_entretien(int(self.vehicle_id_active))
         for (eid, date_iso, km, intervention, precision, entretien_item, effectue_par, cout) in rows:
             try:
                 an, mois, jour = date_iso.split("-")
                 date_aff = f"{jour}/{mois}/{an[2:]}"
             except Exception:
                 date_aff = date_iso
-
             detail = self._format_entretien_detail(intervention, precision, entretien_item)
             cout_str = "" if cout is None else f"{float(cout):.2f}"
             km_str = "" if km is None else str(int(km))
@@ -1168,7 +1210,7 @@ class GarageApp(tk.Tk):
                 km = int(km_txt)
                 if km < 0:
                     raise ValueError("Km entretien invalide (doit être positif).")
-                last = last_km(self.vehicle_id_active)
+                last = last_km(int(self.vehicle_id_active))
                 if last is not None and km > last:
                     if not messagebox.askyesno(
                         "Km élevé",
@@ -1207,9 +1249,9 @@ class GarageApp(tk.Tk):
                 cout = float(cout_txt.replace(",", "."))
 
             if self.entretien_edit_id is None:
-                add_entretien(self.vehicle_id_active, date_iso, km, intervention, precision, entretien_item, effectue_par, cout)
+                add_entretien(int(self.vehicle_id_active), date_iso, km, intervention, precision, entretien_item, effectue_par, cout)
             else:
-                update_entretien(self.entretien_edit_id, self.vehicle_id_active, date_iso, km, intervention, precision, entretien_item, effectue_par, cout)
+                update_entretien(int(self.entretien_edit_id), int(self.vehicle_id_active), date_iso, km, intervention, precision, entretien_item, effectue_par, cout)
                 self.entretien_edit_id = None
 
             self._refresh_entretien()
@@ -1232,7 +1274,7 @@ class GarageApp(tk.Tk):
         cur = conn.cursor()
         cur.execute(
             "SELECT date, kilometrage, intervention, precision, entretien_item, effectue_par, cout FROM entretien WHERE id = ?",
-            (self.entretien_edit_id,),
+            (int(self.entretien_edit_id),),
         )
         row = cur.fetchone()
         conn.close()
@@ -1240,7 +1282,6 @@ class GarageApp(tk.Tk):
             return
 
         date_iso, km, intervention, precision, entretien_item, effectue_par, cout = row
-
         try:
             an, mois, jour = date_iso.split("-")
         except Exception:
@@ -1419,8 +1460,8 @@ class GarageApp(tk.Tk):
         tk.Button(actions, text="Définir actif", command=self._on_vehicle_set_active, width=18).grid(row=1, column=1, pady=4, padx=4)
         tk.Button(actions, text="Rafraîchir", command=self._refresh_all_vehicles_ui, width=18).grid(row=2, column=0, pady=4, padx=4)
 
-        self._vehicle_selected_id: int | None = None
-        self._vehicle_selected_photo_filename: str | None = None
+        self._vehicle_selected_id = None
+        self._vehicle_selected_photo_filename = None
         self._clear_vehicle_form()
 
     def _restore_active_vehicle(self):
@@ -1504,14 +1545,14 @@ class GarageApp(tk.Tk):
             self.lbl_maint_year.config(text="Entretien (moy/an): —")
             return
 
-        fuel = compute_fuel_avg_per_year(self.vehicle_id_active)
-        maint = compute_maintenance_avg_per_year(self.vehicle_id_active)
+        fuel = compute_fuel_avg_per_year(int(self.vehicle_id_active))
+        maint = compute_maintenance_avg_per_year(int(self.vehicle_id_active))
 
         self.lbl_fuel_year.config(text=f"Carburant (moy/an): {fuel:,.0f} €".replace(",", " ") if fuel is not None else "Carburant (moy/an): —")
         self.lbl_maint_year.config(text=f"Entretien (moy/an): {maint:,.0f} €".replace(",", " ") if maint is not None else "Entretien (moy/an): —")
 
     def _refresh_vehicle_photo_and_info(self):
-        v = get_vehicle(self.vehicle_id_active) if self.vehicle_id_active else None
+        v = get_vehicle(int(self.vehicle_id_active)) if self.vehicle_id_active else None
         if not v:
             return
         _, nom, marque, modele, motorisation, energie, annee, immat, photo = v
@@ -1532,24 +1573,27 @@ class GarageApp(tk.Tk):
         self.lbl_info_annee.config(text=f"Année : {annee}" if annee else "")
         self.lbl_info_immat.config(text=f"Immatriculation : {immat}" if immat else "")
 
-        conso = compute_avg_consumption_l_100_robust(self.vehicle_id_active)
+        conso = compute_avg_consumption_l_100_robust(int(self.vehicle_id_active))
         self.lbl_info_conso.config(text=f"Conso moyenne : {conso:.2f} L/100" if conso is not None else "Conso moyenne : —")
 
-        statuses = compute_reminders_status(self.vehicle_id_active)
+        statuses = compute_reminders_status(int(self.vehicle_id_active))
         for i, st in enumerate(statuses):
-            txt = f"- {st['label']}: {st['message']} ({st['help']})"
-            self.reminder_lines[i].config(text=txt, fg=("red" if st["overdue"] else "black"))
+            txt = f"{st['label']}: {st['message']}"
+            if i < len(self.reminder_big_lines):
+                self.reminder_big_lines[i].config(text=txt, fg=("red" if st["overdue"] else "black"))
 
     def _refresh_km_label(self):
-        km = last_km(self.vehicle_id_active) if self.vehicle_id_active else None
+        km = last_km(int(self.vehicle_id_active)) if self.vehicle_id_active else None
         self.lbl_km.config(text=f"{km if km is not None else '—'} km")
+
+    # --- Pleins CRUD ---
 
     def _refresh_pleins(self):
         for item in self.tree.get_children():
             self.tree.delete(item)
         if not self.vehicle_id_active:
             return
-        rows = list_pleins(self.vehicle_id_active)
+        rows = list_pleins(int(self.vehicle_id_active))
         for (pid, date_iso, km, litres, prix, total, lieu) in rows:
             try:
                 an, mois, jour = date_iso.split("-")
@@ -1578,7 +1622,7 @@ class GarageApp(tk.Tk):
             date_iso = f"20{a:02d}-{m:02d}-{j:02d}"
 
             km = int(self.plein_entries["km"].get())
-            last = last_km(self.vehicle_id_active, exclude_id=self.plein_edit_id)
+            last = last_km(int(self.vehicle_id_active), exclude_id=self.plein_edit_id)
             if last is not None and km < last:
                 raise ValueError(f"Kilométrage incohérent : {km} km < dernier relevé ({last} km).")
 
@@ -1588,9 +1632,9 @@ class GarageApp(tk.Tk):
             lieu = (self.plein_entries["lieu"].get() or "").strip()
 
             if self.plein_edit_id is None:
-                add_plein(self.vehicle_id_active, date_iso, km, litres, prix, total, lieu)
+                add_plein(int(self.vehicle_id_active), date_iso, km, litres, prix, total, lieu)
             else:
-                update_plein(self.plein_edit_id, self.vehicle_id_active, date_iso, km, litres, prix, total, lieu)
+                update_plein(int(self.plein_edit_id), int(self.vehicle_id_active), date_iso, km, litres, prix, total, lieu)
                 self.plein_edit_id = None
 
             self._refresh_pleins()
