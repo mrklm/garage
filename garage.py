@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import time
 import datetime as _dt
+import re
 
 APP_NAME = "Garage"
 APP_VERSION = "2.5.3"
@@ -24,8 +25,30 @@ INTERVENTIONS = ["Réparation", "Entretien", "Entretien + Réparation"]
 
 # Rappels (premiers items)
 REMINDERS = [
-    {"key": "courroie", "label": "Courroie", "interval_km": 120_000, "interval_years": 5, "match_terms": ["courroie", "distribution"]},
-    {"key": "vidange", "label": "Vidange", "interval_km": 20_000, "interval_years": 1, "match_terms": ["vidange"]},
+    # Entretiens périodiques "classiques"
+    {"key": "courroie", "label": "Courroie", "type": "km_years", "interval_km": 120_000, "interval_years": 5,
+     "match_terms": ["courroie", "distribution"]},
+    {"key": "vidange", "label": "Vidange", "type": "km_years", "interval_km": 20_000, "interval_years": 1,
+     "match_terms": ["vidange"]},
+
+    # Règles ajoutées (mensuel)
+    {"key": "pneumatiques", "label": "Pneumatiques", "type": "monthly_simple", "interval_days": 30,
+     "match_terms": ["pneumatiques", "pneus"],
+     "ok_text": "Pneumatiques OK (à faire tout le mois)",
+     "todo_text": "Pneumatiques à Vérifier"},
+    {"key": "niveaux", "label": "Niveaux", "type": "monthly_simple", "interval_days": 30,
+     "match_terms": ["niveaux"],
+     "ok_text": "Niveaux OK (à faire tout le mois)",
+     "todo_text": "Niveaux à Vérifier"},
+
+    # Batterie (mensuel + interprétation)
+    {"key": "batterie", "label": "Tension Batterie", "type": "battery_monthly", "interval_days": 30,
+     "match_terms": ["tension de la batterie", "tension batterie"],
+     "todo_text": "Vérifier la Tension de la Batterie"},
+
+    # Contrôle technique (tous les 2 ans + alerte à 1 mois)
+    {"key": "ct", "label": "Contrôle Technique", "type": "ct", "interval_years": 2, "imminent_days": 30,
+     "match_terms": ["contrôle technique", "controle technique"]},
 ]
 
 # Pillow optionnel (affichage images)
@@ -309,7 +332,11 @@ def init_db_and_migrate():
         ('Filtres'),
         ('Pneus'),
         ('Freins'),
-        ('Courroie');
+        ('Courroie'),
+        ('Pneumatiques OK'),
+        ('Niveaux OK'),
+        ('Tension de la Batterie'),
+        ('Contrôle Technique OK');
         """
     )
     conn.commit()
@@ -804,18 +831,131 @@ def compute_maintenance_avg_per_year(vehicle_id: int):
 
 
 def compute_reminders_status(vehicle_id: int):
-    """
-    Affichage demandé:
-    - Si pas dépassé: "à faire dans ##### KM, ou avant le ##/##/####"
-    - Si dépassé: "Aurait du être fait(e) depuis #### KM ou le ##/##/####"
-    (la partie KM est omise si l'entretien n'a pas de kilométrage enregistré).
-    """
     today = _dt.date.today()
     current_km = last_km(vehicle_id) or 0
 
+    def _days_since(d: _dt.date) -> int:
+        return (today - d).days
+
+    def _safe_add_years(d: _dt.date, years: int) -> _dt.date:
+        try:
+            return d.replace(year=d.year + years)
+        except ValueError:
+            # gestion 29 février
+            return d.replace(month=2, day=28, year=d.year + years)
+
+    def _parse_voltage_from_text(text: str) -> float | None:
+        # Accepte "12,5", "12.5", "12V5", "12,5V" etc.
+        t = (text or "").strip().lower().replace(" ", "")
+        if not t:
+            return None
+        # 12v5
+        m = re.search(r"(?P<int>\d{2})v(?P<dec>\d)", t)
+        if m:
+            return float(f"{m.group('int')}.{m.group('dec')}")
+        # 12,5 ou 12.5
+        m = re.search(r"(\d{2})[\.,](\d)", t)
+        if m:
+            return float(f"{m.group(1)}.{m.group(2)}")
+        # 12 (sans décimale)
+        m = re.search(r"\b(\d{2})\b", t)
+        if m:
+            return float(m.group(1))
+        return None
+
+    def _battery_state(voltage: float) -> str:
+        # Règles demandées
+        if voltage <= 12.0:
+            return "Tension en dessous de 12V : Attention décharge critique, prévoir remplacement"
+        if 12.1 <= voltage <= 12.3:
+            return "Tension de batterie faible : À Recharger"
+        if 12.4 <= voltage <= 12.5:
+            return "Batterie OK"
+        # >= 12.6
+        return "Batterie en bonne santé"
+
     results = []
+
     for r in REMINDERS:
-        match = find_last_maintenance_match(vehicle_id, r["match_terms"])
+        rtype = (r.get("type") or "km_years").strip()
+
+        match = find_last_maintenance_match(vehicle_id, r.get("match_terms", []))
+
+        # --- Mensuels simples (pneumatiques / niveaux)
+        if rtype == "monthly_simple":
+            if not match:
+                results.append({"label": r["label"], "overdue": True, "message": r.get("todo_text") or "À faire", "display": r.get("todo_text") or "À faire"})
+                continue
+
+            last_date_iso, _last_km_value, _item, _prec = match
+            last_date = _try_parse_iso_date(last_date_iso)
+            if last_date is None:
+                results.append({"label": r["label"], "overdue": True, "message": f"Date invalide: {last_date_iso}"})
+                continue
+
+            interval_days = int(r.get("interval_days", 30))
+            ok = _days_since(last_date) <= interval_days
+            results.append({
+                "label": r["label"],
+                "overdue": (not ok),
+                "message": (r.get("ok_text") if ok else r.get("todo_text")) or "",
+                "display": (r.get("ok_text") if ok else r.get("todo_text")) or ""
+            })
+            continue
+
+        # --- Batterie (mensuel + interprétation)
+        if rtype == "battery_monthly":
+            if not match:
+                results.append({"label": r["label"], "overdue": True, "message": r.get("todo_text") or "À faire", "display": r.get("todo_text") or "À faire"})
+                continue
+
+            last_date_iso, _last_km_value, item, prec = match
+            last_date = _try_parse_iso_date(last_date_iso)
+            if last_date is None:
+                results.append({"label": r["label"], "overdue": True, "message": f"Date invalide: {last_date_iso}"})
+                continue
+
+            interval_days = int(r.get("interval_days", 30))
+            overdue = _days_since(last_date) > interval_days
+
+            if overdue:
+                results.append({"label": r["label"], "overdue": True, "message": r.get("todo_text") or "À faire", "display": r.get("todo_text") or "À faire"})
+                continue
+
+            # Tente d'extraire la tension depuis l'item ou la précision (selon comment l'utilisateur l'a enregistré)
+            v = _parse_voltage_from_text(f"{item} {prec}")
+            if v is None:
+                msg = f"Fait le {last_date.strftime('%d/%m/%Y')} (tension non renseignée)"
+            else:
+                msg = f"Fait le {last_date.strftime('%d/%m/%Y')} — {_battery_state(v)}"
+            results.append({"label": r["label"], "overdue": False, "message": msg, "display": msg})
+            continue
+
+        # --- Contrôle Technique (2 ans, + imminent à 1 mois)
+        if rtype == "ct":
+            if not match:
+                results.append({"label": r["label"], "overdue": True, "message": "Contrôle Technique en retard", "display": "Contrôle Technique en retard"})
+                continue
+
+            last_date_iso, _last_km_value, _item, _prec = match
+            last_date = _try_parse_iso_date(last_date_iso)
+            if last_date is None:
+                results.append({"label": r["label"], "overdue": True, "message": f"Date invalide: {last_date_iso}"})
+                continue
+
+            due_date = _safe_add_years(last_date, int(r.get("interval_years", 2)))
+            due_str = due_date.strftime("%d/%m/%Y")
+            days_left = (due_date - today).days
+
+            if today > due_date:
+                results.append({"label": r["label"], "overdue": True, "message": "Contrôle Technique en retard", "display": "Contrôle Technique en retard"})
+            elif days_left <= int(r.get("imminent_days", 30)):
+                results.append({"label": r["label"], "overdue": True, "message": f"Contrôle Technique imminent: {due_str}", "display": f"Contrôle Technique imminent: {due_str}"})
+            else:
+                results.append({"label": r["label"], "overdue": False, "message": "Contrôle Technique OK", "display": "Contrôle Technique OK"})
+            continue
+
+        # --- Par défaut: km + années (logique historique)
         if not match:
             results.append({"label": r["label"], "overdue": True, "message": "Aucun entretien enregistré"})
             continue
@@ -826,18 +966,12 @@ def compute_reminders_status(vehicle_id: int):
             results.append({"label": r["label"], "overdue": True, "message": f"Date invalide: {last_date_iso}"})
             continue
 
-        # calc échéances
         due_km = None
-        if last_km_value is not None:
+        if last_km_value is not None and r.get("interval_km") is not None:
             due_km = int(last_km_value) + int(r["interval_km"])
 
-        try:
-            due_date = last_date.replace(year=last_date.year + int(r["interval_years"]))
-        except ValueError:
-            due_date = last_date.replace(month=2, day=28, year=last_date.year + int(r["interval_years"]))
-
+        due_date = _safe_add_years(last_date, int(r.get("interval_years", 1)))
         overdue = (today > due_date) or ((due_km is not None) and (current_km >= due_km))
-
         due_date_str = due_date.strftime("%d/%m/%Y")
 
         if overdue:
@@ -875,6 +1009,7 @@ class GarageApp(tk.Tk):
         self.vehicle_id_active = None
         self.plein_edit_id = None
         self.entretien_edit_id = None
+        self._battery_last_state_message = None
 
         self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill=tk.BOTH, expand=True)
@@ -968,7 +1103,7 @@ class GarageApp(tk.Tk):
         right = tk.Frame(top)
         right.pack(side=tk.RIGHT, padx=20)
 
-        tk.Label(right, text="Infos véhicule", font=("Arial", 11, "bold")).pack(anchor="w")
+        tk.Label(right, text="Infos Véhicule", font=("Arial", 14, "bold", "underline")).pack(anchor="w")
         self.info_lines_frame = tk.Frame(right)
         self.info_lines_frame.pack(anchor="w", fill=tk.X)
 
@@ -1072,43 +1207,50 @@ class GarageApp(tk.Tk):
         form.pack(fill=tk.X, padx=10, pady=10)
 
         self.ent_entries = {}
-
+        # Ligne 1 : date + km + intervention
         for i, (lab, key, w) in enumerate([("Jour", "jour", 6), ("Mois", "mois", 6), ("Année", "annee", 6)]):
-            tk.Label(form, text=lab).grid(row=0, column=i, padx=4)
+            tk.Label(form, text=lab).grid(row=0, column=i, padx=4, sticky="w")
             e = tk.Entry(form, width=w)
-            e.grid(row=1, column=i, padx=4)
+            e.grid(row=1, column=i, padx=4, sticky="w")
             self.ent_entries[key] = e
 
-        tk.Label(form, text="Km").grid(row=0, column=3, padx=4)
+        tk.Label(form, text="Km").grid(row=0, column=3, padx=4, sticky="w")
         e_km = tk.Entry(form, width=10)
-        e_km.grid(row=1, column=3, padx=4)
+        e_km.grid(row=1, column=3, padx=4, sticky="w")
         self.ent_entries["km"] = e_km
 
-        tk.Label(form, text="Intervention").grid(row=0, column=4, padx=4)
+        tk.Label(form, text="Intervention").grid(row=0, column=4, padx=4, sticky="w")
         cb_int = ttk.Combobox(form, state="readonly", width=22, values=INTERVENTIONS)
-        cb_int.grid(row=1, column=4, padx=4)
+        cb_int.grid(row=1, column=4, padx=4, sticky="w")
         cb_int.bind("<<ComboboxSelected>>", self._on_ent_intervention_changed)
         self.ent_entries["intervention"] = cb_int
 
-        tk.Label(form, text="Préciser (réparation)").grid(row=0, column=5, padx=4)
-        e_prec = tk.Entry(form, width=28)
-        e_prec.grid(row=1, column=5, padx=4)
+        # Ligne 2 : détails + acteur + coût (réparti sur 2 lignes pour éviter le débordement)
+        tk.Label(form, text="Préciser (réparation)").grid(row=2, column=0, columnspan=3, padx=4, sticky="w")
+        e_prec = tk.Entry(form, width=46)
+        e_prec.grid(row=3, column=0, columnspan=3, padx=4, sticky="we")
         self.ent_entries["precision"] = e_prec
 
-        tk.Label(form, text="Entretien").grid(row=0, column=6, padx=4)
-        cb_item = ttk.Combobox(form, state="readonly", width=20)
-        cb_item.grid(row=1, column=6, padx=4)
+        tk.Label(form, text="Entretien").grid(row=2, column=3, padx=4, sticky="w")
+        cb_item = ttk.Combobox(form, state="readonly", width=22)
+        cb_item.grid(row=3, column=3, padx=4, sticky="w")
         self.ent_entries["entretien_item"] = cb_item
-        tk.Button(form, text="Ajouter…", command=self._add_entretien_item_dialog).grid(row=1, column=7, padx=4)
+        cb_item.bind("<<ComboboxSelected>>", self._on_entretien_item_selected)
 
-        tk.Label(form, text="Effectué par").grid(row=0, column=8, padx=4)
+        tk.Button(
+            form,
+            text="Ajouter un type d'entretien",
+            command=self._add_entretien_item_dialog
+        ).grid(row=3, column=4, padx=4, sticky="w")
+
+        tk.Label(form, text="Effectué par").grid(row=2, column=5, padx=4, sticky="w")
         e_par = tk.Entry(form, width=22)
-        e_par.grid(row=1, column=8, padx=4)
+        e_par.grid(row=3, column=5, padx=4, sticky="w")
         self.ent_entries["effectue_par"] = e_par
 
-        tk.Label(form, text="€").grid(row=0, column=9, padx=4)
+        tk.Label(form, text="€").grid(row=2, column=6, padx=4, sticky="w")
         e_eur = tk.Entry(form, width=10)
-        e_eur.grid(row=1, column=9, padx=4)
+        e_eur.grid(row=3, column=6, padx=4, sticky="w")
         self.ent_entries["cout"] = e_eur
 
         self._refresh_entretien_items_combo()
@@ -1151,6 +1293,86 @@ class GarageApp(tk.Tk):
         else:
             e_prec.configure(state="normal")
             cb_item.configure(state="readonly")
+
+    
+    def _on_entretien_item_selected(self, _evt=None):
+        """Gestion des items d'entretien nécessitant une saisie guidée."""
+        cb_item: ttk.Combobox = self.ent_entries.get("entretien_item")
+        if not cb_item:
+            return
+        val = (cb_item.get() or "").strip()
+
+        # Saisie guidée: tension batterie
+        if val.strip().lower() == "tension de la batterie":
+            self._open_battery_voltage_dialog()
+
+    def _open_battery_voltage_dialog(self):
+        win = tk.Toplevel(self.root)
+        win.title("Tension de la Batterie")
+        win.resizable(False, False)
+        win.transient(self.root)
+        win.update_idletasks()
+        win.deiconify()
+        win.after(50, win.grab_set)
+
+        info = (
+            "Si la tension moteur éteint est entre 12,6 et 12,8V, la batterie est en bonne santé ; "
+            "12,4V, acceptable ; 12,2V à recharger ; 12,0V ou moins, décharge critique"
+        )
+        tk.Label(win, text=info, wraplength=520, justify="left").pack(padx=14, pady=(12, 8), anchor="w")
+        tk.Label(win, text="Entrez le résultat de la mesure de tension de la batterie", justify="left").pack(
+            padx=14, pady=(0, 10), anchor="w"
+        )
+
+        row = tk.Frame(win)
+        row.pack(padx=14, pady=(0, 10), anchor="w")
+
+        e_int = tk.Entry(row, width=2, justify="center")
+        e_int.pack(side=tk.LEFT)
+        tk.Label(row, text="V").pack(side=tk.LEFT, padx=6)
+        e_dec = tk.Entry(row, width=1, justify="center")
+        e_dec.pack(side=tk.LEFT)
+
+        # pré-remplissage utile
+        e_int.insert(0, "12")
+        e_dec.insert(0, "6")
+
+        def _state(voltage: float) -> str:
+            if voltage <= 12.0:
+                return "Tension en dessous de 12V : Attention décharge critique, prévoir remplacement"
+            if 12.1 <= voltage <= 12.3:
+                return "Tension de batterie faible : À Recharger"
+            if 12.4 <= voltage <= 12.5:
+                return "Batterie OK"
+            return "Batterie en bonne santé"
+
+        def _on_ok():
+            try:
+                i = (e_int.get() or "").strip()
+                d = (e_dec.get() or "").strip()
+                if len(i) != 2 or not i.isdigit():
+                    raise ValueError("Le premier champ doit contenir 2 chiffres (ex: 12).")
+                if len(d) != 1 or not d.isdigit():
+                    raise ValueError("Le second champ doit contenir 1 chiffre (ex: 6).")
+                v = float(f"{int(i)}.{int(d)}")
+            except Exception as ex:
+                messagebox.showerror("Tension de la Batterie", str(ex))
+                return
+
+            msg = _state(v)
+            v_str = f"{v:.1f}".replace(".", ",")
+            cb_item: ttk.Combobox = self.ent_entries.get("entretien_item")
+            if cb_item:
+                cb_item.set(f"Tension de la Batterie {v_str}V")
+            # On met le message dans le champ "Effectué par" si vide ? Non.
+            # On laisse l'utilisateur enregistrer, l'info est dans l'intitulé.
+            self._battery_last_state_message = msg  # utilisé au moment de l'enregistrement
+            win.destroy()
+
+        btns = tk.Frame(win)
+        btns.pack(padx=14, pady=(0, 12), anchor="e")
+        tk.Button(btns, text="Annuler", command=win.destroy, width=12).pack(side=tk.RIGHT, padx=(6, 0))
+        tk.Button(btns, text="Valider", command=_on_ok, width=12).pack(side=tk.RIGHT)
 
     def _format_entretien_detail(self, intervention: str, precision: str | None, entretien_item: str | None) -> str:
         precision = (precision or "").strip()
@@ -1210,21 +1432,21 @@ class GarageApp(tk.Tk):
                 km = int(km_txt)
                 if km < 0:
                     raise ValueError("Km entretien invalide (doit être positif).")
-                last = last_km(int(self.vehicle_id_active))
-                if last is not None and km > last:
-                    if not messagebox.askyesno(
-                        "Km élevé",
-                        f"Le dernier km enregistré dans les pleins est {last} km.\n"
-                        f"Tu veux vraiment enregistrer un entretien à {km} km ?"
-                    ):
-                        return
 
             intervention = (self.ent_entries["intervention"].get() or "").strip()
             if intervention not in INTERVENTIONS:
                 raise ValueError("Intervention invalide.")
 
             precision = (self.ent_entries["precision"].get() or "").strip() or None
+            
+
             entretien_item = (self.ent_entries["entretien_item"].get() or "").strip() or None
+
+            # Si l'utilisateur choisit "Tension de la Batterie" sans déclencher l'évènement de sélection,
+            # on ouvre automatiquement la fenêtre de mesure.
+            if entretien_item and entretien_item.strip().lower() == "tension de la batterie" and not self._battery_last_state_message:
+                self._open_battery_voltage_dialog()
+                return
 
             if intervention == "Réparation":
                 if not precision:
@@ -1238,8 +1460,16 @@ class GarageApp(tk.Tk):
                 if not precision and not entretien_item:
                     raise ValueError("Renseigne au moins un type d’entretien et/ou une réparation.")
 
-            if entretien_item:
+            # Cas spécial: Tension batterie -> on conserve la tension + l'état sans polluer la liste déroulante
+            if entretien_item and entretien_item.lower().startswith("tension de la batterie"):
+                if self._battery_last_state_message:
+                    entretien_item = f"{entretien_item} — {self._battery_last_state_message}"
+                # ne pas ajouter dans entretien_items (sinon on accumule des variantes)
+            elif entretien_item:
                 add_entretien_item(entretien_item)
+
+            # reset (évite de réutiliser l'état précédent par erreur)
+            self._battery_last_state_message = None
 
             effectue_par = (self.ent_entries["effectue_par"].get() or "").strip() or None
 
@@ -1319,6 +1549,7 @@ class GarageApp(tk.Tk):
             return
         delete_entretien(eid)
         self.entretien_edit_id = None
+        self._battery_last_state_message = None
         self._refresh_entretien()
         self._clear_entretien_form()
         self._refresh_vehicle_photo_and_info()
@@ -1525,6 +1756,7 @@ class GarageApp(tk.Tk):
 
         self.plein_edit_id = None
         self.entretien_edit_id = None
+        self._battery_last_state_message = None
 
         self._clear_plein_form()
         self._clear_entretien_form()
@@ -1578,9 +1810,12 @@ class GarageApp(tk.Tk):
 
         statuses = compute_reminders_status(int(self.vehicle_id_active))
         for i, st in enumerate(statuses):
-            txt = f"{st['label']}: {st['message']}"
+            # Si compute_reminders_status fournit déjà une ligne prête, on l'utilise.
+            line = st.get("display") or f"{st['label']}: {st['message']}"
+            symbol = "✗ " if st.get("overdue") else "✓ "
+            txt = f"{symbol}{line}"
             if i < len(self.reminder_big_lines):
-                self.reminder_big_lines[i].config(text=txt, fg=("red" if st["overdue"] else "black"))
+                self.reminder_big_lines[i].config(text=txt, fg=("red" if st.get("overdue") else "green"))
 
     def _refresh_km_label(self):
         km = last_km(int(self.vehicle_id_active)) if self.vehicle_id_active else None
