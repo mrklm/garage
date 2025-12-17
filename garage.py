@@ -1152,7 +1152,7 @@ class GarageApp(tk.Tk):
                 card.grid_propagate(False)  # permet width fixe
 
                 # Titre
-                lbl_title = tk.Label(card, text=nom or "—", font=("Arial", 16, "bold"))
+                lbl_title = tk.Label(card, text=nom or "—", font=("Arial", 25, "bold"))
                 lbl_title.pack(anchor="center", pady=(8, 6))
 
                 top = tk.Frame(card)
