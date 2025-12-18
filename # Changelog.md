@@ -4,6 +4,19 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
+## [3.1.2] – 2025-12-18
+
+-Correction: Correction de fautes et soucis de lisibilité.
+
+## [3.1.1] – 2025-12-18
+
+-Correction: prise en compte des KM de la section entretien pour afficher dans KM actuels sous la photo de 
+ la voiture. 
+
+ -Ajustement: pour les couts à venir, on affiche plus le coût du carburant du dernier plein mais le coût
+ moyen des cinq derniers pleins.
+
+
 ## [3.1.0] – 2025-12-18
 
 -Ajout d'une fonction de previsionnel des couts futurs (dernier prix des carburants enregistrés, estimation

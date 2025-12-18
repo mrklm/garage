@@ -8,7 +8,7 @@ import datetime as _dt
 import re
 
 APP_NAME = "Garage"
-APP_VERSION = "3.1.1"
+APP_VERSION = "3.1.2"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_FILE = str(SCRIPT_DIR / "garage.db")
@@ -77,6 +77,10 @@ def _add_months(d: _dt.date, months: int) -> _dt.date:
     return _dt.date(y, m, min(d.day, last_day))
 
 def get_last_fuel_price_per_liter(vehicle_id: int):
+    """Prix carburant 'actuel' : moyenne des 5 derniers pleins (prix_litre).
+
+    Si moins de 5 pleins, moyenne sur ceux disponibles.
+    """
     conn = connect()
     cur = conn.cursor()
     cur.execute(
@@ -86,18 +90,24 @@ def get_last_fuel_price_per_liter(vehicle_id: int):
         WHERE vehicule_id = ?
           AND prix_litre IS NOT NULL
         ORDER BY date DESC, id DESC
-        LIMIT 1
+        LIMIT 5
         """,
         (vehicle_id,),
     )
-    row = cur.fetchone()
+    rows = cur.fetchall()
     conn.close()
-    if not row or row[0] is None:
+
+    vals = []
+    for r in rows or []:
+        try:
+            if r[0] is not None:
+                vals.append(float(r[0]))
+        except Exception:
+            pass
+
+    if not vals:
         return None
-    try:
-        return float(row[0])
-    except Exception:
-        return None
+    return sum(vals) / len(vals)
 
 def get_last_entretien_cost_and_date(vehicle_id: int, match_terms: list[str]):
     """
@@ -614,8 +624,15 @@ def delete_vehicle(vehicle_id: int):
 # -----------------------------
 
 def last_km(vehicle_id: int, exclude_id=None):
+    """Dernier kilométrage connu du véhicule.
+
+    v3.1.2 : on prend le MAX entre les pleins et les entretiens.
+    (Utile quand un entretien est saisi avec un km > dernier km plein.)
+    """
     conn = connect()
     cur = conn.cursor()
+
+    # Max km des pleins (optionnellement en excluant un plein en cours d'édition)
     if exclude_id is None:
         cur.execute("SELECT MAX(kilometrage) FROM pleins WHERE vehicule_id = ?", (vehicle_id,))
     else:
@@ -623,9 +640,23 @@ def last_km(vehicle_id: int, exclude_id=None):
             "SELECT MAX(kilometrage) FROM pleins WHERE vehicule_id = ? AND id <> ?",
             (vehicle_id, exclude_id),
         )
-    res = cur.fetchone()
+    row_p = cur.fetchone()
+    km_pleins = row_p[0] if row_p and row_p[0] is not None else None
+
+    # Max km des entretiens
+    cur.execute("SELECT MAX(kilometrage) FROM entretien WHERE vehicule_id = ?", (vehicle_id,))
+    row_e = cur.fetchone()
+    km_ent = row_e[0] if row_e and row_e[0] is not None else None
+
     conn.close()
-    return int(res[0]) if res and res[0] is not None else None
+
+    candidates = [v for v in (km_pleins, km_ent) if v is not None]
+    if not candidates:
+        return None
+    try:
+        return int(max(candidates))
+    except Exception:
+        return None
 
 
 def list_pleins(vehicle_id: int):
