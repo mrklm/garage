@@ -7,6 +7,7 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 ## [3.1.2] – 2025-12-18
 
 -Correction: Correction de fautes et soucis de lisibilité.
+-Correction: Ré affiche la conso moyenne qui été pérdue dans les méandres de la v3.0
 
 ## [3.1.1] – 2025-12-18
 

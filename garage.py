@@ -1306,8 +1306,17 @@ class GarageApp(tk.Tk):
                 card.grid_propagate(False)  # permet width fixe
 
                 # Titre
-                lbl_title = tk.Label(card, text=nom or "—", font=("Arial", 25, "bold"))
-                lbl_title.pack(anchor="center", pady=(8, 6))
+                # Header: nom + conso
+                header = tk.Frame(card)
+                header.pack(fill=tk.X, pady=(8, 6))
+                header_inner = tk.Frame(header)
+                header_inner.pack(anchor="center")
+
+                lbl_title = tk.Label(header_inner, text=nom or "—", font=("Arial", 25, "bold"))
+                lbl_title.pack(side=tk.LEFT)
+
+                lbl_conso = tk.Label(header_inner, text="Consommation moyenne: — L / 100km",font=("Arial", 16), fg="#5DADE2")
+                lbl_conso.pack(side=tk.LEFT, padx=(8, 0))
 
                 top = tk.Frame(card)
                 top.pack(fill=tk.X, padx=10)
@@ -1360,7 +1369,7 @@ class GarageApp(tk.Tk):
                 lbl_fuel = tk.Label(row_fuel, text="Carburant (moy/an): —", font=("Arial", 13, "bold"), anchor="w")
                 lbl_fuel.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 12))
 
-                lbl_last_price = tk.Label(row_fuel, text="Prix carburant actuel: — €/L", anchor="e")
+                lbl_last_price = tk.Label(row_fuel, text="Prix moy carburant actuel: — €/L", anchor="e")
                 lbl_last_price.config(font=lbl_fuel.cget("font"))
                 lbl_last_price.pack(side=tk.RIGHT, padx=(12, 0))
 
@@ -1397,6 +1406,7 @@ class GarageApp(tk.Tk):
                 self.general_cards[vid] = {
                     "card": card,
                     "title": lbl_title,
+                    "lbl_conso": lbl_conso,
                     "canvas": canvas,
                     "lbl_km": lbl_km,
                     "lbl_fuel": lbl_fuel,
@@ -1422,6 +1432,17 @@ class GarageApp(tk.Tk):
 
             widgets["title"].config(text=nom or "—")
 
+
+            # Conso moyenne (bleu à côté du nom)
+            try:
+                conso = compute_avg_consumption_l_100_robust(int(vid))
+            except Exception:
+                conso = None
+            if "lbl_conso" in widgets and widgets["lbl_conso"] is not None:
+                if conso is None:
+                    widgets["lbl_conso"].config(text="Consommation moyenne:  — L / 100km")
+                else:
+                    widgets["lbl_conso"].config(text=("Consommation moyenne: {:.2f} L / 100km".format(conso)).replace(".", ","))
             photo_img, _err = load_photo_or_placeholder(photo_filename, size=(220, 150), label=nom or "Véhicule")
             widgets["canvas"].delete("all")
             widgets["canvas"].create_image(0, 0, image=photo_img, anchor="nw")
@@ -1444,9 +1465,9 @@ class GarageApp(tk.Tk):
             pred_maint = predicted_entretien_cost_next_6_months(vid, horizon_months=6)
 
             if last_price is None:
-                widgets["lbl_last_price"].config(text="Prix carburant actuel: — €/L")
+                widgets["lbl_last_price"].config(text="Prix moy carburant actuel: — €/L")
             else:
-                widgets["lbl_last_price"].config(text=f"Prix carburant actuel: {last_price:.3f} €/L")
+                widgets["lbl_last_price"].config(text=f"Prix moy carburant actuel: {last_price:.3f} €/L")
 
             widgets["lbl_pred_maint"].config(text=f"Coûts des entretiens à venir: {pred_maint:,.0f} €".replace(",", " "))
 
