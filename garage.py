@@ -8,7 +8,7 @@ import datetime as _dt
 import re
 
 APP_NAME = "Garage"
-APP_VERSION = "3.1.0"
+APP_VERSION = "3.1.1"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_FILE = str(SCRIPT_DIR / "garage.db")
@@ -51,6 +51,129 @@ REMINDERS = [
      "match_terms": ["contrôle technique", "controle technique"]},
 ]
 
+
+# ------------------- Prédictions (v3.1.x) -------------------
+INFLATION_CUTOFF = _dt.date(2023, 1, 1)
+INFLATION_FACTOR = 1.20
+
+def _parse_iso_date(s):
+    if s is None:
+        return None
+    if isinstance(s, _dt.date) and not isinstance(s, _dt.datetime):
+        return s
+    if isinstance(s, _dt.datetime):
+        return s.date()
+    if isinstance(s, str):
+        try:
+            return _dt.datetime.strptime(s[:10], "%Y-%m-%d").date()
+        except Exception:
+            return None
+    return None
+
+def _add_months(d: _dt.date, months: int) -> _dt.date:
+    y = d.year + (d.month - 1 + months) // 12
+    m = (d.month - 1 + months) % 12 + 1
+    last_day = [31, 29 if (y % 4 == 0 and (y % 100 != 0 or y % 400 == 0)) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m-1]
+    return _dt.date(y, m, min(d.day, last_day))
+
+def get_last_fuel_price_per_liter(vehicle_id: int):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT prix_litre
+        FROM pleins
+        WHERE vehicule_id = ?
+          AND prix_litre IS NOT NULL
+        ORDER BY date DESC, id DESC
+        LIMIT 1
+        """,
+        (vehicle_id,),
+    )
+    row = cur.fetchone()
+    conn.close()
+    if not row or row[0] is None:
+        return None
+    try:
+        return float(row[0])
+    except Exception:
+        return None
+
+def get_last_entretien_cost_and_date(vehicle_id: int, match_terms: list[str]):
+    """
+    Dernier coût + date d'un entretien dont (entretien_item OU precision) contient un des match_terms.
+    """
+    if not match_terms:
+        return None, None
+
+    conn = connect()
+    cur = conn.cursor()
+
+    # Construire une requête LIKE OR (case-insensitive)
+    clauses = []
+    params = [vehicle_id]
+    for t in match_terms:
+        clauses.append("(lower(entretien_item) LIKE ? OR lower(precision) LIKE ?)")
+        tt = f"%{t.lower()}%"
+        params.extend([tt, tt])
+
+    sql = f"""
+        SELECT cout, date
+        FROM entretien
+        WHERE vehicule_id = ?
+          AND cout IS NOT NULL
+          AND ({' OR '.join(clauses)})
+        ORDER BY date DESC, id DESC
+        LIMIT 1
+    """
+    cur.execute(sql, tuple(params))
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        return None, None
+
+    try:
+        cost = float(row[0]) if row[0] is not None else None
+    except Exception:
+        cost = None
+
+    return cost, _parse_iso_date(row[1])
+
+def predicted_entretien_cost_next_6_months(vehicle_id: int, horizon_months: int = 6) -> float:
+    """
+    Somme des coûts des entretiens à venir dans les X mois (fenêtre temporelle),
+    basée sur le dernier coût connu pour le même entretien.
+    +20% si la dernière occurrence est avant 2023.
+    """
+    today = _dt.date.today()
+    horizon = _add_months(today, int(horizon_months))
+    total = 0.0
+
+    for r in REMINDERS:
+        years = r.get("interval_years")
+        if not years:
+            # pas de règle temporelle -> on ne prédit pas ici
+            continue
+
+        match_terms = r.get("match_terms") or []
+        cost, last_d = get_last_entretien_cost_and_date(vehicle_id, match_terms)
+        if cost is None or last_d is None:
+            continue
+
+        # prochaine échéance par années
+        try:
+            next_due = last_d.replace(year=last_d.year + int(years))
+        except ValueError:
+            # 29 février etc.
+            next_due = last_d.replace(month=2, day=28, year=last_d.year + int(years))
+
+        if next_due <= horizon:
+            if last_d < INFLATION_CUTOFF:
+                cost *= INFLATION_FACTOR
+            total += float(cost)
+
+    return total
 # Pillow optionnel (affichage images)
 try:
     from PIL import Image, ImageTk, ImageDraw, ImageFont  # type: ignore
@@ -662,140 +785,6 @@ def find_last_maintenance_match(vehicle_id: int, match_terms: list[str]):
     if not terms:
         return None
 
-
-def _add_months(d: _dt.date, months: int) -> _dt.date:
-    """Ajoute des mois à une date sans dépendance externe."""
-    y = d.year + (d.month - 1 + months) // 12
-    m = (d.month - 1 + months) % 12 + 1
-    # dernier jour du mois cible
-    if m == 2:
-        leap = (y % 4 == 0 and (y % 100 != 0 or y % 400 == 0))
-        last_day = 29 if leap else 28
-    else:
-        last_day = 30 if m in (4, 6, 9, 11) else 31
-    day = min(d.day, last_day)
-    return _dt.date(y, m, day)
-
-
-def find_last_maintenance_match_with_cost(vehicle_id: int, match_terms: list[str]):
-    """Comme find_last_maintenance_match, mais renvoie aussi le coût (cout) si disponible."""
-    terms = [t.strip().lower() for t in match_terms if (t or "").strip()]
-    if not terms:
-        return None
-
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT date, kilometrage, entretien_item, precision, cout
-        FROM entretien
-        WHERE vehicule_id = ?
-        ORDER BY date DESC, id DESC
-        """,
-        (vehicle_id,),
-    )
-    rows = cur.fetchall()
-    conn.close()
-
-    for date_iso, km, item, prec, cout in rows:
-        hay = f"{item or ''} {prec or ''}".lower()
-        if any(t in hay for t in terms):
-            return date_iso, (int(km) if km is not None else None), (item or ""), (prec or ""), cout
-    return None
-
-
-def get_last_fuel_price_per_liter(vehicle_id: int) -> float | None:
-    """Dernier prix/litre saisi dans les pleins."""
-    conn = connect()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT prix_litre
-        FROM pleins
-        WHERE vehicule_id = ?
-          AND prix_litre IS NOT NULL
-        ORDER BY date DESC, id DESC
-        LIMIT 1
-        """,
-        (vehicle_id,),
-    )
-    row = cur.fetchone()
-    conn.close()
-    if not row or row[0] is None:
-        return None
-    try:
-        return float(row[0])
-    except Exception:
-        return None
-
-
-def compute_predicted_entretien_cost_next_6_months(vehicle_id: int, months: int = 6) -> float:
-    """
-    Somme des coûts estimés des entretiens dont l'échéance temporelle tombe dans les X mois,
-    basée sur le dernier coût connu pour le même entretien (match_terms).
-    +20% appliqué si la dernière occurrence est avant 2023.
-    """
-    today = _dt.date.today()
-    horizon = _add_months(today, months)
-
-    inflation_cutoff = _dt.date(2023, 1, 1)
-    inflation_factor = 1.20
-
-    total = 0.0
-
-    for r in REMINDERS:
-        rtype = r.get("type")
-        match_terms = r.get("match_terms", [])
-        last = find_last_maintenance_match_with_cost(vehicle_id, match_terms)
-        if not last:
-            continue
-
-        last_date_iso, _km, _item, _prec, last_cost = last
-        last_date = _try_parse_iso_date(last_date_iso)
-        if not last_date:
-            continue
-
-        # Détermine échéance basée sur le temps uniquement
-        due_date = None
-        if rtype in ("monthly_simple", "battery_monthly"):
-            days = int(r.get("interval_days") or 0)
-            if days > 0:
-                due_date = last_date + _dt.timedelta(days=days)
-        elif rtype == "ct":
-            years = int(r.get("interval_years") or 0)
-            if years > 0:
-                try:
-                    due_date = last_date.replace(year=last_date.year + years)
-                except ValueError:
-                    due_date = last_date.replace(month=2, day=28, year=last_date.year + years)
-        elif rtype == "km_years":
-            years = int(r.get("interval_years") or 0)
-            if years > 0:
-                try:
-                    due_date = last_date.replace(year=last_date.year + years)
-                except ValueError:
-                    due_date = last_date.replace(month=2, day=28, year=last_date.year + years)
-
-        if due_date is None:
-            continue
-
-        if due_date > horizon:
-            continue
-
-        if last_cost is None:
-            continue
-
-        try:
-            c = float(last_cost)
-        except Exception:
-            continue
-
-        if last_date < inflation_cutoff:
-            c *= inflation_factor
-
-        total += c
-
-    return float(total)
     conn = connect()
     cur = conn.cursor()
     cur.execute(
@@ -1302,33 +1291,6 @@ class GarageApp(tk.Tk):
                 canvas = tk.Canvas(left, width=220, height=150, highlightthickness=1)
                 canvas.pack()
 
-                # Lignes (KM / coûts) avec colonne droite "prédictions"
-                row_km = tk.Frame(left)
-                row_km.pack(fill=tk.X, pady=(6, 0))
-
-                lbl_km = tk.Label(row_km, text="— km", font=("Arial", 20, "bold"), anchor="w")
-                lbl_km.pack(side=tk.LEFT, anchor="w")
-
-                lbl_pred6 = tk.Label(row_km, text="Dépenses à prévoir dans les 6 mois: —", font=("Arial", 12, "bold"), anchor="e")
-                lbl_pred6.pack(side=tk.RIGHT, anchor="e")
-
-                row_fuel = tk.Frame(left)
-                row_fuel.pack(fill=tk.X, pady=(6, 0))
-
-                lbl_fuel = tk.Label(row_fuel, text="Carburant (moy/an): —", font=("Arial", 13, "bold"), anchor="w")
-                lbl_fuel.pack(side=tk.LEFT, anchor="w")
-
-                lbl_last_price = tk.Label(row_fuel, text="Prix carburant actuel: — €/L", font=("Arial", 12), anchor="e")
-                lbl_last_price.pack(side=tk.RIGHT, anchor="e")
-
-                row_maint = tk.Frame(left)
-                row_maint.pack(fill=tk.X, pady=(6, 0))
-
-                lbl_maint = tk.Label(row_maint, text="Entretien (moy/an): —", font=("Arial", 13, "bold"), anchor="w")
-                lbl_maint.pack(side=tk.LEFT, anchor="w")
-
-                lbl_pred_maint = tk.Label(row_maint, text="Coûts des entretiens à venir: — €", font=("Arial", 12), anchor="e")
-                lbl_pred_maint.pack(side=tk.RIGHT, anchor="e")
 
                 # Infos véhicule (comme l'ancien onglet Pleins)
                 tk.Label(right, text="Infos Véhicule", font=("Arial", 12, "bold", "underline")).pack(anchor="w")
@@ -1344,6 +1306,43 @@ class GarageApp(tk.Tk):
 
                 for w in (lbl_marque, lbl_modele, lbl_motor, lbl_energie, lbl_annee, lbl_immat):
                     w.pack(anchor="w")
+
+                # Bloc sous les infos véhicule : KM / coûts + prédictions (v3.1.1)
+                below_info = tk.Frame(card)
+                below_info.pack(fill=tk.X, padx=10, pady=(6, 0))
+
+                # Ligne KM + dépenses 6 mois
+                row_km = tk.Frame(below_info)
+                row_km.pack(fill=tk.X, pady=(2, 0))
+
+                lbl_km = tk.Label(row_km, text="— km", font=("Arial", 20, "bold"), anchor="w")
+                lbl_km.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 12))
+
+                lbl_pred6 = tk.Label(row_km, text="Dépenses à prévoir dans les 6 mois: —", anchor="e")
+                lbl_pred6.config(font=lbl_km.cget("font"))
+                lbl_pred6.pack(side=tk.RIGHT, padx=(12, 0))
+
+                # Ligne carburant moy/an + prix carburant actuel
+                row_fuel = tk.Frame(below_info)
+                row_fuel.pack(fill=tk.X, pady=(2, 0))
+
+                lbl_fuel = tk.Label(row_fuel, text="Carburant (moy/an): —", font=("Arial", 13, "bold"), anchor="w")
+                lbl_fuel.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 12))
+
+                lbl_last_price = tk.Label(row_fuel, text="Prix carburant actuel: — €/L", anchor="e")
+                lbl_last_price.config(font=lbl_fuel.cget("font"))
+                lbl_last_price.pack(side=tk.RIGHT, padx=(12, 0))
+
+                # Ligne entretien moy/an + coûts à venir
+                row_maint = tk.Frame(below_info)
+                row_maint.pack(fill=tk.X, pady=(2, 0))
+
+                lbl_maint = tk.Label(row_maint, text="Entretien (moy/an): —", font=("Arial", 13, "bold"), anchor="w")
+                lbl_maint.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 12))
+
+                lbl_pred_maint = tk.Label(row_maint, text="Coûts des entretiens à venir: — €", anchor="e")
+                lbl_pred_maint.config(font=lbl_maint.cget("font"))
+                lbl_pred_maint.pack(side=tk.RIGHT, padx=(12, 0))
 
                 # Alertes/rappels
                 alerts = tk.Frame(card)
@@ -1405,10 +1404,13 @@ class GarageApp(tk.Tk):
             fuel = 0.0 if fuel is None else float(fuel)
             maint = 0.0 if maint is None else float(maint)
 
-            # --- Prédictions (6 mois) ---
+            widgets["lbl_fuel"].config(text=f"Carburant (moy/an): {fuel:,.0f} €".replace(",", " "))
+            widgets["lbl_maint"].config(text=f"Entretien (moy/an): {maint:,.0f} €".replace(",", " "))
+
+
+            # Prédictions (6 mois)
             last_price = get_last_fuel_price_per_liter(vid)
-            pred_maint = compute_predicted_entretien_cost_next_6_months(vid, months=6)
-            pred_total = pred_maint  # (carburant futur: à ajouter plus tard)
+            pred_maint = predicted_entretien_cost_next_6_months(vid, horizon_months=6)
 
             if last_price is None:
                 widgets["lbl_last_price"].config(text="Prix carburant actuel: — €/L")
@@ -1417,10 +1419,8 @@ class GarageApp(tk.Tk):
 
             widgets["lbl_pred_maint"].config(text=f"Coûts des entretiens à venir: {pred_maint:,.0f} €".replace(",", " "))
 
-            widgets["lbl_pred6"].config(text=f"Dépenses à prévoir dans les 6 mois: {pred_total:,.0f} €".replace(",", " "))
-            widgets["lbl_fuel"].config(text=f"Carburant (moy/an): {fuel:,.0f} €".replace(",", " "))
-            widgets["lbl_maint"].config(text=f"Entretien (moy/an): {maint:,.0f} €".replace(",", " "))
-
+            pred_total = float(pred_maint)
+            widgets["lbl_pred6"].config(text=f"Coût 6 prochains mois: {pred_total:,.0f} €".replace(",", " "))
 
             widgets["lbl_marque"].config(text=f"Marque : {marque or '—'}")
             widgets["lbl_modele"].config(text=f"Modèle : {modele or '—'}")
@@ -2217,34 +2217,24 @@ class GarageApp(tk.Tk):
             return
         _, nom, marque, modele, motorisation, energie, annee, immat, photo = v
 
-        canvas = getattr(self, "canvas_photo", None)
-        if canvas is not None:
-            canvas.delete("all")
-            tk_img, _err = load_photo_or_placeholder(photo, size=(220, 150), label=nom)
-            self._tk_vehicle_photo = tk_img
-            if tk_img is not None:
-                canvas.create_image(0, 0, anchor="nw", image=tk_img)
-            else:
-                canvas.create_rectangle(0, 0, 220, 150, fill="#c8c8c8", outline="#999999")
-                canvas.create_text(110, 75, text=f"{nom}\nPhoto introuvable", justify="center")
+        self.canvas_photo.delete("all")
+        tk_img, _err = load_photo_or_placeholder(photo, size=(220, 150), label=nom)
+        self._tk_vehicle_photo = tk_img
+        if tk_img is not None:
+            self.canvas_photo.create_image(0, 0, anchor="nw", image=tk_img)
+        else:
+            self.canvas_photo.create_rectangle(0, 0, 220, 150, fill="#c8c8c8", outline="#999999")
+            self.canvas_photo.create_text(110, 75, text=f"{nom}\nPhoto introuvable", justify="center")
 
-        def _cfg(attr, txt):
-            w = getattr(self, attr, None)
-            if w is not None:
-                try:
-                    w.config(text=txt)
-                except Exception:
-                    pass
-
-        _cfg("lbl_info_marque", f"Marque : {marque}" if marque else "")
-        _cfg("lbl_info_modele", f"Modèle : {modele}" if modele else "")
-        _cfg("lbl_info_motorisation", f"Motorisation : {motorisation}" if motorisation else "")
-        _cfg("lbl_info_energie", f"Énergie : {energie}" if energie else "")
-        _cfg("lbl_info_annee", f"Année : {annee}" if annee else "")
-        _cfg("lbl_info_immat", f"Immatriculation : {immat}" if immat else "")
+        self.lbl_info_marque.config(text=f"Marque : {marque}" if marque else "")
+        self.lbl_info_modele.config(text=f"Modèle : {modele}" if modele else "")
+        self.lbl_info_motorisation.config(text=f"Motorisation : {motorisation}" if motorisation else "")
+        self.lbl_info_energie.config(text=f"Énergie : {energie}" if energie else "")
+        self.lbl_info_annee.config(text=f"Année : {annee}" if annee else "")
+        self.lbl_info_immat.config(text=f"Immatriculation : {immat}" if immat else "")
 
         conso = compute_avg_consumption_l_100_robust(int(self.vehicle_id_active))
-        _cfg("lbl_info_conso", f"Conso moyenne : {conso:.2f} L/100" if conso is not None else "Conso moyenne : —")
+        self.lbl_info_conso.config(text=f"Conso moyenne : {conso:.2f} L/100" if conso is not None else "Conso moyenne : —")
 
         statuses = compute_reminders_status(int(self.vehicle_id_active))
         for i, st in enumerate(statuses):
