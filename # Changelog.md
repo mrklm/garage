@@ -4,8 +4,24 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
+## [3.1.0] – 2025-12-18
 
+-Ajout d'une fonction de previsionnel des couts futurs (dernier prix des carburants enregistrés, estimation
+ du cout des entretiens à venir dans les 6 prochains mois en ce basant sur les dernieres factures en prenant
+en compte que si la facture est d'avant 2023, on ajoute 20% pour l'inflation)
 
+## [3.0.1] – 2025-12-17
+
+-Changement de placement de texte, tailles et styles de police
+
+## [3.0.0] – 2025-12-17
+- Refonte des onglets: un onglet general avec les photos des voitures affichées, leurs KM à la derniere
+M-A-J plein ou Entretien, les details technique des voitures, la conso moyenne au litre / 100km, et les alertes.
+
+Les autres onglets sonts:
+-Les pleins
+-les Entretiens
+-Les options (à venir)
 
 ## [2.5.4] – 2025-12-17
 ### Ajouté
