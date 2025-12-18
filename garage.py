@@ -34,11 +34,11 @@ REMINDERS = [
     # Règles ajoutées (mensuel)
     {"key": "pneumatiques", "label": "Pneumatiques", "type": "monthly_simple", "interval_days": 30,
      "match_terms": ["pneumatiques", "pneus"],
-     "ok_text": "Pneumatiques OK (à faire tout le mois)",
+     "ok_text": "Pneumatiques OK (à faire tout les mois)",
      "todo_text": "Pneumatiques à Vérifier"},
     {"key": "niveaux", "label": "Niveaux", "type": "monthly_simple", "interval_days": 30,
      "match_terms": ["niveaux"],
-     "ok_text": "Niveaux OK (à faire tout le mois)",
+     "ok_text": "Niveaux OK (à faire tout les mois)",
      "todo_text": "Niveaux à Vérifier"},
 
     # Batterie (mensuel + interprétation)
