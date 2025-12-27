@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
+## [4.0.0] – 2025-12-19
+
+-Refonte de l'onglet Entretien, on y gerera désormais la definition des differents type d'entretien
+ selon le vehicule en y renseigant une description, une periodoicité et les mention de rappel à 
+ afficher dans l'onglet "Général" possibilité d'ajouter une/plusieurs ligne(s) "Anomalye / A verifier", 
+ en bas de la liste des rappels. (ligne(s) Anomalie --> en orange dans les rappels)
+
+
 ## [3.1.2] – 2025-12-18
 
 -Correction: Correction de fautes et soucis de lisibilité.

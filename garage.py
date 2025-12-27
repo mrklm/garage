@@ -14,7 +14,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DB_FILE = str(SCRIPT_DIR / "garage.db")
 
 ASSETS_DIR = SCRIPT_DIR / "assets"
-VEHICLES_DIR = ASSETS_DIR / "vehicles"
+# v3.1.2a: On stocke les photos directement dans assets/ (pas de sous-dossier vehicles)
+PHOTO_DIR = ASSETS_DIR
+# Compat: si des anciennes photos existent dans assets/vehicles/, on tente aussi là-bas
+LEGACY_PHOTO_DIR = ASSETS_DIR / "vehicles"
 
 MAX_VEHICLES = 5
 
@@ -204,15 +207,12 @@ def safe_filename(name: str) -> str:
 
 
 def ensure_dirs():
-    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-    VEHICLES_DIR.mkdir(parents=True, exist_ok=True)
-    gitkeep = VEHICLES_DIR / ".gitkeep"
-    if not gitkeep.exists():
-        try:
-            gitkeep.write_text("", encoding="utf-8")
-        except Exception:
-            pass
+    """Crée le dossier assets/ si besoin.
 
+    v3.1.2a: on ne crée plus automatiquement assets/vehicles/.
+    Si tu avais déjà des photos dans assets/vehicles/, elles restent lisibles (compat).
+    """
+    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 
 def _try_parse_iso_date(s: str):
     try:
@@ -234,7 +234,12 @@ def _format_km(km: int) -> str:
 
 def load_photo_or_placeholder(photo_filename: str | None, size=(220, 150), label="Véhicule"):
     w, h = size
-    path = (VEHICLES_DIR / photo_filename) if photo_filename else None
+    path = (PHOTO_DIR / photo_filename) if photo_filename else None
+    # Compat: anciennes photos dans assets/vehicles
+    if photo_filename and (path is None or not path.exists()):
+        legacy = LEGACY_PHOTO_DIR / photo_filename
+        if legacy.exists():
+            path = legacy
 
     if PIL_AVAILABLE:
         try:
@@ -1218,7 +1223,7 @@ class GarageApp(tk.Tk):
             "Suivi des pleins + entretien multi-véhicules + gestion des lieux.\n"
             "v3.0.1: onglet Général (vue flotte) + Pleins simplifié + Options.\n\n"
             f"Base: {DB_FILE}\n"
-            f"Photos: {VEHICLES_DIR}\n"
+            f"Photos: {PHOTO_DIR}\n"
             f"Pillow: {'OK' if PIL_AVAILABLE else 'non détecté'}",
         )
 
@@ -2478,10 +2483,10 @@ class GarageApp(tk.Tk):
         name_hint = safe_filename(self.vehicle_form["nom"].get())
         ext = src.suffix.lower() if src.suffix else ".png"
         dest_name = f"{name_hint}{ext}"
-        dest = VEHICLES_DIR / dest_name
+        dest = PHOTO_DIR / dest_name
         if dest.exists():
             dest_name = f"{name_hint}_{int(time.time())}{ext}"
-            dest = VEHICLES_DIR / dest_name
+            dest = PHOTO_DIR / dest_name
 
         try:
             shutil.copy2(src, dest)
