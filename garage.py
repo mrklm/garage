@@ -19,7 +19,9 @@ import re
 import sqlite3
 import shutil
 import uuid
+import math
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime, date
 
@@ -72,6 +74,16 @@ def _ensure_db_columns():
         cols_v = _columns(cur, "vehicules")
         if "photo_file" not in cols_v:
             cur.execute("ALTER TABLE vehicules ADD COLUMN photo_file TEXT")
+    except Exception:
+        pass
+
+    # vehicule_entretien_types.enabled (rappel activé)
+    try:
+        cols_vtt = _columns(cur, "vehicule_entretien_types")
+        if "enabled" not in cols_vtt:
+            cur.execute("ALTER TABLE vehicule_entretien_types ADD COLUMN enabled INTEGER DEFAULT 1")
+            # si possible, mettre à 1 les lignes existantes
+            cur.execute("UPDATE vehicule_entretien_types SET enabled=1 WHERE enabled IS NULL")
     except Exception:
         pass
 
@@ -381,9 +393,14 @@ def last_km_any(vehicle_id: int):
 
 
 def list_vehicle_types(vehicle_id: int):
+    """Retourne les types d'entretien associés au véhicule + flag enabled (rappel affiché)."""
     conn = _connect_db()
     cur = conn.cursor()
-    cur.execute("""SELECT t.id AS type_id, t.nom AS type_name, t.period_km, t.period_months
+    cur.execute("""SELECT t.id AS type_id,
+                          t.nom AS type_name,
+                          t.period_km,
+                          t.period_months,
+                          COALESCE(vtt.enabled, 1) AS enabled
                    FROM vehicule_entretien_types vtt
                    JOIN entretien_types t ON t.id = vtt.type_id
                    WHERE vtt.vehicule_id = ?
@@ -440,6 +457,150 @@ def delete_type_from_vehicle(vehicle_id: int, type_id: int):
         cur.execute("DELETE FROM entretien_types WHERE id=?", (int(type_id),))
     conn.commit()
     conn.close()
+
+
+
+def set_vehicle_type_enabled(vehicle_id: int, type_id: int, enabled: int):
+    """Active/désactive l'affichage du rappel pour un type d'entretien sur un véhicule.
+    UPDATE puis INSERT si la ligne n'existe pas (robuste).
+    """
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE vehicule_entretien_types SET enabled=? WHERE vehicule_id=? AND type_id=?",
+        (1 if enabled else 0, int(vehicle_id), int(type_id)),
+    )
+    if cur.rowcount == 0:
+        cur.execute(
+            "INSERT OR IGNORE INTO vehicule_entretien_types(vehicule_id, type_id, enabled) VALUES (?, ?, ?)",
+            (int(vehicle_id), int(type_id), 1 if enabled else 0),
+        )
+    conn.commit()
+    conn.close()
+
+
+def get_last_entretien_for_type(vehicle_id: int, type_id: int):
+    """Retourne (date_iso, km) du dernier entretien pour ce type sur ce véhicule."""
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT date_iso, km
+           FROM entretiens
+           WHERE vehicule_id=? AND type_id=?
+           ORDER BY date_iso DESC, km DESC, id DESC
+           LIMIT 1""",
+        (int(vehicle_id), int(type_id)),
+    )
+    r = cur.fetchone()
+    conn.close()
+    if not r:
+        return (None, None)
+    return (r["date_iso"], r["km"])
+
+
+def _month_diff(d1: date, d2: date) -> int:
+    """Nombre de mois entiers entre d1 et d2 (d2 >= d1)."""
+    if not d1 or not d2:
+        return 0
+    m = (d2.year - d1.year) * 12 + (d2.month - d1.month)
+    if d2.day < d1.day:
+        m -= 1
+    return max(0, m)
+
+
+def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_months):
+    """Calcule (is_done, color, label) pour un rappel.
+
+    - is_done: bool (pas dû / OK)
+
+    - label: 'À faire dans …' ou 'À faire depuis …'
+
+    Règle: si km et/ou mois définis, on considère 'dû' quand au moins un seuil est dépassé.
+
+    Si aucun entretien enregistré -> dû immédiatement.
+    """
+    current_km = last_km_any(vehicle_id) or 0
+    last_date_iso, last_km = get_last_entretien_for_type(vehicle_id, type_id)
+
+    pk = _safe_int(period_km)
+    pm = _safe_int(period_months)
+
+    if last_date_iso is None and last_km is None:
+        # Jamais fait -> dû
+        if pk or pm:
+            parts = []
+            if pk:
+                parts.append(f"{pk} km")
+            if pm:
+                parts.append(f"{pm} mois")
+            extra = " / ".join(parts) if parts else ""
+            return (False, "red", f"À faire (jamais fait) {('- ' + extra) if extra else ''}".strip())
+        return (False, "red", "À faire (jamais fait)")
+
+    # écarts
+    km_delta = None
+    if pk is not None and last_km is not None:
+        km_delta = int(current_km) - int(last_km)
+
+    months_delta = None
+    if pm is not None:
+        d_last = _parse_iso_date(last_date_iso)
+        if d_last:
+            months_delta = _month_diff(d_last, date.today())
+
+    # restants / dépassements
+    km_left = None
+    if pk is not None and km_delta is not None:
+        km_left = pk - km_delta
+
+    months_left = None
+    if pm is not None and months_delta is not None:
+        months_left = pm - months_delta
+
+    # déterminer dû si un des deux <=0
+    overdue = False
+    if km_left is not None and km_left <= 0:
+        overdue = True
+    if months_left is not None and months_left <= 0:
+        overdue = True
+
+    if overdue:
+        parts = []
+        if km_left is not None and km_left <= 0:
+            parts.append(f"{abs(km_left)} km")
+        if months_left is not None and months_left <= 0:
+            parts.append(f"{abs(months_left)} mois")
+        suffix = " / ".join(parts) if parts else ""
+        return (False, "red", f"À faire depuis {suffix}".strip())
+    else:
+        parts = []
+        if km_left is not None:
+            parts.append(f"{km_left} km")
+        if months_left is not None:
+            parts.append(f"{months_left} mois")
+        suffix = " / ".join(parts) if parts else ""
+        # si pas de fréquence, on considère 'fait'
+        if not suffix:
+            return (True, "green", "OK")
+        return (True, "green", f"À faire dans {suffix}".strip())
+
+
+def battery_health_message(v):
+    if v is None:
+        return "—"
+    try:
+        v = float(v)
+    except Exception:
+        return "—"
+    if v <= 12.0:
+        return "Tension en dessous de 12V : Attention décharge critique, prévoir remplacement"
+    if 12.1 <= v <= 12.3:
+        return "Tension de batterie faible : À recharger"
+    if 12.4 <= v <= 12.5:
+        return "Batterie limite mais ça passe"
+    if v >= 12.6:
+        return "Batterie en bonne santé"
+    return "—"
 
 
 def list_entretiens_full(vehicle_id: int):
@@ -507,6 +668,48 @@ def delete_entretien(entretien_id: int):
     cur.execute("DELETE FROM entretiens WHERE id=?", (int(entretien_id),))
     conn.commit()
     conn.close()
+
+
+def maintenance_done(vehicle_id: int, type_id: int) -> bool:
+    """True si au moins un entretien existe pour ce type sur ce véhicule."""
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT 1 FROM entretiens WHERE vehicule_id=? AND type_id=? LIMIT 1",
+        (int(vehicle_id), int(type_id)),
+    )
+    ok = cur.fetchone() is not None
+    conn.close()
+    return ok
+
+
+def conso_moy_l100(vehicle_id: int):
+    """Conso moyenne (L/100) basée sur pleins: SUM(litres)/(max_km-min_km)*100. Nécessite >=2 pleins."""
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT MIN(km) AS kmin, MAX(km) AS kmax, SUM(litres) AS lsum, COUNT(*) AS n FROM pleins WHERE vehicule_id=?",
+        (int(vehicle_id),),
+    )
+    r = cur.fetchone()
+    conn.close()
+    if not r:
+        return None
+    try:
+        n = int(r["n"] or 0)
+    except Exception:
+        n = 0
+    if n < 2:
+        return None
+    kmin = _safe_int(r["kmin"])
+    kmax = _safe_int(r["kmax"])
+    lsum = _safe_float(r["lsum"])
+    if kmin is None or kmax is None or lsum is None:
+        return None
+    dist = kmax - kmin
+    if dist <= 0:
+        return None
+    return (lsum / dist) * 100.0
 
 
 # ----------------- Modales -----------------
@@ -734,6 +937,17 @@ class EntretienEditor(tk.Toplevel):
 class GarageApp(tk.Tk):
     def __init__(self):
         super().__init__()
+
+        # Fonts (base +4 demandé)
+        _base = tkfont.nametofont('TkDefaultFont')
+        _fam = _base.actual('family')
+        _sz = int(_base.actual('size'))
+        self.font_card_title = tkfont.Font(family=_fam, size=_sz + 7, weight='bold')
+        self.font_rem_title = tkfont.Font(family=_fam, size=_sz + 4, weight='bold')
+        self.font_rem_item = tkfont.Font(family=_fam, size=_sz + 4)
+        self.font_detail_label = tkfont.Font(family=_fam, size=_sz, weight='bold')
+        self.font_info2_bold = tkfont.Font(family=_fam, size=_sz + 2, weight='bold')
+        self.font_info2 = tkfont.Font(family=_fam, size=_sz + 2)
         self.title(APP_TITLE)
         self.geometry("1400x950")
         self.minsize(1180, 720)
@@ -796,244 +1010,231 @@ class GarageApp(tk.Tk):
     def _set_status(self, txt: str):
         self.status.set(txt)
 
-
     # ---------- Général ----------
     def _build_general_tab(self):
-        """
-        Vue d'ensemble flotte :
-        - Affiche 1 à N véhicules sous forme de "cartes".
-        - Si <=2 : affichage côte à côte.
-        - Si >2 : navigation avec flèches (défilement horizontal).
-        - Un clic sur une carte sélectionne le véhicule pour les autres onglets.
-        """
+        # 2 véhicules par page, cartes qui prennent toute la zone (plein écran)
         self.tab_general.columnconfigure(0, weight=1)
-        self.tab_general.rowconfigure(0, weight=1)
+        self.tab_general.rowconfigure(1, weight=1)
 
-        root = ttk.Frame(self.tab_general)
-        root.grid(row=0, column=0, sticky="nsew")
-        root.columnconfigure(1, weight=1)
-        root.rowconfigure(0, weight=1)
+        head = ttk.Frame(self.tab_general)
+        head.grid(row=0, column=0, sticky="ew")
+        head.columnconfigure(1, weight=1)
 
-        # Flèches (visibles seulement si > 2 véhicules)
-        self.gen_left_btn = ttk.Button(root, text="◀", width=3, command=lambda: self._gen_scroll(-1))
-        self.gen_left_btn.grid(row=0, column=0, sticky="ns", padx=(0, 8))
-        self.gen_right_btn = ttk.Button(root, text="▶", width=3, command=lambda: self._gen_scroll(+1))
-        self.gen_right_btn.grid(row=0, column=2, sticky="ns", padx=(8, 0))
+        nav = ttk.Frame(head)
+        nav.grid(row=0, column=1, sticky="e")
+        self.btn_prev = ttk.Button(nav, text="◀", width=3, command=self._general_prev_page)
+        self.btn_next = ttk.Button(nav, text="▶", width=3, command=self._general_next_page)
+        self.lbl_page = ttk.Label(nav, text="")
 
-        # Zone scrollable horizontale
-        self.gen_canvas = tk.Canvas(root, highlightthickness=0)
-        self.gen_canvas.grid(row=0, column=1, sticky="nsew")
+        self.btn_prev.grid(row=0, column=0, padx=(0, 6))
+        self.lbl_page.grid(row=0, column=1, padx=(0, 6))
+        self.btn_next.grid(row=0, column=2)
 
-        self.gen_scroll_x = ttk.Scrollbar(root, orient="horizontal", command=self.gen_canvas.xview)
-        self.gen_canvas.configure(xscrollcommand=self.gen_scroll_x.set)
-        self.gen_scroll_x.grid(row=1, column=1, sticky="ew", pady=(10, 0))
+        self.general_cards = ttk.Frame(self.tab_general)
+        self.general_cards.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        self.general_cards.columnconfigure(0, weight=1)
+        self.general_cards.columnconfigure(1, weight=1)
+        self.general_cards.rowconfigure(0, weight=1)
 
-        self.gen_cards_frame = ttk.Frame(self.gen_canvas)
-        self._gen_cards_window = self.gen_canvas.create_window((0, 0), window=self.gen_cards_frame, anchor="nw")
+        self.general_page = 0
+        self._general_card_imgs = {}
 
-        self.gen_cards_frame.bind("<Configure>", self._on_gen_cards_configure)
-        self.gen_canvas.bind("<Configure>", self._on_gen_canvas_configure)
+    def _general_prev_page(self):
+        if self.general_page > 0:
+            self.general_page -= 1
+            self._refresh_general_overview()
 
-        # Petit helper pour molette / trackpad (horizontal)
-        def _wheel(e):
-            # Sur macOS, delta est petit et inversé selon périphériques ; on garde simple.
-            try:
-                delta = int(-1 * (e.delta / 120))
-            except Exception:
-                delta = 0
-            if delta:
-                self.gen_canvas.xview_scroll(delta, "units")
+    def _general_next_page(self):
+        total = len(self.vehicles_rows)
+        max_page = max(0, (total - 1) // 2)
+        if self.general_page < max_page:
+            self.general_page += 1
+            self._refresh_general_overview()
 
-        self.gen_canvas.bind_all("<Shift-MouseWheel>", _wheel)
-
-        # State scroll
-        self._gen_card_width = 460
-        self._gen_scroll_page = 0
-
-        # Conteneur des widgets (pour update rapide)
-        self._general_cards = []
-
-    def _on_gen_cards_configure(self, _evt=None):
-        # Ajuste la scrollregion au contenu
-        self.gen_canvas.configure(scrollregion=self.gen_canvas.bbox("all"))
-
-    def _on_gen_canvas_configure(self, _evt=None):
-        # Maintient la fenêtre interne à la bonne hauteur
-        try:
-            self.gen_canvas.itemconfigure(self._gen_cards_window, height=self.gen_canvas.winfo_height())
-        except Exception:
-            pass
-
-    def _gen_scroll(self, direction: int):
-        """
-        direction: -1 (gauche) / +1 (droite)
-        Défile d'une carte à la fois.
-        """
-        n = len(self.vehicles_rows)
-        if n <= 2:
-            return
-
-        self._gen_scroll_page = max(0, min(self._gen_scroll_page + direction, n - 2))
-        total_w = max(1, self.gen_cards_frame.winfo_reqwidth())
-        view_w = max(1, self.gen_canvas.winfo_width())
-
-        # Calcul du x ciblé (défilement par carte)
-        x_target = self._gen_scroll_page * self._gen_card_width
-        x_target = max(0, min(x_target, max(0, total_w - view_w)))
-        self.gen_canvas.xview_moveto(x_target / total_w)
-
-    def _on_general_card_click(self, vehicle_id: int):
+    def _select_vehicle_from_general(self, vehicle_id: int):
         self.active_vehicle_id = int(vehicle_id)
-        self._refresh_all_tabs_after_vehicle_change(source="general_overview")
-
-    def _general_avg_consumption_l_per_100(self, vehicle_id: int):
-        """
-        Estimation simple conso (L/100) :
-        - prend les pleins du véhicule
-        - distance = max(km) - min(km)
-        - conso = (somme litres / distance) * 100
-        """
-        conn = _connect_db()
-        cur = conn.cursor()
-        cur.execute("SELECT MIN(km) AS kmin, MAX(km) AS kmax, SUM(litres) AS lsum FROM pleins WHERE vehicule_id=?", (int(vehicle_id),))
-        r = cur.fetchone()
-        conn.close()
-        if not r:
-            return None
-        kmin = _safe_int(r["kmin"])
-        kmax = _safe_int(r["kmax"])
-        lsum = _safe_float(r["lsum"])
-        if kmin is None or kmax is None or lsum is None:
-            return None
-        dist = kmax - kmin
-        if dist <= 0:
-            return None
-        return (lsum / dist) * 100.0
-
-    def _general_reminders_checklist(self, vehicle_id: int):
-        """
-        Checklist ultra-simple demandée :
-        - Pour chaque type d'entretien du véhicule :
-          - si au moins 1 entretien existe => V vert
-          - sinon => X rouge
-        """
-        types = list_vehicle_types(vehicle_id)
-        if not types:
-            return []
-
-        conn = _connect_db()
-        cur = conn.cursor()
-        out = []
-        for t in types:
-            tid = int(t["type_id"])
-            name = t["type_name"] or f"Type #{tid}"
-            cur.execute("SELECT COUNT(*) AS n FROM entretiens WHERE vehicule_id=? AND type_id=?", (int(vehicle_id), tid))
-            n = int(cur.fetchone()["n"])
-            done = n > 0
-            out.append((name, done))
-        conn.close()
-        return out
+        self._refresh_all_tabs_after_vehicle_change(source="general_click")
 
     def _refresh_general_overview(self):
-        # Nettoyage cartes
-        for w in self.gen_cards_frame.winfo_children():
+        # Nettoyage
+        for w in self.general_cards.winfo_children():
             w.destroy()
-        self._general_cards = []
+        self._general_card_imgs = {}
 
-        n = len(self.vehicles_rows)
-        # Flèches : uniquement si > 2
-        if n > 2:
-            self.gen_left_btn.state(["!disabled"])
-            self.gen_right_btn.state(["!disabled"])
+        total = len(self.vehicles_rows)
+        max_page = max(0, (total - 1) // 2)
+        if self.general_page > max_page:
+            self.general_page = max_page
+
+        # Flèches uniquement si >2 véhicules
+        if total <= 2:
+            self.btn_prev.grid_remove()
+            self.btn_next.grid_remove()
+            self.lbl_page.grid_remove()
         else:
-            self.gen_left_btn.state(["disabled"])
-            self.gen_right_btn.state(["disabled"])
-            self._gen_scroll_page = 0
-            self.gen_canvas.xview_moveto(0.0)
+            # ré-affiche si on était en grid_remove
+            self.btn_prev.grid()
+            self.btn_next.grid()
+            self.lbl_page.grid()
 
-        # Style de grille : 2 colonnes max visibles (comme demandé)
-        # On affiche toutes les cartes, mais la navigation gère le "défilement" si >2.
-        cols = 2 if n >= 2 else 1
+            self.btn_prev.state(["!disabled"] if self.general_page > 0 else ["disabled"])
+            self.btn_next.state(["!disabled"] if self.general_page < max_page else ["disabled"])
+            self.lbl_page.config(text=f"{self.general_page + 1}/{max_page + 1}")
 
-        self._gen_card_width = 460  # base pour scroll
-        pad_x = 12
-        pad_y = 12
+        # 2 véhicules par page
+        start = self.general_page * 2
+        show_rows = self.vehicles_rows[start:start + 2]
 
-        for i, vr in enumerate(self.vehicles_rows):
-            vid = int(vr["id"])
-            row = i // cols
-            col = i % cols
+        # Si un seul véhicule dans la page, il prend toute la largeur (colspan=2)
+        if len(show_rows) == 1:
+            self._build_general_card(show_rows[0], row=0, col=0, colspan=2)
+        else:
+            for col, r in enumerate(show_rows):
+                self._build_general_card(r, row=0, col=col, colspan=1)
 
-            card = ttk.Frame(self.gen_cards_frame, padding=12, relief="ridge")
-            card.grid(row=row, column=col, padx=pad_x, pady=pad_y, sticky="n")
 
-            # Clic sur carte => sélection véhicule
-            card.bind("<Button-1>", lambda e, _vid=vid: self._on_general_card_click(_vid))
 
-            title = (vr["nom"] or f"Véhicule #{vid}").strip()
-            subtitle = f"{(vr['marque'] or '').strip()} {(vr['modele'] or '').strip()}".strip()
-            if subtitle:
-                header_txt = f"{title} — {subtitle}"
+    def _build_general_card(self, r, row: int, col: int, colspan: int):
+        vid = int(r["id"])
+        title = r["nom"] or f"Véhicule #{vid}"
+
+        card = ttk.Frame(self.general_cards, padding=14, style="Card.TFrame")
+        card.grid(row=row, column=col, columnspan=colspan, sticky="nsew", padx=10, pady=10)
+
+        # Expand
+        self.general_cards.columnconfigure(col, weight=1)
+        self.general_cards.rowconfigure(row, weight=1)
+        card.columnconfigure(0, weight=0)
+        card.columnconfigure(1, weight=1)
+
+        # Click anywhere on card selects vehicle
+        card.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
+
+        # ---- Title (centered, big) ----
+        title_lbl = ttk.Label(card, text=title, font=self.font_card_title, anchor="center")
+        title_lbl.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        title_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
+
+        # ---- Conso (light blue, +2) ----
+        cons = conso_moy_l100(vid)
+        cons_txt = (f"{_fmt_num(cons, 2)} L/100 km" if cons is not None else "—")
+        conso_lbl = ttk.Label(card, text=f"Conso moy. : {cons_txt}", font=self.font_info2_bold, foreground="#66B3FF")
+        conso_lbl.grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        conso_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
+
+        # ---- Battery state (colored, +2) ----
+        vbat = get_last_battery_voltage(vid)
+        bat_label = ttk.Label(card, text="État de la Batterie :", font=self.font_info2_bold)
+        bat_label.grid(row=2, column=0, sticky="w", pady=(0, 12))
+
+        if vbat is None:
+            bat_msg, bat_color = "—", ""
+        else:
+            if vbat <= 12.0:
+                bat_msg = "Tension en dessous de 12V : Attention décharge critique, prévoir remplacement"
+                bat_color = "red"
+            elif 12.1 <= vbat <= 12.3:
+                bat_msg = "Tension de batterie faible : À recharger"
+                bat_color = "red"
+            elif 12.4 <= vbat <= 12.5:
+                bat_msg = "Batterie limite mais ça passe"
+                bat_color = "orange"
             else:
-                header_txt = title
+                bat_msg = "Batterie en bonne santé"
+                bat_color = "green"
+            bat_msg = f"{bat_msg} ({vbat:.2f} V)"
 
-            hdr = ttk.Label(card, text=header_txt, font=("TkDefaultFont", 11, "bold"))
-            hdr.grid(row=0, column=0, columnspan=2, sticky="w")
-            hdr.bind("<Button-1>", lambda e, _vid=vid: self._on_general_card_click(_vid))
+        bat_val = ttk.Label(card, text=bat_msg, font=self.font_info2, foreground=bat_color, wraplength=900, justify="left")
+        bat_val.grid(row=2, column=1, sticky="w", pady=(0, 12))
+        bat_label.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
+        bat_val.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
-            # Photo à gauche
-            photo = _load_vehicle_photo_tk(vr["photo_file"], max_w=180, max_h=110)
-            photo_lbl = ttk.Label(card, text="(aucune photo)")
-            photo_lbl.grid(row=1, column=0, sticky="nw", pady=(10, 0))
-            photo_lbl.bind("<Button-1>", lambda e, _vid=vid: self._on_general_card_click(_vid))
-            if photo:
-                photo_lbl.configure(image=photo, text="")
-                # Référence à conserver
-                photo_lbl.image = photo
+        # ---- Photo ----
+        img = _load_vehicle_photo_tk(r["photo_file"], max_w=270, max_h=165)
+        self._general_card_imgs[vid] = img
 
-            # Détails à droite
-            details = ttk.Frame(card)
-            details.grid(row=1, column=1, sticky="nw", padx=(14, 0), pady=(10, 0))
+        photo = ttk.Label(card, text="(aucune photo)")
+        photo.grid(row=3, column=0, sticky="nw")
+        if img:
+            photo.config(image=img, text="")
+        photo.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
-            def _drow(r, label, value):
-                ttk.Label(details, text=label + " :").grid(row=r, column=0, sticky="e", padx=(0, 8), pady=2)
-                ttk.Label(details, text=value or "").grid(row=r, column=1, sticky="w", pady=2)
+        # ---- Cost estimate (under photo) ----
+        est = estimate_maintenance_cost_next_6_months(vid, horizon_months=6)
+        est_txt = (f"{_fmt_num(est, 0)} €" if est is not None else "—")
+        cost_lbl = ttk.Label(card, text=f"Coût à prévoir pour les 6 prochains mois : {est_txt}")
+        cost_lbl.grid(row=4, column=0, sticky="w", pady=(10, 0))
+        cost_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
-            _drow(0, "Motorisation", vr["motorisation"] or "")
-            _drow(1, "Énergie", vr["energie"] or "")
-            _drow(2, "Année", "" if vr["annee"] is None else str(vr["annee"]))
-            _drow(3, "Immat", vr["immatriculation"] or "")
+        # ---- Technical details (right) ----
+        details = ttk.Frame(card)
+        details.grid(row=3, column=1, rowspan=2, sticky="nw", padx=(14, 0))
+        details.columnconfigure(1, weight=1)
 
-            dk = last_km_any(vid)
-            _drow(4, "Dernier km", "" if dk is None else str(dk))
+        def row_get(key, default=""):
+            try:
+                if key in r.keys():
+                    v = r[key]
+                    return default if v is None else v
+            except Exception:
+                pass
+            return default
 
-            conso = self._general_avg_consumption_l_per_100(vid)
-            conso_txt = "" if conso is None else f"{_fmt_num(conso, 2)} L/100"
-            _drow(5, "Conso moyenne", conso_txt)
+        def add_row(label, value, rr):
+            ttk.Label(details, text=label + " :", font=self.font_detail_label).grid(row=rr, column=0, sticky="e", padx=(0, 10), pady=3)
+            ttk.Label(details, text=value, wraplength=800).grid(row=rr, column=1, sticky="w", pady=3)
 
-            # Rappels / checklist
-            reminders = ttk.Labelframe(card, text="Rappels (types d'entretien)", padding=8)
-            reminders.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(12, 0))
-            reminders.columnconfigure(0, weight=1)
+        add_row("Marque", row_get("marque", ""), 0)
+        add_row("Modèle", row_get("modele", ""), 1)
+        add_row("Motorisation", row_get("motorisation", ""), 2)
+        add_row("Énergie", row_get("energie", ""), 3)
+        add_row("Année", ("" if row_get("annee", None) is None else str(row_get("annee", None))), 4)
+        add_row("Immat.", row_get("immatriculation", ""), 5)
+        dk = last_km_any(vid) or ""
+        add_row("Dernier km", str(dk), 6)
 
-            items = self._general_reminders_checklist(vid)
-            if not items:
-                ttk.Label(reminders, text="(aucun type d'entretien)").grid(row=0, column=0, sticky="w")
-            else:
-                for r_i, (name, done) in enumerate(items):
-                    sym = "✓" if done else "✗"
-                    color = "#1a8f2f" if done else "#c1121f"
-                    line = ttk.Label(reminders, text=f"{sym}  {name}", foreground=color)
-                    line.grid(row=r_i, column=0, sticky="w", pady=1)
-                    line.bind("<Button-1>", lambda e, _vid=vid: self._on_general_card_click(_vid))
+        details.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
-            self._general_cards.append(card)
+        # ---- Reminders ----
+        reminders = ttk.Frame(card)
+        reminders.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(14, 0))
+        reminders.columnconfigure(0, weight=1)
 
-        # Ajustement : forcer recalcul scrollregion
-        self.gen_cards_frame.update_idletasks()
-        self.gen_canvas.configure(scrollregion=self.gen_canvas.bbox("all"))
+        ttk.Label(reminders, text="Rappels", font=self.font_rem_title).grid(row=0, column=0, sticky="w", pady=(0, 6))
 
-    # ---------- Véhicules ----------
+        types = list_vehicle_types(vid)
+        line_row = 1
+        shown = 0
+        for t in types:
+            enabled_raw = t["enabled"] if "enabled" in t.keys() else 1
+            enabled = int(enabled_raw) if enabled_raw is not None else 1
+            if enabled != 1:
+                continue
+
+            type_id = int(t["type_id"])
+            type_name = t["type_name"] or ""
+
+            is_due, _color_ignored, when_txt = compute_reminder_status(vid, type_id, t["period_km"], t["period_months"])
+            sym = "X" if is_due else "V"
+            color = "red" if is_due else "green"
+            suffix = f" — {when_txt}" if when_txt else ""
+
+            ttk.Label(
+                reminders,
+                text=f"{sym}  {type_name}{suffix}",
+                font=self.font_rem_item,
+                foreground=color,
+                wraplength=1100,
+                justify="left",
+            ).grid(row=line_row, column=0, sticky="w", pady=2)
+            line_row += 1
+            shown += 1
+
+        if shown == 0:
+            ttk.Label(reminders, text="(Rappels désactivés)", font=self.font_rem_item).grid(row=1, column=0, sticky="w")
+
+        reminders.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
+
     def _build_vehicules_tab(self):
         self.tab_vehicules.columnconfigure(0, weight=1)
 
@@ -1242,6 +1443,36 @@ class GarageApp(tk.Tk):
         r = get_vehicle(self.active_vehicle_id)
         if not r:
             return
+
+        if hasattr(self, 'general_vars'):
+            try:
+                self.general_vars["Nom"].set(r["nom"] or "")
+                self.general_vars["Marque"].set(r["marque"] or "")
+                self.general_vars["Modèle"].set(r["modele"] or "")
+                self.general_vars["Motorisation"].set(r["motorisation"] or "")
+                self.general_vars["Énergie"].set(r["energie"] or "")
+                self.general_vars["Année"].set("" if r["annee"] is None else str(r["annee"]))
+                self.general_vars["Immat."].set(r["immatriculation"] or "")
+                self.general_vars["Dernier km"].set(str(last_km_any(self.active_vehicle_id) or ""))
+            except Exception:
+                pass
+
+        self.veh_vars["nom"].set(r["nom"] or "")
+        self.veh_vars["marque"].set(r["marque"] or "")
+        self.veh_vars["modele"].set(r["modele"] or "")
+        self.veh_vars["motorisation"].set(r["motorisation"] or "")
+        self.veh_vars["energie"].set(r["energie"] or "")
+        self.veh_vars["annee"].set("" if r["annee"] is None else str(r["annee"]))
+        self.veh_vars["immatriculation"].set(r["immatriculation"] or "")
+        self.veh_vars["dernier_km"].set(str(last_km_any(self.active_vehicle_id) or ""))
+
+        if hasattr(self, "general_photo_label"):
+            img = _load_vehicle_photo_tk(r["photo_file"])
+            self._general_photo_img = img
+            if img:
+                self.general_photo_label.config(image=img, text="")
+            else:
+                self.general_photo_label.config(image="", text="(aucune photo)")
 
         img2 = _load_vehicle_photo_tk(r["photo_file"])
         self._veh_photo_img = img2
@@ -1490,13 +1721,16 @@ class GarageApp(tk.Tk):
         box_list.grid(row=2, column=0, columnspan=6, sticky="nsew", pady=(12, 0))
         box_list.columnconfigure(0, weight=1)
 
-        self.tree_types = ttk.Treeview(box_list, columns=("type", "freq"), show="headings", height=6)
+        self.tree_types = ttk.Treeview(box_list, columns=("rappel", "type", "freq"), show="headings", height=6)
         self.tree_types.grid(row=0, column=0, sticky="nsew")
+        self.tree_types.heading("rappel", text="Rappel")
         self.tree_types.heading("type", text="Type d'entretien")
         self.tree_types.heading("freq", text="Fréquence de l'entretien")
-        self.tree_types.column("type", width=420, anchor="w", stretch=True)
+        self.tree_types.column("rappel", width=70, anchor="center", stretch=False)
+        self.tree_types.column("type", width=360, anchor="w", stretch=True)
         self.tree_types.column("freq", width=240, anchor="w", stretch=True)
         self.tree_types.bind("<<TreeviewSelect>>", self._on_type_select)
+        self.tree_types.bind("<Button-1>", self._on_types_click)
 
         ysb_t = ttk.Scrollbar(box_list, orient="vertical", command=self.tree_types.yview)
         ysb_t.grid(row=0, column=1, sticky="ns")
@@ -1594,18 +1828,58 @@ class GarageApp(tk.Tk):
             type_id = int(r["type_id"])
             type_name = r["type_name"]
             freq = _format_frequency(r["period_km"], r["period_months"])
-            self.tree_types.insert("", "end", values=(type_name, freq))
+            self.tree_types.insert("", "end", values=("☑" if int(r["enabled"]) else "☐", type_name, freq))
             self._type_name_to_id[type_name] = type_id
 
     def _on_type_select(self, _evt=None):
         sel = self.tree_types.selection()
         if not sel:
             return
-        type_name, _freq = self.tree_types.item(sel[0], "values")
+        vals = self.tree_types.item(sel[0], "values")
+        if len(vals) == 3:
+            _chk, type_name, _freq = vals
+        else:
+            type_name, _freq = vals
         type_id = self._type_name_to_id.get(type_name)
         if not type_id:
             return
         self.selected_type_id = type_id
+
+
+    def _on_types_click(self, event):
+        """Toggle checkbox 'Rappel' sur clic colonne."""
+        region = self.tree_types.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+        col = self.tree_types.identify_column(event.x)  # '#1' = rappel
+        if col != "#1":
+            return
+        row_id = self.tree_types.identify_row(event.y)
+        if not row_id:
+            return
+        vals = list(self.tree_types.item(row_id, "values"))
+        if len(vals) < 3:
+            return
+        chk, type_name, freq = vals[0], vals[1], vals[2]
+        type_id = self._type_name_to_id.get(type_name)
+        if not type_id:
+            return
+        enabled = 0 if str(chk).strip() in ("☑", "1", "True") else 1
+        try:
+            set_vehicle_type_enabled(self.active_vehicle_id, type_id, enabled)
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
+            return
+        vals[0] = "☑" if enabled else "☐"
+        self.tree_types.item(row_id, values=tuple(vals))
+        # refresh général (rappels)
+        self._refresh_general_overview()
+        # refresh aussi la liste des types (relit la DB) pour rester cohérent
+        # (utile si plusieurs vues utilisent le même flag enabled)
+        # on garde la sélection si possible
+        self._refresh_types_ui()
+        self._refresh_type_choices_for_new_entretien()
+        self._set_status("Rappel " + ("activé" if enabled else "désactivé") + f" : {type_name}")
 
         conn = _connect_db()
         cur = conn.cursor()
@@ -1838,7 +2112,6 @@ class GarageApp(tk.Tk):
         self.pl_header_label.config(text=title)
         self.ent_header_label.config(text=title)
 
-        self._refresh_general_overview()
         self._refresh_vehicle_forms()
 
         self._refresh_pleins()
@@ -1847,10 +2120,96 @@ class GarageApp(tk.Tk):
         self._refresh_types_ui()
         self._refresh_type_choices_for_new_entretien()
         self._refresh_entretiens()
+        self._refresh_general_overview()
 
         self._set_status(f"Véhicule #{self.active_vehicle_id} — DB: {os.path.basename(DB_FILE)}")
 
 
+
+def get_last_battery_voltage(vehicle_id: int):
+    """Retourne le dernier voltage batterie (float) renseigné dans les entretiens, ou None."""
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT battery_voltage
+        FROM entretiens
+        WHERE vehicule_id = ? AND battery_voltage IS NOT NULL
+        ORDER BY date_iso DESC, km DESC, id DESC
+        LIMIT 1
+        """,
+        (int(vehicle_id),),
+    )
+    r = cur.fetchone()
+    conn.close()
+    if not r:
+        return None
+    try:
+        return float(r["battery_voltage"])
+    except Exception:
+        return None
+
+
+def _recent_cost_for_type(vehicle_id: int, type_id: int):
+    """Coût le plus récent (non NULL) pour un type d'entretien sur un véhicule."""
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT cout
+        FROM entretiens
+        WHERE vehicule_id = ? AND type_id = ? AND cout IS NOT NULL
+        ORDER BY date_iso DESC, km DESC, id DESC
+        LIMIT 1
+        """,
+        (int(vehicle_id), int(type_id)),
+    )
+    r = cur.fetchone()
+    conn.close()
+    if not r:
+        return None
+    try:
+        return float(r["cout"])
+    except Exception:
+        return None
+
+
+def estimate_maintenance_cost_next_6_months(vehicle_id: int, horizon_months: int = 6):
+    """Estimation simple des coûts à prévoir sur les prochains mois.
+
+    - On ne prend que les types cochés (enabled=1).
+    - On projette uniquement les types avec period_months > 0.
+    - Pour chaque type, on prend le coût le plus récent et on multiplie par ceil(horizon/period_months).
+    """
+    total = 0.0
+    any_included = False
+
+    for t in list_vehicle_types(vehicle_id):
+        enabled_raw = t["enabled"] if "enabled" in t.keys() else 1
+        enabled = int(enabled_raw) if enabled_raw is not None else 1
+        if enabled != 1:
+            continue
+
+        pm = t["period_months"]
+        try:
+            pm = int(pm) if pm is not None else 0
+        except Exception:
+            pm = 0
+        if pm <= 0:
+            continue
+
+        expected = int(math.ceil(horizon_months / pm))
+        if expected <= 0:
+            continue
+
+        cost = _recent_cost_for_type(vehicle_id, int(t["type_id"]))
+        if cost is None or cost <= 0:
+            continue
+
+        total += cost * expected
+        any_included = True
+
+    return total if any_included else None
 def main():
     app = GarageApp()
     app.mainloop()
