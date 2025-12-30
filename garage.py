@@ -62,8 +62,7 @@ def _ensure_schema():
     cur = conn.cursor()
 
     # Tables minimales
-    if not _table_exists(cur, "
-    "):
+    if not _table_exists(cur, "vehicules"):
         cur.execute("""
             CREATE TABLE vehicules(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1176,11 +1175,10 @@ class GarageApp(tk.Tk):
 
         self.vehicles_rows = list_vehicles()
         if not self.vehicles_rows:
-        messagebox.showinfo("Aucun véhicule", "La base est vide. Ajoutez un premier véhicule")
-        self.vehicles_rows = []   # au cas où
-        return
-
-        self.active_vehicle_id = int(self.vehicles_rows[0]["id"])
+            messagebox.showinfo("Aucun véhicule", "La base est vide. Ajoute ton premier véhicule 🙂")
+            self.active_vehicle_id = None
+        else:
+            self.active_vehicle_id = int(self.vehicles_rows[0]["id"])
         self._general_card_imgs = {}
         self._veh_photo_img = None
         self._veh_mode = "view"  # view/add/edit
