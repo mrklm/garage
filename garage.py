@@ -1179,6 +1179,7 @@ class GarageApp(tk.Tk):
             self.active_vehicle_id = None
         else:
             self.active_vehicle_id = int(self.vehicles_rows[0]["id"])
+
         self._general_card_imgs = {}
         self._veh_photo_img = None
         self._veh_mode = "view"  # view/add/edit
@@ -2350,8 +2351,45 @@ class GarageApp(tk.Tk):
         self._set_status("Entretien supprimé.")
 
     # ---------- Refresh / Sync ----------
+
+    def _show_empty_state(self):
+        """État UI quand la base est vide (aucun véhicule)."""
+        # Mettre les listes déroulantes à vide si elles existent
+        for attr in ("veh_vehicle_cb", "pl_vehicle_cb", "ent_vehicle_cb"):
+            cb = getattr(self, attr, None)
+            if cb is not None:
+                try:
+                    cb["values"] = []
+                    cb.set("")
+                except Exception:
+                    pass
+
+        # Mettre les en-têtes à jour si présents
+        for attr, text in (
+            ("pl_header_label", "Aucun véhicule"),
+            ("ent_header_label", "Aucun véhicule"),
+        ):
+            w = getattr(self, attr, None)
+            if w is not None:
+                try:
+                    w.config(text=text)
+                except Exception:
+                    pass
+
+        # Status bar
+        try:
+            self._set_status(f"Aucun véhicule — DB: {os.path.basename(DB_FILE)}")
+        except Exception:
+            pass
+
     def _refresh_all(self):
         self.vehicles_rows = list_vehicles()
+        if not self.vehicles_rows:
+            self.active_vehicle_id = None
+            self._vehicle_index_to_id = []
+            self._show_empty_state()
+            return
+
         self._vehicle_index_to_id = []
         labels = []
         for r in self.vehicles_rows:
@@ -2372,6 +2410,11 @@ class GarageApp(tk.Tk):
         self._refresh_all_tabs_after_vehicle_change(source="init")
 
     def _refresh_all_tabs_after_vehicle_change(self, source=""):
+
+        if not getattr(self, "_vehicle_index_to_id", None) or self.active_vehicle_id is None:
+            self._show_empty_state()
+            return
+
         try:
             idx = self._vehicle_index_to_id.index(self.active_vehicle_id)
         except ValueError:
