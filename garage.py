@@ -29,7 +29,7 @@ import tkinter.font as tkfont
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime, date
 
-APP_TITLE = "Garage (v10.1 — Flotte + Photos + Pleins + Entretiens)"
+APP_TITLE = "Garage v4.1.2"
 DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
@@ -170,6 +170,16 @@ def _ensure_schema():
     except Exception:
         pass
 
+    # preconisations constructeur (notes libres par véhicule)
+    cur.execute("""CREATE TABLE IF NOT EXISTS preconisations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicule_id INTEGER NOT NULL,
+            texte TEXT NOT NULL,
+            created_at TEXT,
+            FOREIGN KEY(vehicule_id) REFERENCES vehicules(id) ON DELETE CASCADE
+        )""")
+
+
     conn.commit()
     conn.close()
 
@@ -196,7 +206,7 @@ def _copy_vehicle_photo(src_path: str, vehicle_id: int | None = None) -> str | N
     return out_name
 
 
-def _load_vehicle_photo_tk(photo_file: str | None, max_w=360, max_h=220):
+def _load_vehicle_photo_tk(photo_file: str | None, max_w=290, max_h=180):
     """Charge un PNG via PhotoImage et le réduit (subsample) pour l'affichage."""
     if not photo_file:
         return None
@@ -401,6 +411,61 @@ def delete_vehicle(vehicle_id: int):
     conn = _connect_db()
     cur = conn.cursor()
     cur.execute("DELETE FROM vehicules WHERE id=?", (int(vehicle_id),))
+    conn.commit()
+    conn.close()
+
+
+
+# ----------------- DB API : Préconisations constructeur -----------------
+
+def list_preconisations(vehicle_id: int):
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT id, texte, created_at
+           FROM preconisations
+           WHERE vehicule_id = ?
+           ORDER BY id DESC""",
+        (int(vehicle_id),),
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def insert_preconisation(vehicle_id: int, texte: str):
+    txt = (texte or "").strip()
+    if not txt:
+        raise ValueError("Texte vide.")
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO preconisations(vehicule_id, texte, created_at)
+           VALUES (?, ?, ?)""",
+        (int(vehicle_id), txt, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_preconisation(preco_id: int, texte: str):
+    txt = (texte or "").strip()
+    if not txt:
+        raise ValueError("Texte vide.")
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE preconisations SET texte=? WHERE id=?",
+        (txt, int(preco_id)),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_preconisation(preco_id: int):
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM preconisations WHERE id=?", (int(preco_id),))
     conn.commit()
     conn.close()
 
@@ -1359,6 +1424,8 @@ class GarageApp(tk.Tk):
         ttk.Button(btns, text="Ajouter", command=self._veh_add_mode).grid(row=0, column=0, padx=(0, 8))
         ttk.Button(btns, text="Modifier", command=self._veh_edit_mode).grid(row=0, column=1, padx=(0, 8))
         ttk.Button(btns, text="Supprimer", command=self._veh_delete).grid(row=0, column=2)
+        self.veh_btn_save_top = ttk.Button(btns, text="Enregistrer", command=self._veh_save)
+        self.veh_btn_save_top.grid(row=0, column=3, padx=(8, 0))
 
         body = ttk.Frame(self.tab_vehicules)
         body.grid(row=2, column=0, sticky="nsew", pady=(12, 0))
@@ -1378,6 +1445,43 @@ class GarageApp(tk.Tk):
 
         form = ttk.Labelframe(body, text="Détails tech", padding=10)
         form.grid(row=0, column=1, sticky="nw")
+
+        # ---- Préconisations constructeur (notes libres) ----
+        body.rowconfigure(1, weight=1)
+
+        preco_box = ttk.Labelframe(body, text="", padding=10)
+        preco_box.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
+        preco_box.columnconfigure(0, weight=1)
+        preco_box.rowconfigure(2, weight=1)  # <-- la liste sera en row=2
+
+        lbl_preco_title = ttk.Label(
+            preco_box,
+            text="Préconisations constructeur",
+            font=("TkDefaultFont", 18, "bold")
+        )
+        lbl_preco_title.grid(row=0, column=0, sticky="w", pady=(0, 8))
+
+        add_line = ttk.Frame(preco_box)
+        add_line.grid(row=1, column=0, sticky="ew")
+        add_line.columnconfigure(1, weight=1)
+
+        ttk.Button(add_line, text="+", width=3, command=self._preco_add).grid(row=0, column=0, sticky="w")
+        self.preco_entry_var = tk.StringVar(value="")
+        ttk.Entry(add_line, textvariable=self.preco_entry_var).grid(row=0, column=1, sticky="ew", padx=(8, 0))
+
+        # Liste sélectionnable
+        self.preco_list = tk.Listbox(preco_box, height=6)
+        self.preco_list.grid(row=2, column=0, sticky="nsew", pady=(10, 0))
+        self.preco_list.bind("<<ListboxSelect>>", self._on_preco_select)
+
+        actions_p = ttk.Frame(preco_box)
+        actions_p.grid(row=2, column=0, sticky="e", pady=(10, 0))
+        ttk.Button(actions_p, text="Enregistrer", command=self._preco_save).grid(row=0, column=0, padx=(0, 8))
+        ttk.Button(actions_p, text="Modifier", command=self._preco_update).grid(row=0, column=1, padx=(0, 8))
+        ttk.Button(actions_p, text="Supprimer", command=self._preco_delete).grid(row=0, column=2)
+
+        self.preco_selected_id = None
+        self._preco_rows = []
 
         self.veh_vars = {
             "nom": tk.StringVar(value=""),
@@ -1436,6 +1540,8 @@ class GarageApp(tk.Tk):
                 ent.config(state=state)
 
         self.veh_btn_save.state(["!disabled"] if editable else ["disabled"])
+        if hasattr(self, 'veh_btn_save_top'):
+            self.veh_btn_save_top.state(["!disabled"] if editable else ["disabled"])
         self.veh_btn_cancel.state(["!disabled"] if editable else ["disabled"])
         self.veh_photo_hint.config(text=("PNG uniquement. La photo sera copiée dans ./assets" if editable else ""))
 
@@ -1458,6 +1564,8 @@ class GarageApp(tk.Tk):
     def _veh_cancel(self):
         self._veh_set_mode("view")
         self._refresh_vehicle_forms()
+
+        self._refresh_preconisations()
         self._set_status("Annulé")
 
     def _veh_pick_photo(self):
@@ -1478,7 +1586,7 @@ class GarageApp(tk.Tk):
         try:
             img = tk.PhotoImage(file=path)
             w, h = img.width(), img.height()
-            s = max(1, int(max(w / 360, h / 220)))
+            s = max(1, int(max(w / 288, h / 176)))
             if s > 1:
                 img = img.subsample(s, s)
             self._veh_photo_img = img
@@ -1547,6 +1655,85 @@ class GarageApp(tk.Tk):
         self._refresh_all()
         self._set_status("Véhicule supprimé.")
 
+    # ---------- Préconisations constructeur ----------
+    def _refresh_preconisations(self):
+        if not hasattr(self, "preco_list"):
+            return
+        try:
+            self._preco_rows = list_preconisations(self.active_vehicle_id)
+        except Exception:
+            self._preco_rows = []
+        self.preco_list.delete(0, "end")
+        for r in self._preco_rows:
+            txt = r["texte"] if "texte" in r.keys() else r[1]
+            self.preco_list.insert("end", txt)
+        self.preco_selected_id = None
+        if hasattr(self, "preco_entry_var"):
+            self.preco_entry_var.set("")
+
+    def _on_preco_select(self, _evt=None):
+        if not self._preco_rows:
+            return
+        sel = self.preco_list.curselection()
+        if not sel:
+            return
+        idx = int(sel[0])
+        if idx < 0 or idx >= len(self._preco_rows):
+            return
+        r = self._preco_rows[idx]
+        self.preco_selected_id = int(r["id"] if "id" in r.keys() else r[0])
+        txt = r["texte"] if "texte" in r.keys() else r[1]
+        self.preco_entry_var.set(txt)
+
+    def _preco_add(self):
+        """Bouton + : ajoute directement la ligne saisie."""
+        self._preco_save()
+
+    def _preco_save(self):
+        txt = (self.preco_entry_var.get() if hasattr(self, "preco_entry_var") else "").strip()
+        if not txt:
+            messagebox.showinfo("Préconisations", "Entre un texte avant d'enregistrer.")
+            return
+        try:
+            insert_preconisation(self.active_vehicle_id, txt)
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
+            return
+        self._refresh_preconisations()
+        self._set_status("Préconisation enregistrée.")
+
+    def _preco_update(self):
+        if not getattr(self, "preco_selected_id", None):
+            messagebox.showinfo("Sélection", "Sélectionne une préconisation dans la liste.")
+            return
+        txt = (self.preco_entry_var.get() if hasattr(self, "preco_entry_var") else "").strip()
+        if not txt:
+            messagebox.showinfo("Préconisations", "Texte vide.")
+            return
+        try:
+            update_preconisation(self.preco_selected_id, txt)
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
+            return
+        self._refresh_preconisations()
+        self._set_status("Préconisation modifiée.")
+
+    def _preco_delete(self):
+        if not getattr(self, "preco_selected_id", None):
+            messagebox.showinfo("Sélection", "Sélectionne une préconisation dans la liste.")
+            return
+        if not messagebox.askyesno("Confirmer", "Supprimer cette préconisation ?"):
+            return
+        try:
+            delete_preconisation(self.preco_selected_id)
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
+            return
+        self._refresh_preconisations()
+        self._set_status("Préconisation supprimée.")
+
+
+
     def _refresh_vehicle_forms(self):
         r = get_vehicle(self.active_vehicle_id)
         if not r:
@@ -1561,12 +1748,19 @@ class GarageApp(tk.Tk):
         self.veh_vars["immatriculation"].set(r["immatriculation"] or "")
         self.veh_vars["dernier_km"].set(str(last_km_any(self.active_vehicle_id) or ""))
 
-        img = _load_vehicle_photo_tk(r["photo_file"])
+        img = _load_vehicle_photo_tk(r["photo_file"], max_w=288, max_h=176)
         self._veh_photo_img = img
         if img:
             self.veh_photo_label.config(image=img, text="")
         else:
             self.veh_photo_label.config(image="", text="(aucune photo)")
+        # Préconisations constructeur (liées au véhicule actif)
+        if hasattr(self, "preco_list"):
+            try:
+                self._refresh_preconisations()
+            except Exception:
+                pass
+
 
     # ---------- Pleins ----------
     def _build_pleins_tab(self):
