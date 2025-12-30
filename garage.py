@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v10.1 (clean, single-file)
+Garage — v4.1.3 (clean, single-file)
 
 DB attendue : garage.db (à côté du script)
 Dossier photos : ./assets (à côté du script)
@@ -29,7 +29,7 @@ import tkinter.font as tkfont
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime, date
 
-APP_TITLE = "Garage v4.1.2"
+APP_TITLE = "Garage v4.1.3"
 DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
@@ -206,7 +206,7 @@ def _copy_vehicle_photo(src_path: str, vehicle_id: int | None = None) -> str | N
     return out_name
 
 
-def _load_vehicle_photo_tk(photo_file: str | None, max_w=290, max_h=180):
+def _load_vehicle_photo_tk(photo_file: str | None, max_w=360, max_h=220):
     """Charge un PNG via PhotoImage et le réduit (subsample) pour l'affichage."""
     if not photo_file:
         return None
@@ -710,6 +710,15 @@ def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_mon
         suffix = " / ".join(parts) if parts else ""
         if not suffix:
             return (True, "green", "OK")
+
+        # Pré-alerte : si la fréquence est > 6 mois et que c'est dû dans <= 6 mois → orange
+        try:
+            pm_int = int(pm) if pm is not None else None
+        except Exception:
+            pm_int = None
+        if pm_int is not None and pm_int > 6 and months_left is not None and 0 < months_left <= 6:
+            return (True, "orange", f"À faire dans {suffix}".strip())
+
         return (True, "green", f"À faire dans {suffix}".strip())
 
 
@@ -1339,7 +1348,7 @@ class GarageApp(tk.Tk):
 
         est = estimate_maintenance_cost_next_months(vid, horizon_months=6)
         est_txt = (f"{_fmt_num(est, 0)} €" if est is not None else "—")
-        cost_lbl = ttk.Label(card, text=f"Coût à prévoir pour les 6 prochains mois : {est_txt}")
+        cost_lbl = ttk.Label(card, text=f"Coût à prévoir pour les 6 prochains mois ≃ {est_txt}", font=self.font_rem_item, foreground="#66B3FF")
         cost_lbl.grid(row=4, column=0, sticky="w", pady=(10, 0))
         cost_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
@@ -1449,29 +1458,22 @@ class GarageApp(tk.Tk):
         # ---- Préconisations constructeur (notes libres) ----
         body.rowconfigure(1, weight=1)
 
-        preco_box = ttk.Labelframe(body, text="", padding=10)
+        preco_box = ttk.Labelframe(body, text="Préconisations constructeur", padding=10)
         preco_box.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
         preco_box.columnconfigure(0, weight=1)
-        preco_box.rowconfigure(2, weight=1)  # <-- la liste sera en row=2
-
-        lbl_preco_title = ttk.Label(
-            preco_box,
-            text="Préconisations constructeur",
-            font=("TkDefaultFont", 18, "bold")
-        )
-        lbl_preco_title.grid(row=0, column=0, sticky="w", pady=(0, 8))
+        preco_box.rowconfigure(1, weight=1)
 
         add_line = ttk.Frame(preco_box)
-        add_line.grid(row=1, column=0, sticky="ew")
+        add_line.grid(row=0, column=0, sticky="ew")
         add_line.columnconfigure(1, weight=1)
 
         ttk.Button(add_line, text="+", width=3, command=self._preco_add).grid(row=0, column=0, sticky="w")
         self.preco_entry_var = tk.StringVar(value="")
         ttk.Entry(add_line, textvariable=self.preco_entry_var).grid(row=0, column=1, sticky="ew", padx=(8, 0))
 
-        # Liste sélectionnable
+        # Liste sélectionnable (chaque ligne = une préco)
         self.preco_list = tk.Listbox(preco_box, height=6)
-        self.preco_list.grid(row=2, column=0, sticky="nsew", pady=(10, 0))
+        self.preco_list.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
         self.preco_list.bind("<<ListboxSelect>>", self._on_preco_select)
 
         actions_p = ttk.Frame(preco_box)
@@ -1511,13 +1513,6 @@ class GarageApp(tk.Tk):
             e.grid(row=i, column=1, sticky="w", pady=4)
             self.veh_entries[key] = e
 
-        actions = ttk.Frame(self.tab_vehicules)
-        actions.grid(row=3, column=0, sticky="e", pady=(14, 0))
-        self.veh_btn_save = ttk.Button(actions, text="Enregistrer", command=self._veh_save)
-        self.veh_btn_cancel = ttk.Button(actions, text="Annuler", command=self._veh_cancel)
-        self.veh_btn_save.grid(row=0, column=0, padx=(0, 8))
-        self.veh_btn_cancel.grid(row=0, column=1)
-
         self._veh_set_mode("view")
 
     def _on_veh_vehicle_change(self, _evt=None):
@@ -1538,11 +1533,10 @@ class GarageApp(tk.Tk):
                 ent.config(state="readonly")
             else:
                 ent.config(state=state)
-
-        self.veh_btn_save.state(["!disabled"] if editable else ["disabled"])
-        if hasattr(self, 'veh_btn_save_top'):
+        if hasattr(self, "veh_btn_save_top"):
             self.veh_btn_save_top.state(["!disabled"] if editable else ["disabled"])
-        self.veh_btn_cancel.state(["!disabled"] if editable else ["disabled"])
+        if hasattr(self, "veh_btn_cancel_top"):
+            self.veh_btn_cancel_top.state(["!disabled"] if editable else ["disabled"])
         self.veh_photo_hint.config(text=("PNG uniquement. La photo sera copiée dans ./assets" if editable else ""))
 
         if not editable:

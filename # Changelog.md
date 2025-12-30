@@ -4,12 +4,27 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
+## [4.1.2] – 2025-12-30
+
+-Nouvelle regle concernat les Rappels: si un entretien dans la liste des rappels a une règle de fréquence qui est
+supérieur à 6 mois et qu'il faut le faire dans moins de 6 mois alors il passe en orange.
+
+-Augmentation de la taille de police et changement de la couleur de la ligne "Coût à prevoir" dans l'onglet general.
+
+## [4.1.1] – 2025-12-30
+
+-Mise en page onglet vehicule et général
+
+## [4.1.0] – 2025-12-30
+
+-Une section "Préconisations Constructeur" est ajouté dans l'onglet vehicule pour y noter
+ type d'huile, pression des pneumatiques, frequences des entretiens.
+
 ## [4.0.0] – 2025-12-19
 
--Refonte de l'onglet Entretien, on y gerera désormais la definition des differents type d'entretien
- selon le vehicule en y renseigant une description, une periodoicité et les mention de rappel à 
- afficher dans l'onglet "Général" possibilité d'ajouter une/plusieurs ligne(s) "Anomalye / A verifier", 
- en bas de la liste des rappels. (ligne(s) Anomalie --> en orange dans les rappels)
+-Refonte de l'onglet Entretien, on y gerera désormais la definition des differents types d'entretien
+ selon le vehicule en y renseigant une description, une periodoicité et un case a cocher pour que le rappel  
+ apparaisse dans l'onglet "Général". 
 
 
 ## [3.1.2] – 2025-12-18
