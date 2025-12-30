@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.1.3 (clean, single-file)
+Garage — v4.1.4 (clean, single-file)
 
 DB attendue : garage.db (à côté du script)
 Dossier photos : ./assets (à côté du script)
@@ -29,7 +29,7 @@ import tkinter.font as tkfont
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime, date
 
-APP_TITLE = "Garage v4.1.3"
+APP_TITLE = "Garage v4.1.4"
 DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
