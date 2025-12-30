@@ -1175,7 +1175,7 @@ class GarageApp(tk.Tk):
 
         self.vehicles_rows = list_vehicles()
         if not self.vehicles_rows:
-            messagebox.showerror("Aucun véhicule", "La base ne contient aucun véhicule.")
+            messagebox.showinfo("Aucun véhicule", "La base ne contient aucun véhicule.")
             raise SystemExit(1)
 
         self.active_vehicle_id = int(self.vehicles_rows[0]["id"])
