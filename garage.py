@@ -1206,7 +1206,7 @@ class GarageApp(tk.Tk):
 
         self.vehicles_rows = list_vehicles()
         if not self.vehicles_rows:
-            messagebox.showinfo("Aucun véhicule", "La base est vide. Ajoutez votre premier véhicule 🙂")
+            messagebox.showinfo("Aucun véhicule", "La base est vide. Ajoutez votre premier véhicule")
             self.active_vehicle_id = None
         else:
             self.active_vehicle_id = int(self.vehicles_rows[0]["id"])
