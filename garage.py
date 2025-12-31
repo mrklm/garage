@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.1.4 (clean, single-file)
+Garage — v4.2 (clean, single-file)
 
 DB attendue : garage.db (à côté du script)
 Dossier photos : ./assets (à côté du script)
@@ -28,8 +28,31 @@ import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime, date
+import sys
 
-APP_TITLE = "Garage v4.1.4"
+# Pillow est recommandé pour afficher les PNG de manière fiable sur macOS.
+try:
+    from PIL import Image, ImageTk  # type: ignore
+    PIL_AVAILABLE = True
+except Exception:
+    PIL_AVAILABLE = False
+
+
+def resource_path(relative_path: str) -> str:
+    """Retourne un chemin absolu compatible PyInstaller (sys._MEIPASS)."""
+    base_path = getattr(sys, "_MEIPASS", os.path.abspath(os.path.dirname(__file__)))
+    return os.path.join(base_path, relative_path)
+
+
+def read_text_file_safely(path: str) -> str:
+    """Lit un fichier texte en UTF-8, retourne une chaîne vide en cas d'échec."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return ""
+
+APP_TITLE = "Garage v4.2"
 DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
@@ -1175,7 +1198,7 @@ class GarageApp(tk.Tk):
 
         self.vehicles_rows = list_vehicles()
         if not self.vehicles_rows:
-            messagebox.showinfo("Aucun véhicule", "La base est vide. Ajoute ton premier véhicule 🙂")
+            messagebox.showinfo("Aucun véhicule", "La base est vide. Ajoutez votre premier véhicule 🙂")
             self.active_vehicle_id = None
         else:
             self.active_vehicle_id = int(self.vehicles_rows[0]["id"])
@@ -1216,12 +1239,166 @@ class GarageApp(tk.Tk):
         self._build_pleins_tab()
         self._build_entretiens_tab()
 
+        # --- Aide : case à cocher globale (toujours visible, centrée sous les onglets) ---
+        self.show_help_var = tk.BooleanVar(value=False)
+        self.show_help_label = tk.StringVar(value="Afficher l\'Aide")
+
+        self.help_toggle_bar = ttk.Frame(self)
+        self.help_toggle_bar.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 6))
+        self.help_toggle_bar.columnconfigure(0, weight=1)
+
+        self.chk_show_help = ttk.Checkbutton(
+            self.help_toggle_bar,
+            textvariable=self.show_help_label,
+            variable=self.show_help_var,
+            command=self._on_help_toggle,
+        )
+        self.chk_show_help.grid(row=0, column=0)
+
         ttk.Label(self, textvariable=self.status, relief="sunken", anchor="w", padding=(10, 4)).grid(
-            row=1, column=0, sticky="ew", padx=10, pady=(0, 10)
+            row=2, column=0, sticky="ew", padx=10, pady=(0, 10)
         )
 
     def _set_status(self, txt: str):
         self.status.set(txt)
+
+    def _on_help_toggle(self) -> None:
+        """Affiche/masque l'aide. La case est globale (visible sur tous les onglets)."""
+
+        # Si l'aide est demandée, on bascule sur l'onglet Général.
+        if self.show_help_var.get():
+            try:
+                self.nb.select(self.tab_general)
+            except Exception:
+                pass
+
+        self._apply_help_visibility()
+
+    def _apply_help_visibility(self) -> None:
+        """Applique l'état d'affichage de l'aide dans l'onglet Général."""
+        show = bool(self.show_help_var.get())
+        if not hasattr(self, "help_frame") or not hasattr(self, "general_cards"):
+            return
+
+        if show:
+            # Afficher l'aide
+            try:
+                self.help_frame.grid()
+            except Exception:
+                pass
+            try:
+                self.general_cards.grid_remove()
+            except Exception:
+                pass
+            self._load_help_into_widget()
+        else:
+            # Masquer l'aide
+            try:
+                self.help_frame.grid_remove()
+            except Exception:
+                pass
+            try:
+                self.general_cards.grid()
+            except Exception:
+                pass
+            # Rafraîchir l'aperçu général si des véhicules existent
+            if getattr(self, "vehicles_rows", None):
+                try:
+                    self._refresh_general_overview()
+                except Exception:
+                    pass
+
+    def _read_help_md(self) -> str:
+        """Lit AIDE.md (à la racine de l'app) et nettoie le bloc <img> en tête si présent."""
+        # AIDE.md est attendu à la racine, au même niveau que garage.py (ou dans le bundle PyInstaller).
+        candidates = [
+            resource_path("AIDE.md"),
+            os.path.join(os.path.abspath(os.path.dirname(__file__)), "AIDE.md"),
+            os.path.abspath("AIDE.md"),
+        ]
+        txt = ""
+        for p in candidates:
+            if os.path.exists(p):
+                txt = read_text_file_safely(p)
+                break
+
+        if not txt:
+            return (
+                "Aide indisponible\n\n"
+                "Le fichier AIDE.md n'a pas été trouvé à la racine de l'application."
+            )
+
+        # Si le fichier commence par un bloc HTML <p><img ...></p>, on le retire
+        lines = txt.splitlines()
+        if lines and "<img" in "\n".join(lines[:10]):
+            cleaned = []
+            skipping = False
+            removed_any = False
+            for line in lines:
+                l = line.strip().lower()
+                if not removed_any and (l.startswith("<p") and "align" in l):
+                    skipping = True
+                    removed_any = True
+                    continue
+                if skipping:
+                    if "</p>" in l:
+                        skipping = False
+                    continue
+                cleaned.append(line)
+            txt = "\n".join(cleaned).lstrip()
+
+        return txt
+
+    def _load_help_into_widget(self) -> None:
+        """Charge le contenu de l'aide dans le widget Text (fond blanc)."""
+        if not hasattr(self, "help_text"):
+            return
+        content = self._read_help_md()
+        try:
+            self.help_text.config(state="normal")
+            self.help_text.delete("1.0", "end")
+            self.help_text.insert("1.0", content)
+            self.help_text.config(state="disabled")
+        except Exception:
+            pass
+
+
+    def _load_logo_image(self) -> None:
+        """Charge le logo PNG (assets/Logo.png) et l'affiche si possible."""
+        if not hasattr(self, "help_logo_label"):
+            return
+
+        # Chemins possibles (dev + bundle PyInstaller)
+        candidates = [
+            resource_path(os.path.join("assets", "Logo.png")),
+            os.path.join(os.path.abspath(os.path.dirname(__file__)), "assets", "Logo.png"),
+            os.path.abspath(os.path.join("assets", "Logo.png")),
+        ]
+        logo_path = next((p for p in candidates if os.path.exists(p)), "")
+
+        if not logo_path:
+            # Fallback texte si fichier introuvable
+            try:
+                self.help_logo_label.config(text="Garage", image="")
+            except Exception:
+                pass
+            return
+
+        try:
+            if PIL_AVAILABLE:
+                img = Image.open(logo_path)
+                img.thumbnail((220, 220))
+                self._logo_img = ImageTk.PhotoImage(img)
+                self.help_logo_label.config(image=self._logo_img, text="")
+            else:
+                # Fallback Tk (moins fiable sur certains macOS)
+                self._logo_img = tk.PhotoImage(file=logo_path)
+                self.help_logo_label.config(image=self._logo_img, text="")
+        except Exception:
+            try:
+                self.help_logo_label.config(text="Garage", image="")
+            except Exception:
+                pass
 
     # ---------- Général ----------
     def _build_general_tab(self):
@@ -1246,6 +1423,47 @@ class GarageApp(tk.Tk):
         self.general_cards.columnconfigure(0, weight=1)
         self.general_cards.columnconfigure(1, weight=1)
         self.general_cards.rowconfigure(0, weight=1)
+
+        # --- Aide (logo + texte) : superposé à l'aperçu Général ---
+        self.help_frame = ttk.Frame(self.tab_general)
+        self.help_frame.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        self.help_frame.columnconfigure(0, weight=1)
+        self.help_frame.rowconfigure(1, weight=1)
+
+        # Logo (affiché par l'UI, pas par le Markdown)
+        self.help_logo_frame = ttk.Frame(self.help_frame)
+        self.help_logo_frame.grid(row=0, column=0, sticky="ew")
+        self.help_logo_frame.columnconfigure(0, weight=1)
+
+        self.help_logo_label = ttk.Label(self.help_logo_frame)
+        self.help_logo_label.grid(row=0, column=0, pady=(0, 8))
+
+        self._load_logo_image()
+
+        # Zone texte d'aide (fond blanc)
+        self.help_text_container = tk.Frame(self.help_frame, bg="white")
+        self.help_text_container.grid(row=1, column=0, sticky="nsew")
+        self.help_text_container.columnconfigure(0, weight=1)
+        self.help_text_container.rowconfigure(0, weight=1)
+
+        self.help_text = tk.Text(
+            self.help_text_container,
+            wrap="word",
+            bg="white",
+            fg="black",
+            relief="flat",
+            bd=0,
+            padx=12,
+            pady=10,
+        )
+        self.help_scroll = ttk.Scrollbar(self.help_text_container, orient="vertical", command=self.help_text.yview)
+        self.help_text.configure(yscrollcommand=self.help_scroll.set)
+
+        self.help_text.grid(row=0, column=0, sticky="nsew")
+        self.help_scroll.grid(row=0, column=1, sticky="ns")
+
+        # L'aide est masquée par défaut (la case à cocher pilote l'affichage)
+        self.help_frame.grid_remove()
 
         self.general_page = 0
 
@@ -1565,7 +1783,7 @@ class GarageApp(tk.Tk):
 
     def _veh_pick_photo(self):
         if self._veh_mode not in ("add", "edit"):
-            messagebox.showinfo("Photo", "Clique sur Ajouter ou Modifier pour changer la photo.")
+            messagebox.showinfo("Photo", "Cliquez sur Ajouter ou Modifier pour changer la photo.")
             return
         path = filedialog.askopenfilename(
             title="Choisir une photo PNG",
@@ -2379,6 +2597,18 @@ class GarageApp(tk.Tk):
         # Status bar
         try:
             self._set_status(f"Aucun véhicule — DB: {os.path.basename(DB_FILE)}")
+        except Exception:
+            pass
+
+        # Basculer sur l'onglet Général et afficher l'aide automatiquement
+        try:
+            self.nb.select(self.tab_general)
+        except Exception:
+            pass
+
+        try:
+            self.show_help_var.set(True)
+            self._apply_help_visibility()
         except Exception:
             pass
 
