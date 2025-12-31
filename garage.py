@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.3 (clean, single-file)
+Garage — v4.2.1 (clean, single-file)
 
 DB attendue : garage.db (à côté du script)
 Dossier photos : ./assets (à côté du script)
@@ -25,7 +25,7 @@ HELP_FONT_FAMILY = "Helvetica"
 HELP_FONT_SIZE = 20          # Taille de la police de l'aide
 HELP_TEXT_COLOR = "#F2F2F2"  # Couleur du texte de l'aide
 HELP_BG = "#2B2B2B"          # Fond de l'aide (gris très sombre)
-HELP_LOGO_MAX_SIZE = 300     # Taille maximale du logo (px)
+HELP_LOGO_MAX_SIZE = 220     # Taille maximale du logo (px)
 
 import os
 import re
@@ -60,7 +60,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.3"
+APP_TITLE = "Garage v4.2.1"
 DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
@@ -1358,35 +1358,32 @@ class GarageApp(tk.Tk):
         return txt
 
     def _load_help_into_widget(self) -> None:
-
-        """Charge le contenu de l'aide dans le widget Text (fond stylé)."""
-
+        """Charge l'aide dans le widget et centre l'affichage (alignement "Centré")."""
         if not hasattr(self, "help_text"):
-
             return
 
         content = self._read_help_md()
 
         try:
-
             self.help_text.config(state="normal")
-
             self.help_text.delete("1.0", "end")
 
-            # Tag unique qui impose le style du texte d'aide (couleur incluse)
+            # Nettoie uniquement nos tags (évite de toucher aux tags internes de Tk)
+            for t in ("help", "center", "center_all"):
+                try:
+                    self.help_text.tag_delete(t)
+                except Exception:
+                    pass
 
-            self.help_text.tag_configure("help", foreground=HELP_TEXT_COLOR)
-
-            self.help_text.insert("1.0", content, "help")
-
+            # Tag unique : centrage réel + couleur du texte
+            self.help_text.tag_configure("center", justify="center", foreground=HELP_TEXT_COLOR)
+            self.help_text.insert("1.0", content, "center")
             self.help_text.config(state="disabled")
-
         except Exception:
-
-            pass
-
-
-
+            try:
+                self.help_text.config(state="disabled")
+            except Exception:
+                pass
     def _load_logo_image(self) -> None:
         """Charge le logo PNG (assets/Logo.png) et l'affiche si possible."""
         if not hasattr(self, "help_logo_label"):
