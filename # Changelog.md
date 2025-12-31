@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
+## [4.2.1] – 2025-12-31
+
+- Possibilité de changer la couleur la taille de la police & la couleur du fond de l'AIDE
+
+## [4.2] – 2025-12-30
+
+-Fichier AIDE.md affiché au démarage si pas de véhicule (1er démarage) + case à cocher pour l'afficher
+
+
 ## [4.1.2] – 2025-12-30
 
 -Nouvelle regle concernat les Rappels: si un entretien dans la liste des rappels a une règle de fréquence qui est
