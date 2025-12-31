@@ -1621,7 +1621,7 @@ class GarageApp(tk.Tk):
         reminders = ttk.Frame(card)
         reminders.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(14, 0))
         reminders.columnconfigure(0, weight=1)
-        ttk.Label(reminders, text="Rappels", font=self.font_rem_title).grid(row=0, column=0, sticky="w", pady=(0, 6))
+        ttk.Label(reminders, text="Rappels:", font=self.font_rem_title).grid(row=0, column=0, sticky="w", pady=(0, 6))
 
         types = list_vehicle_types(vid)
         line_row = 1
