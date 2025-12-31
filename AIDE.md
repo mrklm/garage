@@ -2,38 +2,30 @@
   <img src="assets/Logo.png" alt="Garage" width="160">
 </p>
 
-🚖 🔧 GARAGE — Aide & Prise en main 🛠️ 🚘️
+🚗🔧 GARAGE — Aide & Prise en main 🔧🚗
 
-     🔧 Bienvenue dans Garage  🛠️ 
-     
+     🛠️ Bienvenue dans Garage  🛠️ 
 
-💻️
-
- 🚌    🚐    🚕    🚗    🚙    🛻    🚚    🚛   🛺
-
-Garage est un logiciel pour suivre simplement 
-les informations essentielles de vos véhicules.
-
- 🚜.   🏎️    🏍️    🛵    🚲️   🛴   🛥️    🛩️    🚁
+Garage est un logiciel pour suivre simplement les informations essentiels de vos véhicules.
 
 ---
 
-🚦 Premier démarrage 
+🚦 Premier démarrage (onglet Général)
 
 Lors du premier lancement, il est normal que le message suivant apparaisse :
 
 > Aucun véhicule
 
-La base de donnée est vide = et tout est prêt pour commencer 🙂
+La base est vide, et tout est prêt pour commencer 🙂
 
 👉 Ajoutez simplement votre premier véhicule pour activer toutes les fonctionnalités,
 
-🚘 Gestion des véhicules (onglet Véhicules)
+🚘 Gestion des véhicules  (onglet Véhicules)
 
    
-   🚗-ajoutez une photos de votre vehicule 
+   🚗-ajoutez une photos de votre vehicule (au format .PNG)
    
-   📋-ajouter les caractéristiques techniques du véhicule (marque, motorisation, type d'energie, année, immatriculation)
+   📋-ajouter les caractéristiques technique du véhicule (marque, motorisation, type d'energie, année, immatriculation)
    
    -vous pouvez également renseigner les préconisations constructeur afin de l'avoir en pense bête:
    
@@ -41,11 +33,11 @@ La base de donnée est vide = et tout est prêt pour commencer 🙂
 
    - Cliquez sur le bouton "Enregistrer" ✅
 
-Le véhicule devient automatiquement actif.
+Le véhicule devient automatiquement le véhicule actif.
 
 ---
 
- ✏️ Vous voulez modifier un véhicule ? :
+ ✏️ Modifier un véhicule:
 
 - Ouvrez l’onglet Véhicules
 
@@ -59,7 +51,7 @@ Le véhicule devient automatiquement actif.
 
 ---
 
-🗑️ SVous voulez supprimer un véhicule ? :
+🗑️ Supprimer un véhicule:
 
 - Ouvrez l’onglet Véhicules
 
@@ -70,8 +62,6 @@ Le véhicule devient automatiquement actif.
 ⚠️ Attention : Cette action est définitive. Les pleins et entretiens associés seront supprimés.
 
 ---
-
- Pour faire un suivi du coût du carburant je vous invite à renseigner l'onglet "Plein"
 
 ⛽ Pleins de carburant:  (onglet Pleins)
 
@@ -99,8 +89,6 @@ Ces données permettent de suivre :
 
 - 💶/📅 l’évolution des dépenses
 
-- 💶 l'évolution du prix du carburant par années
-
 ---
 
 🔩 Entretiens & maintenance: (onglet Entretiens)
@@ -111,7 +99,7 @@ Conservez un historique clair des opérations réalisées sur le véhicule actif
 
 - 🧰 filtres
 
-- 🚙 pneus
+- 🛞 pneus
 
 - 🛑 freins
 
@@ -119,17 +107,15 @@ Conservez un historique clair des opérations réalisées sur le véhicule actif
 
 Chaque entretien peut inclure :
 
-- 📆 une date
+- une date
 
-- 🛣️ un kilométrage
+- un kilométrage
 
-- 🪛 un type d’opération
+- un type d’opération
 
-- ✏️ un commentaire
+- un commentaire
 
 ---
-
-
 
 🚨 Le Système de Rappel: (onglet Entretien) --> Case "rappel"
 
@@ -145,16 +131,6 @@ un rappel sera affiché dans l'onglet general en dessous du vehicule:
 🟠-En orange si l'entretien est à faire dans moins de six mois
 
 🧭-> Chaque rappel precise dans combien de temps / de Km il faut faire l'entretien
-
-
-L'onglet "Graphiques" Permet de visualiser rapidement:
-
-
-- 🛢️la conso L/100km 
-
-- 💶/📅 l'évolution des prix des entretiens et des réparations par années
-
-- 💶/📅 l'évolution du prix du carburant par années
 
 ---
 
@@ -184,7 +160,7 @@ Astuce -->
 
 Le fichier ou sont stockées toute les informaions est une "base de donnée SQL" il es très leger, 
 Une fois toutes les infos renseignées, envoyez vous le fichier "garage.db" par courriel de cette
-mannière vous pourrez le récuperer à tout moment.💾
+mannière vous pourrez le récuperer à tout moment. 
 
 ---
 
@@ -200,12 +176,12 @@ C’est normal lors du premier lancement.
 
 🍎 macOS bloque l’application au lancement
 
-- ⚙️ Allez dans préférences système / 🔒️ Sécurité et confidentialité /
-- 🔐 Cliquez sur autoriser Garage / ✅️ Ouvrir quand même
+- Faites un clic droit sur l’application → Ouvrir
+- Confirmez l’autorisation
 
 ---
 
-🧭 Astuce 
+🧭 Astuce  (onglet Général)
 
 Vous pouvez afficher ou masquer cette aide à tout moment grâce à la case  
 ☑️ Afficher l’aide au démarrage en bas de chaque fenêtre.
@@ -219,10 +195,6 @@ Garage, c’est :
 - 🚗 un suivi clair de vos véhicules
 - 🔧 un historique complet
 - 🔒 zéro données récupérées
+- 🛠️ un outil simple, pensé pour anticiper l'utilisation et l'usure de vos véhicules.
 
-- 🛠️ un outil simple, pensé pour anticiper:
-
-- 🚍️ L'usure et les entretiens de vos véhicules
-- 💰️ Votre budget véhicule
-
- 🛣️ Bonne route avec garage 🚦
+Bonne route avec garage 🚦
