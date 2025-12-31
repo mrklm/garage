@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.2 (clean, single-file)
+Garage — v4.2.1 (clean, single-file)
 
 DB attendue : garage.db (à côté du script)
 Dossier photos : ./assets (à côté du script)
@@ -18,6 +18,11 @@ Compat :
 - Python 3.10+ (OK 3.13)
 """
 from __future__ import annotations
+# --- AIDE (style) ---
+HELP_FONT_FAMILY = "Helvetica"
+HELP_FONT_SIZE = 20   # ← Réglez ici la taille de la police de l'aide
+HELP_BG = "#2B2B2B"   # Gris très sombre mais confortable
+
 
 import os
 import re
@@ -52,7 +57,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.2"
+APP_TITLE = "Garage v4.2.1"
 DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
@@ -1449,8 +1454,9 @@ class GarageApp(tk.Tk):
         self.help_text = tk.Text(
             self.help_text_container,
             wrap="word",
-            bg="white",
+            bg=HELP_BG,
             fg="black",
+            font=(HELP_FONT_FAMILY, HELP_FONT_SIZE),
             relief="flat",
             bd=0,
             padx=12,
