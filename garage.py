@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.2.1 (clean, single-file)
+Garage — v4.3 (clean, single-file)
 
 DB attendue : garage.db (à côté du script)
 Dossier photos : ./assets (à côté du script)
@@ -18,11 +18,14 @@ Compat :
 - Python 3.10+ (OK 3.13)
 """
 from __future__ import annotations
+
+
 # --- AIDE (style) ---
 HELP_FONT_FAMILY = "Helvetica"
-HELP_FONT_SIZE = 20   # ← Réglez ici la taille de la police de l'aide
-HELP_BG = "#2B2B2B"   # Gris très sombre mais confortable
-
+HELP_FONT_SIZE = 20          # Taille de la police de l'aide
+HELP_TEXT_COLOR = "#F2F2F2"  # Couleur du texte de l'aide
+HELP_BG = "#2B2B2B"          # Fond de l'aide (gris très sombre)
+HELP_LOGO_MAX_SIZE = 300     # Taille maximale du logo (px)
 
 import os
 import re
@@ -57,7 +60,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.2.1"
+APP_TITLE = "Garage v4.3"
 DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
@@ -1355,17 +1358,33 @@ class GarageApp(tk.Tk):
         return txt
 
     def _load_help_into_widget(self) -> None:
-        """Charge le contenu de l'aide dans le widget Text (fond blanc)."""
+
+        """Charge le contenu de l'aide dans le widget Text (fond stylé)."""
+
         if not hasattr(self, "help_text"):
+
             return
+
         content = self._read_help_md()
+
         try:
+
             self.help_text.config(state="normal")
+
             self.help_text.delete("1.0", "end")
-            self.help_text.insert("1.0", content)
+
+            # Tag unique qui impose le style du texte d'aide (couleur incluse)
+
+            self.help_text.tag_configure("help", foreground=HELP_TEXT_COLOR)
+
+            self.help_text.insert("1.0", content, "help")
+
             self.help_text.config(state="disabled")
+
         except Exception:
+
             pass
+
 
 
     def _load_logo_image(self) -> None:
@@ -1392,7 +1411,7 @@ class GarageApp(tk.Tk):
         try:
             if PIL_AVAILABLE:
                 img = Image.open(logo_path)
-                img.thumbnail((220, 220))
+                img.thumbnail((HELP_LOGO_MAX_SIZE, HELP_LOGO_MAX_SIZE))
                 self._logo_img = ImageTk.PhotoImage(img)
                 self.help_logo_label.config(image=self._logo_img, text="")
             else:
@@ -1463,7 +1482,7 @@ class GarageApp(tk.Tk):
             pady=10,
         )
         self.help_scroll = ttk.Scrollbar(self.help_text_container, orient="vertical", command=self.help_text.yview)
-        self.help_text.configure(yscrollcommand=self.help_scroll.set)
+        self.help_text.configure(font=(HELP_FONT_FAMILY, HELP_FONT_SIZE), bg=HELP_BG, fg=HELP_TEXT_COLOR, insertbackground=HELP_TEXT_COLOR)
 
         self.help_text.grid(row=0, column=0, sticky="nsew")
         self.help_scroll.grid(row=0, column=1, sticky="ns")

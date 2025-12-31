@@ -25,15 +25,15 @@ La base est vide, et tout est prêt pour commencer 🙂
 
    Allez dans l'onglet "Véhicule"
 
-   -ajoutez une photos de votre vehicule (au format .PNG)
+   🚗-ajoutez une photos de votre vehicule (au format .PNG)
    
-   -ajouter les caractéristiques technique du véhicule (marque, motorisation, type d'energie, année, immatriculation)
+   📋-ajouter les caractéristiques technique du véhicule (marque, motorisation, type d'energie, année, immatriculation)
    
    -vous pouvez également renseigner les préconisations constructeur afin de l'avoir en pense bête:
    
   (type d'huile moteur, pression des pneumatiques, frequence vidange et courroie de distribution...)
 
-  - Validez ✅
+  - Cliquez sur le bouton "Enregistrer" ✅
 
 Le véhicule devient automatiquement **le véhicule actif**.
 
@@ -44,6 +44,8 @@ Le véhicule devient automatiquement **le véhicule actif**.
 - Sélectionnez un véhicule dans la liste
 - Cliquez sur **Modifier**
 - Ajustez les informations nécessaires
+
+- Cliquez sur le bouton "Enregistrer" ✅
 
 ---
 
@@ -66,6 +68,10 @@ Pour le véhicule actif, vous pouvez enregistrer :
 - 🛢️ la quantité de carburant
 - 💶 le prix €/L
 - 📍 le lieu (optionnel)
+
+- - Cliquez sur le bouton "Enregistrer" ✅
+
+- Notez que vous pouvez modifier / supprimer les pleins au besoin.
 
 Ces données permettent de suivre :
 - la consommation
@@ -92,23 +98,20 @@ Chaque entretien peut inclure :
 
 ---
 
-## 📋 Préconisations d’entretien  
+## 🚨 Le Système de Rappel
+
 *(onglet **Entretien**)* --> Case "rappel"
 
-Les préconisations servent à anticiper les opérations futures, par exemple :
-- 🔁 vidange tous les 15 000 km
-- 📆 contrôle annuel
-- ⏱️ remplacement périodique
 
 En cochant la case "Rappel" au debut des la liste "Type d'entretien"
 
 un rappel sera affiché dans l'onglet general en dessous du vehicule:
 
--Il sera en vert si l'entretien à ete effectué dans les temps
--En rouge si le delai est dépassé
--En orange si l'entretien est à faire dans moins de six mois
+✅-Il sera en vert si l'entretien à ete effectué dans les temps
+❌-En rouge si le delai est dépassé
+🟠-En orange si l'entretien est à faire dans moins de six mois
 
--> Chaque rappel precise dans combien de temps / de Km il faut faire l'entretien
+🧭-> Chaque rappel precise dans combien de temps / de Km il faut faire l'entretien
 
 ---
 
@@ -116,9 +119,11 @@ un rappel sera affiché dans l'onglet general en dessous du vehicule:
 *(onglet **Général**)*
 
 🔒 **Garage fonctionne entièrement en local** :
+
 - aucune connexion internet requise
 - aucune donnée envoyée à un serveur
 - aucun compte utilisateur
+- Open source et gratuit, distrubuez ce programme autour de vous
 
 Vos données restent **sur votre ordinateur**.
 
@@ -131,6 +136,12 @@ Pour sauvegarder l’ensemble de vos informations :
 - copiez simplement le fichier **`garage.db`**
 
 💡 Une sauvegarde régulière vous garantit tranquillité et sécurité.
+
+Astuce --> 
+
+Le fichier ou sont stockées toute les informaions est une "base de donnée SQL" il es très leger, 
+Une fois toutes les infos renseignées, envoyez vous le fichier "garage.db" par courriel de cette
+ mannière vous pourrez le récuperer à tout moment. 
 
 ---
 
@@ -145,6 +156,7 @@ Ouvrez l’onglet **Véhicules**, puis cliquez sur **Ajouter un véhicule** pour
 ---
 
 ### 🍎 macOS bloque l’application au lancement
+
 - Faites un clic droit sur l’application → **Ouvrir**
 - Confirmez l’autorisation
 
@@ -154,16 +166,17 @@ Ouvrez l’onglet **Véhicules**, puis cliquez sur **Ajouter un véhicule** pour
 *(onglet **Général**)*
 
 Vous pouvez afficher ou masquer cette aide à tout moment grâce à la case  
-☑️ **Afficher l’aide au démarrage**
+☑️ **Afficher l’aide au démarrage** en bas de chaque fenêtre.
 
 ---
 
 ## 🏁 En résumé
 
 **Garage**, c’est :
+
 - 🚗 un suivi clair de vos véhicules
 - 🔧 un historique complet
 - 🔒 zéro données récupérées
-- 🛠️ un outil simple, pensé pour anticiper l'utilisation de vos véhicules.
+- 🛠️ un outil simple, pensé pour anticiper l'utilisation et l'usure de vos véhicules.
 
 Bonne route avec garage 🚦
