@@ -17,7 +17,7 @@ les informations essentielles de vos véhicules.
 
 ---
 
-🚦 Premier démarrage (onglet Général)
+🚦 Premier démarrage 
 
 Lors du premier lancement, il est normal que le message suivant apparaisse :
 
@@ -44,7 +44,7 @@ Le véhicule devient automatiquement le véhicule actif.
 
 ---
 
- ✏️ Modifier un véhicule:
+ ✏️ Vous voulez modifier un véhicule ? :
 
 - Ouvrez l’onglet Véhicules
 
@@ -58,7 +58,7 @@ Le véhicule devient automatiquement le véhicule actif.
 
 ---
 
-🗑️ Supprimer un véhicule:
+🗑️ SVous voulez supprimer un véhicule ? :
 
 - Ouvrez l’onglet Véhicules
 
@@ -69,6 +69,8 @@ Le véhicule devient automatiquement le véhicule actif.
 ⚠️ Attention : Cette action est définitive. Les pleins et entretiens associés seront supprimés.
 
 ---
+
+ Pour faire un suivi du coût du carburant je vous invite à renseigner l'onglet "Plein"
 
 ⛽ Pleins de carburant:  (onglet Pleins)
 
@@ -188,7 +190,7 @@ C’est normal lors du premier lancement.
 
 ---
 
-🧭 Astuce  (onglet Général)
+🧭 Astuce 
 
 Vous pouvez afficher ou masquer cette aide à tout moment grâce à la case  
 ☑️ Afficher l’aide au démarrage en bas de chaque fenêtre.
