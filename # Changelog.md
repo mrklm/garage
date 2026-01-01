@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
+## [4.2.1] – 2026-01-01
+
+- Ajout d'une combobox et d'un bouton manquant dans l'onglet entretien
+- Édition et mise à jour du README
+- Fix: Soucis d'affichage du logo de la page aide sous Linux
+
 ## [4.2.1] – 2025-12-31
 
 - Possibilité de changer la couleur la taille de la police & la couleur du fond de l'AIDE
