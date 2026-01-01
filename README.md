@@ -1,110 +1,118 @@
 # GARAGE
 
-![Version]
-![License]
-![Platform]
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey)
+![License](https://img.shields.io/badge/license-GPLv3-blue)
+![Version](https://img.shields.io/badge/version-4.2.2-green)
 
-Garage sert à suivre simplement les informations essentielles de vos véhicules.
+**Garage** est une application simple et autonome pour suivre les informations essentielles de vos véhicules.
 
-On renseigne le type de vehicule, sa photo, les details des entretiens fait ou à faire 
-avec leurs frequences préconisée par le constructeur ainsi que les pleins:
+Elle permet de gérer :
+- les véhicules (type, photo, caractéristiques),
+- les entretiens réalisés et à prévoir, avec leurs fréquences constructeur,
+- les pleins de carburant.
 
-Seront affichés automatiquement:
-
-- Les rappels des diffenents types d'entretiens à faire.    
-- Un calcul de la consomation moyenne au 100 Kmdu vehicule.
-- Une éstimation des coût à prevoir dans les six moi pour votre véhicule. 
- 
+L’onglet **Général** affiche automatiquement :
+- les rappels d’entretien à effectuer,
+- la consommation moyenne (L/100 km),
+- une estimation des coûts à prévoir sur les six prochains mois,
+- l’état de la batterie (si renseigné).
 
 ---
 
 ## 📥 Téléchargement
 
-### Applications standalone (recommandé pour utilisateurs)
+👉 Les versions compilées sont disponibles dans la section **Releases** :  
+https://github.com/mrklm/garage/releases
 
-- **macOS** : 
-- **Ubuntu/Linux** : 
-- **Windows** : _(à venir)_
+### Applications standalone (recommandé)
 
-#### Instructions Ubuntu/Linux après téléchargement :
+- **Linux (recommandé)**  
+  - `Garage-x86_64.AppImage`  
+  - `Garage-linux-x86_64-v4.2.2.tar.gz` (alternative)
 
+- **macOS**  
+  - `Garage - MacOs - v 4.2.2.zip`
 
-
-**Prérequis** : 
+- **Windows**  
+  - `Garage - Windows - v4.2.2.zip`
 
 ---
 
-## 🚀 Installation
+## 🐧 Linux / Ubuntu
 
-### Option 1 : Applications standalone (recommandé)
+### Option 1 — AppImage (recommandé)
 
-Téléchargez la version correspondante à votre système d'exploitation :
-- **macOS** : 
-- **Windows** : _(à venir)_
-- **Linux** : 
+```bash
+chmod +x Garage-x86_64.AppImage
+./Garage-x86_64.AppImage
+```
 
-### Option 2 : Installation depuis les sources
+### Option 2 — Archive `.tar.gz`
 
-1. **Clonez ce dépôt** :
+```bash
+tar -xzf Garage-linux-x86_64-v4.2.2.tar.gz
+cd Garage
+./Garage
+```
 
+---
 
-2. **Créez un environnement virtuel et installez les dépendances** :
-   
-   **Sur macOS/Linux** :
+## 💾 Données et base de données
 
-   
-   **Sur Windows** :
+Garage utilise une **base de données persistante**.
 
+Lors du premier lancement, la base est automatiquement créée dans :
 
-3. **Lancez le programme** :
+```text
+~/.local/share/Garage/garage.db
+```
 
+---
+
+## 🚀 Installation depuis les sources (optionnel)
+
+### Prérequis
+- Python 3.10+
+- Tkinter
+- SQLite
+- Pillow (recommandé)
+
+### 1. Cloner le dépôt
+```bash
+git clone https://github.com/mrklm/garage.git
+cd garage
+```
+
+### 2. Créer un environnement virtuel
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3. Lancer l’application
+```bash
+python garage.py
+```
+
+---
 
 ## 📜 Licence
 
-Ce logiciel est distribué sous la **[GNU General Public License v3.0](LICENSE)**.
+Ce logiciel est distribué sous la **GNU General Public License v3.0**.
 
-Vous êtes libre de :
-- ✅ Utiliser ce logiciel à toute fin (y compris commerciale)
-- ✅ Étudier et modifier le code source
-- ✅ Redistribuer le logiciel
-- ✅ Redistribuer vos modifications
-
-**À condition de** :
-- 📝 Conserver la même licence GPL v3
-- 📝 Rendre le code source disponible
-- 📝 Documenter vos modifications
-
-Pour plus de détails, consultez le fichier [LICENSE](LICENSE).
 ---
 
 ## 🛠️ Contribuer
 
-Les contributions sont les bienvenues ! Pour contribuer :
-
-1. Forkez ce dépôt.
-2. Créez une branche pour votre fonctionnalité ou correction.
-3. Ouvrez une *Pull Request* en expliquant vos modifications.
-
----
-
-## ⚠️ Avertissement
-
-Ce logiciel est fourni **sans garantie**. L'auteur décline toute responsabilité en cas de dommage ou de dysfonctionnement.
-
----
-
-## 💡 Pourquoi ce projet est-il sous licence libre ?
-
-Ce projet s'inscrit dans la philosophie du logiciel libre, promue par des associations comme [April](https://www.april.org/). Nous croyons que le partage des connaissances et des outils est essentiel pour une société numérique plus juste et transparente.
+Les contributions sont les bienvenues via *Pull Requests*.
 
 ---
 
 ## 📬 Contact
 
-Pour toute question ou demande d'autorisation (notamment pour un usage commercial), vous pouvez me contacter à l'adresse suivante :
-
 **clementmorel@free.fr**
 
 ---
 
-**✨ Bonne route avec Garage !**
+✨ Bonne route avec Garage !
