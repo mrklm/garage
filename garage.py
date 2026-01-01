@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.2.1 (clean, single-file)
+Garage — v4.2.2 (clean, single-file)
 
 DB attendue : garage.db (à côté du script)
 Dossier photos : ./assets (à côté du script)
@@ -25,7 +25,7 @@ HELP_FONT_FAMILY = "Helvetica"
 HELP_FONT_SIZE = 20          # Taille de la police de l'aide
 HELP_TEXT_COLOR = "#F2F2F2"  # Couleur du texte de l'aide
 HELP_BG = "#2B2B2B"          # Fond de l'aide (gris très sombre)
-HELP_LOGO_MAX_SIZE = 240    # Taille maximale du logo (px)
+HELP_LOGO_MAX_SIZE = 220     # Taille maximale du logo (px)
 
 import os
 import re
@@ -60,7 +60,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.2.1"
+APP_TITLE = "Garage v4.2.2"
 DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
@@ -1803,7 +1803,7 @@ class GarageApp(tk.Tk):
             self.veh_btn_save_top.state(["!disabled"] if editable else ["disabled"])
         if hasattr(self, "veh_btn_cancel_top"):
             self.veh_btn_cancel_top.state(["!disabled"] if editable else ["disabled"])
-        self.veh_photo_hint.config(text=(".PNG / .JPG / .BMP. La photo sera copiée dans ./assets" if editable else ""))
+        self.veh_photo_hint.config(text=("PNG uniquement. La photo sera copiée dans ./assets" if editable else ""))
 
         if not editable:
             self._veh_photo_src_path = None
@@ -2237,6 +2237,9 @@ class GarageApp(tk.Tk):
     def _build_entretiens_tab(self):
         self.tab_ent.columnconfigure(0, weight=1)
 
+        # Permet au tableau des entretiens (au centre) de s\'étendre, tout en gardant le formulaire visible en bas
+        self.tab_ent.rowconfigure(2, weight=1)
+
         header = ttk.Frame(self.tab_ent)
         header.grid(row=0, column=0, sticky="ew")
         header.columnconfigure(1, weight=1)
@@ -2336,7 +2339,6 @@ class GarageApp(tk.Tk):
         self.new_kind = tk.StringVar(value="Entretien")
         ttk.Combobox(form, textvariable=self.new_kind, state="readonly",
                     values=["Réparation", "Entretien", "Entretien & Réparation"]).grid(row=0, column=5, sticky="ew", padx=(6, 0))
-
         ttk.Label(form, text="Type d'entretien :").grid(row=1, column=0, sticky="w", pady=(8, 0))
         self.new_type = tk.StringVar(value="")
         self.new_type_cb = ttk.Combobox(form, textvariable=self.new_type, state="readonly")
