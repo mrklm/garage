@@ -30,7 +30,7 @@ La base de donnée est vide = et tout est prêt pour commencer 🙂
 🚘 Gestion des véhicules (onglet Véhicules)
 
    
-   🚗-ajoutez une photos de votre vehicule (au format .PNG)
+   🚗-ajoutez une photos de votre vehicule 
    
    📋-ajouter les caractéristiques techniques du véhicule (marque, motorisation, type d'energie, année, immatriculation)
    
@@ -40,7 +40,7 @@ La base de donnée est vide = et tout est prêt pour commencer 🙂
 
    - Cliquez sur le bouton "Enregistrer" ✅
 
-Le véhicule devient automatiquement le véhicule actif.
+Le véhicule devient automatiquement actif.
 
 ---
 
@@ -125,6 +125,8 @@ Chaque entretien peut inclure :
 - ✏️ un commentaire
 
 ---
+
+
 
 🚨 Le Système de Rappel: (onglet Entretien) --> Case "rappel"
 

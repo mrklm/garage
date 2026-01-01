@@ -220,21 +220,46 @@ def _ensure_assets_dir():
 
 
 def _copy_vehicle_photo(src_path: str, vehicle_id: int | None = None) -> str | None:
-    """Copie un PNG dans ./assets et retourne le nom de fichier stocké en DB."""
+    """Copie une image (PNG/JPG/JPEG/BMP) dans ./assets et retourne le nom PNG stocké en DB.
+
+    Pour fiabiliser l'affichage Tkinter et le packaging, l'image est toujours convertie en PNG.
+    """
     if not src_path:
         return None
     _ensure_assets_dir()
+
     base = os.path.basename(src_path)
     name, ext = os.path.splitext(base)
-    if ext.lower() != ".png":
-        raise ValueError("La photo doit être un fichier .PNG")
+    ext_l = ext.lower()
+
+    allowed = {".png", ".jpg", ".jpeg", ".bmp"}
+    if ext_l not in allowed:
+        raise ValueError("Format non supporté. Veuillez choisir une image PNG, JPG/JPEG ou BMP.")
 
     safe = re.sub(r"[^a-zA-Z0-9._-]+", "_", name).strip("_") or "vehicule"
     tag = f"v{int(vehicle_id)}_" if vehicle_id else ""
     out_name = f"{tag}{safe}_{uuid.uuid4().hex[:8]}.png"
     dst = os.path.join(ASSETS_DIR, out_name)
-    shutil.copy2(src_path, dst)
+
+    try:
+        # Pillow est déjà utilisé dans l'application (Image/ImageTk).
+        from PIL import Image, ImageOps  # type: ignore
+        img = Image.open(src_path)
+        # Corrige l'orientation EXIF (souvent utile pour les JPG)
+        try:
+            img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass
+        img = img.convert("RGBA")
+        img.save(dst, format="PNG", optimize=True)
+    except Exception:
+        # Fallback minimal : si ce n'est pas un PNG, Tkinter ne pourra pas le lire.
+        if ext_l != ".png":
+            raise ValueError("Impossible de convertir l'image. Veuillez installer Pillow ou utiliser un PNG.")
+        shutil.copy2(src_path, dst)
+
     return out_name
+
 
 
 def _load_vehicle_photo_tk(photo_file: str | None, max_w=360, max_h=220):
@@ -1805,31 +1830,47 @@ class GarageApp(tk.Tk):
 
     def _veh_pick_photo(self):
         if self._veh_mode not in ("add", "edit"):
-            messagebox.showinfo("Photo", "Cliquez sur Ajouter ou Modifier pour changer la photo.")
+            messagebox.showinfo("Photo", "Veuillez cliquer sur Ajouter ou Modifier pour changer la photo.")
             return
+
         path = filedialog.askopenfilename(
-            title="Choisir une photo PNG",
-            filetypes=[("PNG", "*.png"), ("Tous les fichiers", "*.*")]
+            title="Choisir une photo",
+            filetypes=[
+                ("Images (PNG/JPG/BMP)", "*.png *.jpg *.jpeg *.bmp"),
+                ("PNG", "*.png"),
+                ("JPG/JPEG", "*.jpg *.jpeg"),
+                ("BMP", "*.bmp"),
+                ("Tous les fichiers", "*.*"),
+            ],
         )
         if not path:
             return
-        if not path.lower().endswith(".png"):
-            messagebox.showwarning("Photo", "Format non supporté. Choisis un PNG (.png).")
+
+        ext = os.path.splitext(path)[1].lower()
+        if ext not in (".png", ".jpg", ".jpeg", ".bmp"):
+            messagebox.showwarning("Photo", "Format non supporté. Veuillez choisir une image PNG, JPG/JPEG ou BMP.")
             return
 
         self._veh_photo_src_path = path
+
+        # Aperçu : on utilise Pillow pour supporter JPG/BMP (et PNG aussi)
         try:
-            img = tk.PhotoImage(file=path)
-            w, h = img.width(), img.height()
-            s = max(1, int(max(w / 288, h / 176)))
-            if s > 1:
-                img = img.subsample(s, s)
-            self._veh_photo_img = img
-            self.veh_photo_label.config(image=img, text="")
+            from PIL import Image, ImageTk, ImageOps  # type: ignore
+
+            img = Image.open(path)
+            try:
+                img = ImageOps.exif_transpose(img)
+            except Exception:
+                pass
+            img = img.convert("RGBA")
+            img.thumbnail((288, 176))
+
+            tkimg = ImageTk.PhotoImage(img)
+            self._veh_photo_img = tkimg  # garder une ref
+            self.veh_photo_label.config(image=tkimg, text="")
         except Exception:
             self._veh_photo_img = None
             self.veh_photo_label.config(image="", text="(aperçu impossible)")
-
     def _veh_save(self):
         if self._veh_mode not in ("add", "edit"):
             return
