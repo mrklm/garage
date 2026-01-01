@@ -25,7 +25,7 @@ HELP_FONT_FAMILY = "Helvetica"
 HELP_FONT_SIZE = 20          # Taille de la police de l'aide
 HELP_TEXT_COLOR = "#F2F2F2"  # Couleur du texte de l'aide
 HELP_BG = "#2B2B2B"          # Fond de l'aide (gris très sombre)
-HELP_LOGO_MAX_SIZE = 220     # Taille maximale du logo (px)
+HELP_LOGO_MAX_SIZE = 240    # Taille maximale du logo (px)
 
 import os
 import re
@@ -1803,7 +1803,7 @@ class GarageApp(tk.Tk):
             self.veh_btn_save_top.state(["!disabled"] if editable else ["disabled"])
         if hasattr(self, "veh_btn_cancel_top"):
             self.veh_btn_cancel_top.state(["!disabled"] if editable else ["disabled"])
-        self.veh_photo_hint.config(text=("PNG uniquement. La photo sera copiée dans ./assets" if editable else ""))
+        self.veh_photo_hint.config(text=(".PNG / .JPG / .BMP. La photo sera copiée dans ./assets" if editable else ""))
 
         if not editable:
             self._veh_photo_src_path = None
