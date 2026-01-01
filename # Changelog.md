@@ -4,7 +4,7 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
-## [4.2.1] – 2026-01-01
+## [4.2.2] – 2026-01-01
 
 - Ajout d'une combobox et d'un bouton manquant dans l'onglet entretien
 - Édition et mise à jour du README
