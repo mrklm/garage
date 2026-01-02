@@ -4,22 +4,44 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
+## [4.2.3] – 2026-01-01
+
+### Ajouté
+
+- Ajout du calcul de coût d'entretien moyen par an.
+
+### Corrigé
+
+- Les photos sont redimenssionées afin de ne pas modifier l'apparence des fenêtres
+- Le programme ne crash plus si suppression du seul véhucule
+
 ## [4.2.2] – 2026-01-01
 
-- Ajout d'une combobox et d'un bouton manquant dans l'onglet entretien
+### Ajouté
+
 - Édition et mise à jour du README
-- Fix: Soucis d'affichage du logo de la page aide sous Linux
+
+### Corrigé
+
+- Problème de bouton manquant dans l'onglet entretien
+- Problème d'affichage du logo de la page aide sous Linux
 
 ## [4.2.1] – 2025-12-31
 
-- Possibilité de changer la couleur la taille de la police & la couleur du fond de l'AIDE
+### Ajouté
+
+- Possibilité de changer la couleur la taille de la police & la couleur du fond de l'AIDE (au début du code)
 
 ## [4.2] – 2025-12-30
+
+### Ajouté
 
 -Fichier AIDE.md affiché au démarage si pas de véhicule (1er démarage) + case à cocher pour l'afficher
 
 
 ## [4.1.2] – 2025-12-30
+
+### Ajouté
 
 -Nouvelle regle concernat les Rappels: si un entretien dans la liste des rappels a une règle de fréquence qui est
 supérieur à 6 mois et qu'il faut le faire dans moins de 6 mois alors il passe en orange.
@@ -28,47 +50,59 @@ supérieur à 6 mois et qu'il faut le faire dans moins de 6 mois alors il passe 
 
 ## [4.1.1] – 2025-12-30
 
+### Modifié 
+
 -Mise en page onglet vehicule et général
 
 ## [4.1.0] – 2025-12-30
 
--Une section "Préconisations Constructeur" est ajouté dans l'onglet vehicule pour y noter
- type d'huile, pression des pneumatiques, frequences des entretiens.
+### Ajouté
+
+-Une section "Préconisations Constructeur" dans l'onglet vehicule pour y noter
+ par exemple: type d'huile, pression des pneumatiques, frequences des entretiens...
 
 ## [4.0.0] – 2025-12-19
 
+### Ajouté 
+
 -Refonte de l'onglet Entretien, on y gerera désormais la definition des differents types d'entretien
- selon le vehicule en y renseigant une description, une periodoicité et un case a cocher pour que le rappel  
+ selon le vehicule en y renseigant une description, une periodoicité et une case à cocher pour que le rappel  
  apparaisse dans l'onglet "Général". 
 
 
 ## [3.1.2] – 2025-12-18
 
--Correction: Correction de fautes et soucis de lisibilité.
--Correction: Ré affiche la conso moyenne qui été pérdue dans les méandres de la v3.0
+### Modifié 
+
+- Correction de fautes et soucis de lisibilité.
+- Ré affiche la conso moyenne qui été pérdue dans les méandres de la v3.0
 
 ## [3.1.1] – 2025-12-18
 
--Correction: prise en compte des KM de la section entretien pour afficher dans KM actuels sous la photo de 
+### Ajouté
+
+- Prise en compte des KM de la section entretien pour afficher dans KM actuels sous la photo de 
  la voiture. 
-
- -Ajustement: pour les couts à venir, on affiche plus le coût du carburant du dernier plein mais le coût
- moyen des cinq derniers pleins.
-
 
 ## [3.1.0] – 2025-12-18
 
--Ajout d'une fonction de previsionnel des couts futurs (dernier prix des carburants enregistrés, estimation
- du cout des entretiens à venir dans les 6 prochains mois en ce basant sur les dernieres factures en prenant
-en compte que si la facture est d'avant 2023, on ajoute 20% pour l'inflation)
+### Ajouté
+
+- Fonction de previsionnel des couts futurs (dernier prix des carburants enregistrés, estimation
+  du cout des entretiens à venir dans les 6 prochains mois en ce basant sur les dernieres factures.
 
 ## [3.0.1] – 2025-12-17
 
--Changement de placement de texte, tailles et styles de police
+### Modifié
+
+- Placement de texte, tailles et styles de police
 
 ## [3.0.0] – 2025-12-17
+
+### Modifié
+
 - Refonte des onglets: un onglet general avec les photos des voitures affichées, leurs KM à la derniere
-M-A-J plein ou Entretien, les details technique des voitures, la conso moyenne au litre / 100km, et les alertes.
+  M-A-J plein ou Entretien, les details technique des voitures, la conso moyenne au litre / 100km, et les alertes.
 
 Les autres onglets sonts:
 -Les pleins
@@ -76,7 +110,9 @@ Les autres onglets sonts:
 -Les options (à venir)
 
 ## [2.5.4] – 2025-12-17
+
 ### Ajouté
+
 - Rappels d’entretien intelligents :
   - Affichage *à faire dans XXXX KM, ou le JJ/MM/AAAA* si l’entretien n’est pas encore dû
   - Affichage *aurait dû être fait depuis XXXX KM ou le JJ/MM/AAAA* si l’entretien est dépassé
@@ -84,6 +120,7 @@ Les autres onglets sonts:
 - Migration automatique des anciennes tables `entretien` sans colonne `id`
 
 ### Amélioré
+
 - Mise en page principale :
   - Coût moyen annuel carburant et entretien affichés **sous la photo du véhicule**
   - Rappels d’entretien **centrés sous les boutons**
@@ -94,6 +131,7 @@ Les autres onglets sonts:
   - La consommation moyenne ignore automatiquement les segments avec plein manquant
 
 ### Corrigé
+
 - Erreurs SQLite liées aux schémas anciens (`no such column: id`)
 - Problème de variable masquant la fonction `last_km`
 - Fichiers corrompus suite à des injections involontaires de regex
@@ -101,7 +139,9 @@ Les autres onglets sonts:
 ---
 
 ## [2.5.0] – 2025-12-16
+
 ### Ajouté
+
 - Gestion multi-véhicules (jusqu’à 5 véhicules)
 - Fiches véhicule complètes :
   - Nom (pseudo), marque, modèle, motorisation, énergie, année, immatriculation, photo
@@ -117,7 +157,9 @@ Les autres onglets sonts:
 ---
 
 ## [2.4.0]
+
 ### Ajouté
+
 - Ajout du kilométrage dans les entretiens
 - Gestion combinée entretien + réparation
 - Détection silencieuse des pleins manquants pour fiabiliser les calculs
@@ -125,14 +167,18 @@ Les autres onglets sonts:
 ---
 
 ## [2.3.0]
+
 ### Ajouté
+
 - Module Entretien (première version)
 - Séparation claire Pleins / Entretien / Lieux / Véhicules
 
 ---
 
 ## [2.0.0]
+
 ### Ajouté
+
 - Interface graphique Tkinter
 - Gestion des pleins par véhicule
 - Historique et calculs de base
@@ -140,6 +186,8 @@ Les autres onglets sonts:
 ---
 
 ## [1.x]
+
 ### Initial
+
 - Prototype mono-véhicule
 - Suivi simple des pleins
