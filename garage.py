@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.2.2 (clean, single-file)
+Garage — v4.2.3 (clean, single-file)
 
 DB attendue : garage.db (à côté du script)
 Dossier photos : ./assets (à côté du script)
@@ -26,7 +26,6 @@ HELP_FONT_SIZE = 20          # Taille de la police de l'aide
 HELP_TEXT_COLOR = "#F2F2F2"  # Couleur du texte de l'aide
 HELP_BG = "#2B2B2B"          # Fond de l'aide (gris très sombre)
 HELP_LOGO_MAX_SIZE = 220     # Taille maximale du logo (px)
-HELP_LOGO_AREA_HEIGHT = 200  # hauteur réservée au logo dans l'aide
 
 import os
 import re
@@ -61,7 +60,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.2.2"
+APP_TITLE = "Garage v4.2.3"
 DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
@@ -983,6 +982,63 @@ def estimate_maintenance_cost_next_months(vehicle_id: int, horizon_months: int =
     return total if any_included else None
 
 
+def avg_cost_per_year(vehicle_id: int):
+    """Coût moyen annuel du véhicule.
+
+    Basé sur :
+    - Pleins : champ `total`
+    - Entretiens : champ `cout`
+
+    Méthode :
+    total = SUM(pleins.total) + SUM(entretiens.cout)
+    période = du plus ancien au plus récent (dates pleins/entretiens)
+    années = max(1.0, jours / 365.25) pour éviter division par 0
+    """
+    conn = _connect_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        "SELECT SUM(total) AS s FROM pleins WHERE vehicule_id=? AND total IS NOT NULL",
+        (int(vehicle_id),),
+    )
+    s_pleins = _safe_float(cur.fetchone()["s"]) or 0.0
+
+    cur.execute(
+        "SELECT SUM(cout) AS s FROM entretiens WHERE vehicule_id=? AND cout IS NOT NULL",
+        (int(vehicle_id),),
+    )
+    s_ent = _safe_float(cur.fetchone()["s"]) or 0.0
+
+    total = s_pleins + s_ent
+
+    cur.execute(
+        """
+        SELECT MIN(d) AS dmin, MAX(d) AS dmax FROM (
+            SELECT date_iso AS d FROM pleins WHERE vehicule_id=? AND date_iso IS NOT NULL AND TRIM(date_iso) <> ''
+            UNION ALL
+            SELECT date_iso AS d FROM entretiens WHERE vehicule_id=? AND date_iso IS NOT NULL AND TRIM(date_iso) <> ''
+        )
+        """,
+        (int(vehicle_id), int(vehicle_id)),
+    )
+    r = cur.fetchone()
+    conn.close()
+
+    if total <= 0:
+        return None
+
+    dmin = _parse_iso_date(r["dmin"]) if r and r["dmin"] else None
+    dmax = _parse_iso_date(r["dmax"]) if r and r["dmax"] else None
+
+    if not dmin or not dmax:
+        years = 1.0
+    else:
+        days = (dmax - dmin).days
+        years = max(1.0, days / 365.25)
+
+    return total / years
+
+
 # ----------------- Modales -----------------
 
 class PleinEditor(tk.Toplevel):
@@ -1321,10 +1377,6 @@ class GarageApp(tk.Tk):
             except Exception:
                 pass
             try:
-                self._load_logo_image()
-            except Exception:
-                pass
-            try:
                 self.general_cards.grid_remove()
             except Exception:
                 pass
@@ -1415,108 +1467,43 @@ class GarageApp(tk.Tk):
             except Exception:
                 pass
     def _load_logo_image(self) -> None:
-        """Charge le logo (assets/Logo.*) et l'affiche dans la zone Aide.
-
-        Points importants (un seul code, multi-OS) :
-        - Linux est sensible à la casse : Logo.png != logo.png
-        - Tu as parfois un fichier 'Logo' SANS extension (mais contenu PNG) -> Tk sans Pillow peut échouer.
-        - Tkinter (PhotoImage) ne redimensionne pas nativement : on réduit via subsample().
-        """
+        """Charge le logo PNG (assets/Logo.png) et l'affiche si possible."""
         if not hasattr(self, "help_logo_label"):
             return
 
-        # Dossiers possibles (dev + bundle PyInstaller)
-        assets_dirs = [
-            resource_path("assets"),
-            os.path.join(os.path.abspath(os.path.dirname(__file__)), "assets"),
-            os.path.abspath("assets"),
+        # Chemins possibles (dev + bundle PyInstaller)
+        candidates = [
+            resource_path(os.path.join("assets", "Logo.png")),
+            os.path.join(os.path.abspath(os.path.dirname(__file__)), "assets", "Logo.png"),
+            os.path.abspath(os.path.join("assets", "Logo.png")),
         ]
-
-        # Cherche Logo.* (insensible à la casse)
-        logo_path = ""
-        preferred = {"png", "gif", "ppm", "pgm", "jpg", "jpeg"}  # jpg/jpeg nécessitent Pillow
-        for ad in assets_dirs:
-            try:
-                if not os.path.isdir(ad):
-                    continue
-                for fn in os.listdir(ad):
-                    base, ext = os.path.splitext(fn)
-                    if base.lower() == "logo":
-                        e = ext.lower().lstrip(".")
-                        if (not ext) or (e in preferred):
-                            logo_path = os.path.join(ad, fn)
-                            break
-                if logo_path:
-                    break
-            except Exception:
-                pass
-
-        # Si on a un fichier "Logo" sans extension, et que Logo.png existe aussi -> préfère Logo.png
-        if logo_path and os.path.splitext(logo_path)[1] == "":
-            cand = logo_path + ".png"
-            cand2 = logo_path + ".PNG"
-            if os.path.exists(cand):
-                logo_path = cand
-            elif os.path.exists(cand2):
-                logo_path = cand2
+        logo_path = next((p for p in candidates if os.path.exists(p)), "")
 
         if not logo_path:
+            # Fallback texte si fichier introuvable
             try:
                 self.help_logo_label.config(text="Garage", image="")
             except Exception:
                 pass
             return
 
-        # Dimensions max (on se base sur le frame de logo si présent)
-        max_w = HELP_LOGO_MAX_SIZE
-        max_h = HELP_LOGO_AREA_HEIGHT
-        if hasattr(self, "help_logo_frame"):
-            try:
-                self.help_logo_frame.update_idletasks()
-                fw = int(self.help_logo_frame.winfo_width())
-                fh = int(self.help_logo_frame.winfo_height())
-                if fw > 0:
-                    max_w = max(80, fw - 10)
-                if fh > 0:
-                    max_h = max(80, fh - 10)
-            except Exception:
-                pass
-
         try:
             if PIL_AVAILABLE:
                 img = Image.open(logo_path)
-                img.thumbnail((max_w, max_h), Image.LANCZOS)
+                img.thumbnail((HELP_LOGO_MAX_SIZE, HELP_LOGO_MAX_SIZE))
                 self._logo_img = ImageTk.PhotoImage(img)
                 self.help_logo_label.config(image=self._logo_img, text="")
             else:
-                # Sans Pillow : PhotoImage lit PNG/GIF/PPM/PGM selon Tk.
-                # Cas spécial : fichier PNG sans extension -> on force format='png' si besoin.
-                ext = os.path.splitext(logo_path)[1].lower()
-                try:
-                    if ext == "":
-                        img = tk.PhotoImage(file=logo_path, format="png")
-                    else:
-                        img = tk.PhotoImage(file=logo_path)
-                except Exception:
-                    # Dernière chance : essayer explicitement en 'png'
-                    img = tk.PhotoImage(file=logo_path, format="png")
-
-                # Réduction (subsample) pour rentrer dans la zone
-                iw = max(1, img.width())
-                ih = max(1, img.height())
-                sx = max(1, (iw + max_w - 1) // max_w)
-                sy = max(1, (ih + max_h - 1) // max_h)
-                s = max(sx, sy)
-                if s > 1:
-                    img = img.subsample(s, s)
-
-                self._logo_img = img
+                # Fallback Tk (moins fiable sur certains macOS)
+                self._logo_img = tk.PhotoImage(file=logo_path)
                 self.help_logo_label.config(image=self._logo_img, text="")
         except Exception:
             try:
                 self.help_logo_label.config(text="Garage", image="")
             except Exception:
                 pass
+
+    # ---------- Général ----------
     def _build_general_tab(self):
         self.tab_general.columnconfigure(0, weight=1)
         self.tab_general.rowconfigure(1, weight=1)
@@ -1548,14 +1535,8 @@ class GarageApp(tk.Tk):
 
         # Logo (affiché par l'UI, pas par le Markdown)
         self.help_logo_frame = ttk.Frame(self.help_frame)
-        self.help_logo_frame = ttk.Frame(self.help_frame, height=HELP_LOGO_AREA_HEIGHT)
         self.help_logo_frame.grid(row=0, column=0, sticky="ew")
         self.help_logo_frame.columnconfigure(0, weight=1)
-
-        try:
-            self.help_logo_frame.grid_propagate(False)
-        except Exception:
-            pass
 
         self.help_logo_label = ttk.Label(self.help_logo_frame)
         self.help_logo_label.grid(row=0, column=0, pady=(0, 8))
@@ -1688,10 +1669,16 @@ class GarageApp(tk.Tk):
             photo.config(image=img, text="")
         photo.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
+        avg = avg_cost_per_year(vid)
+        avg_txt = (f"{_fmt_num(avg, 0)} € / an" if avg is not None else "—")
+        avg_lbl = ttk.Label(card, text=f"Coût moyen du véhicule par an ≃ {avg_txt}", font=self.font_rem_item, foreground="#66B3FF")
+        avg_lbl.grid(row=4, column=0, sticky="w", pady=(10, 0))
+        avg_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
+
         est = estimate_maintenance_cost_next_months(vid, horizon_months=6)
         est_txt = (f"{_fmt_num(est, 0)} €" if est is not None else "—")
         cost_lbl = ttk.Label(card, text=f"Coût à prévoir pour les 6 prochains mois ≃ {est_txt}", font=self.font_rem_item, foreground="#66B3FF")
-        cost_lbl.grid(row=4, column=0, sticky="w", pady=(10, 0))
+        cost_lbl.grid(row=5, column=0, sticky="w", pady=(6, 0))
         cost_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
         details = ttk.Frame(card)
@@ -1720,7 +1707,7 @@ class GarageApp(tk.Tk):
         add_row("Dernier km", str(last_km_any(vid) or ""), 6)
 
         reminders = ttk.Frame(card)
-        reminders.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(14, 0))
+        reminders.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(14, 0))
         reminders.columnconfigure(0, weight=1)
         ttk.Label(reminders, text="Rappels:", font=self.font_rem_title).grid(row=0, column=0, sticky="w", pady=(0, 6))
 
@@ -1958,9 +1945,10 @@ class GarageApp(tk.Tk):
         energie = self.veh_vars["energie"].get()
         annee = self.veh_vars["annee"].get()
         immat = self.veh_vars["immatriculation"].get()
-
-        existing = get_vehicle(self.active_vehicle_id)
-        photo_file = existing["photo_file"] if existing else None
+        photo_file = None
+        if self._veh_mode == "edit" and self.active_vehicle_id is not None:
+            existing = get_vehicle(self.active_vehicle_id)
+            photo_file = existing["photo_file"] if existing else None
 
         if self._veh_photo_src_path:
             try:
@@ -2001,8 +1989,11 @@ class GarageApp(tk.Tk):
         self.vehicles_rows = list_vehicles()
         if not self.vehicles_rows:
             messagebox.showinfo("Info", "Plus aucun véhicule dans la flotte.")
-            self.destroy()
+            self.active_vehicle_id = None
+            self._vehicle_index_to_id = []
+            self._show_empty_state()
             return
+
         self.active_vehicle_id = int(self.vehicles_rows[0]["id"])
         self._refresh_all()
         self._set_status("Véhicule supprimé.")

@@ -7,12 +7,15 @@
 **Garage** est une application simple et autonome pour suivre les informations essentielles de vos véhicules.
 
 Elle permet de gérer :
+
 - les véhicules (type, photo, caractéristiques),
 - les entretiens réalisés et à prévoir, avec leurs fréquences constructeur,
 - les pleins de carburant.
 
 L’onglet **Général** affiche automatiquement :
+
 - les rappels d’entretien à effectuer,
+- la moyenne du coût du véhicule par an, 
 - la consommation moyenne (L/100 km),
 - une estimation des coûts à prévoir sur les six prochains mois,
 - l’état de la batterie (si renseigné).
