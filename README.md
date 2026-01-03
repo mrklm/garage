@@ -19,7 +19,7 @@ L’onglet **Général** affiche automatiquement :
 - la consommation moyenne (L/100 km),
 - une estimation des coûts à prévoir sur les six prochains mois,
 - l’état de la batterie (si renseigné).
-
+- Des graphiques de la conso L/100km del l'évolution dans le temps des prix -entretiens /réparations /carburant.
 ---
 
 ## 📥 Téléchargement

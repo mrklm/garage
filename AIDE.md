@@ -98,6 +98,8 @@ Ces données permettent de suivre :
 
 - 💶/📅 l’évolution des dépenses
 
+- 💶 l'évolution du prix du carburant par années
+
 ---
 
 🔩 Entretiens & maintenance: (onglet Entretiens)
@@ -142,6 +144,16 @@ un rappel sera affiché dans l'onglet general en dessous du vehicule:
 🟠-En orange si l'entretien est à faire dans moins de six mois
 
 🧭-> Chaque rappel precise dans combien de temps / de Km il faut faire l'entretien
+
+
+L'onglet "Graphiques" Permet de visualiser rapidement:
+
+
+- 🛢️la conso L/100km 
+
+- 💶/📅 l'évolution des prix des entretiens et des réparations par années
+
+- 💶/📅 l'évolution du prix du carburant par années
 
 ---
 

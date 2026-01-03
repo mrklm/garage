@@ -4,11 +4,20 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
-## [4.2.3] – 2026-01-01
+## [4.3] – 2026-01-03
 
 ### Ajouté
 
-- Ajout du calcul de coût d'entretien moyen par an.
+- Onglet "Graphiques" comporte pour l'instant trois graphiques:
+- la conso L/100km 
+- L'évolution des prix des entretiens et des réparations par années
+- L'évolution du prix du carburant par années
+
+## [4.2.3] – 2026-01-02
+
+### Ajouté
+
+- Calcul de coût d'entretien moyen par an.
 
 ### Corrigé
 
