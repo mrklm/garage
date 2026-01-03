@@ -64,6 +64,10 @@ APP_TITLE = "Garage v4.2.3"
 DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
+# --- Véhicules : zone photo fixe (évite que la photo décale l’UI) ---
+VEH_PHOTO_AREA_W = 300   # largeur max de l’aperçu photo
+VEH_PHOTO_AREA_H = 200   # hauteur max de l’aperçu photo
+
 
 # ----------------- Helpers -----------------
 
@@ -276,8 +280,8 @@ def _load_vehicle_photo_tk(photo_file: str | None, max_w=360, max_h=220):
 
     try:
         w, h = img.width(), img.height()
-        sx = max(1, int(w / max_w))
-        sy = max(1, int(h / max_h))
+        sx = max(1, (w + max_w - 1) // max_w)
+        sy = max(1, (h + max_h - 1) // max_h)
         s = max(sx, sy)
         if s > 1:
             img = img.subsample(s, s)
@@ -435,7 +439,7 @@ def insert_vehicle(nom, marque, modele, motorisation, energie, annee, immatricul
                  (modele or "").strip() or None,
                  (motorisation or "").strip() or None,
                  (energie or "").strip() or None,
-                 int(annee) if str(annee).strip() != "" else None,
+                 _safe_int(str(annee).strip()) if str(annee).strip() != "" else None,
                  (immatriculation or "").strip() or None,
                  (photo_file or "").strip() or None))
     vid = int(cur.lastrowid)
@@ -455,7 +459,7 @@ def update_vehicle(vehicle_id: int, nom, marque, modele, motorisation, energie, 
                  (modele or "").strip() or None,
                  (motorisation or "").strip() or None,
                  (energie or "").strip() or None,
-                 int(annee) if str(annee).strip() != "" else None,
+                 _safe_int(str(annee).strip()) if str(annee).strip() != "" else None,
                  (immatriculation or "").strip() or None,
                  (photo_file or "").strip() or None,
                  int(vehicle_id)))
@@ -981,62 +985,63 @@ def estimate_maintenance_cost_next_months(vehicle_id: int, horizon_months: int =
 
     return total if any_included else None
 
+def entretien_costs_by_year(vehicle_id: int):
+    """Retourne un dict {année:int -> total_cout:float} basé uniquement sur les entretiens.
 
-def avg_cost_per_year(vehicle_id: int):
-    """Coût moyen annuel du véhicule.
-
-    Basé sur :
-    - Pleins : champ `total`
-    - Entretiens : champ `cout`
-
-    Méthode :
-    total = SUM(pleins.total) + SUM(entretiens.cout)
-    période = du plus ancien au plus récent (dates pleins/entretiens)
-    années = max(1.0, jours / 365.25) pour éviter division par 0
+    - Ne compte que entretiens.cout non NULL
+    - Année extraite de date_iso (format YYYY-MM-DD attendu)
     """
     conn = _connect_db()
     cur = conn.cursor()
-
-    cur.execute(
-        "SELECT SUM(total) AS s FROM pleins WHERE vehicule_id=? AND total IS NOT NULL",
-        (int(vehicle_id),),
-    )
-    s_pleins = _safe_float(cur.fetchone()["s"]) or 0.0
-
-    cur.execute(
-        "SELECT SUM(cout) AS s FROM entretiens WHERE vehicule_id=? AND cout IS NOT NULL",
-        (int(vehicle_id),),
-    )
-    s_ent = _safe_float(cur.fetchone()["s"]) or 0.0
-
-    total = s_pleins + s_ent
-
     cur.execute(
         """
-        SELECT MIN(d) AS dmin, MAX(d) AS dmax FROM (
-            SELECT date_iso AS d FROM pleins WHERE vehicule_id=? AND date_iso IS NOT NULL AND TRIM(date_iso) <> ''
-            UNION ALL
-            SELECT date_iso AS d FROM entretiens WHERE vehicule_id=? AND date_iso IS NOT NULL AND TRIM(date_iso) <> ''
-        )
+        SELECT SUBSTR(date_iso, 1, 4) AS y, SUM(cout) AS s
+        FROM entretiens
+        WHERE vehicule_id = ? AND cout IS NOT NULL AND TRIM(COALESCE(date_iso,'')) <> ''
+        GROUP BY y
+        ORDER BY y
         """,
-        (int(vehicle_id), int(vehicle_id)),
+        (int(vehicle_id),),
     )
-    r = cur.fetchone()
+    rows = cur.fetchall()
     conn.close()
 
-    if total <= 0:
-        return None
+    out = {}
+    for r in rows:
+        y = r["y"] if isinstance(r, sqlite3.Row) else r[0]
+        s = r["s"] if isinstance(r, sqlite3.Row) else r[1]
+        try:
+            yi = int(y)
+        except Exception:
+            continue
+        try:
+            sf = float(s) if s is not None else 0.0
+        except Exception:
+            sf = 0.0
+        out[yi] = sf
+    return out
 
-    dmin = _parse_iso_date(r["dmin"]) if r and r["dmin"] else None
-    dmax = _parse_iso_date(r["dmax"]) if r and r["dmax"] else None
 
-    if not dmin or not dmax:
-        years = 1.0
-    else:
-        days = (dmax - dmin).days
-        years = max(1.0, days / 365.25)
+def entretien_avg_cost_per_year(vehicle_id: int):
+    """Retourne (avg_all_years, detail_string, n_years).
 
-    return total / years
+    avg_all_years = moyenne des totaux annuels, sur les années où il existe au moins un entretien chiffré.
+    detail_string = "2019: 380 € • 2020: 420 € ..." (peut être vide)
+    """
+    by_year = entretien_costs_by_year(vehicle_id)
+    if not by_year:
+        return (None, "", 0)
+
+    years = sorted(by_year.keys())
+    totals = [by_year[y] for y in years]
+    n = len(totals)
+    avg = sum(totals) / n if n > 0 else None
+
+    parts = [f"{y}: {_fmt_num(by_year[y], 0)} €" for y in years]
+    detail = " • ".join(parts)
+
+    return (avg, detail, n)
+
 
 
 # ----------------- Modales -----------------
@@ -1669,16 +1674,32 @@ class GarageApp(tk.Tk):
             photo.config(image=img, text="")
         photo.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
-        avg = avg_cost_per_year(vid)
-        avg_txt = (f"{_fmt_num(avg, 0)} € / an" if avg is not None else "—")
-        avg_lbl = ttk.Label(card, text=f"Coût moyen du véhicule par an ≃ {avg_txt}", font=self.font_rem_item, foreground="#66B3FF")
+        est = estimate_maintenance_cost_next_months(vid, horizon_months=6)
+        est_txt = (f"{_fmt_num(est, 0)} €" if est is not None else "—")
+
+        avg_year, _detail_years, n_years = entretien_avg_cost_per_year(vid)
+        avg_txt = (f"{_fmt_num(avg_year, 0)} €" if avg_year is not None else "—")
+
+        avg_lbl = ttk.Label(
+            card,
+            text=f"Coût moyen d'entretien par an ≃ {avg_txt}",
+            font=self.font_rem_item,
+            foreground="#66B3FF",
+            wraplength=1100,
+            justify="left",
+        )
         avg_lbl.grid(row=4, column=0, sticky="w", pady=(10, 0))
         avg_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
-        est = estimate_maintenance_cost_next_months(vid, horizon_months=6)
-        est_txt = (f"{_fmt_num(est, 0)} €" if est is not None else "—")
-        cost_lbl = ttk.Label(card, text=f"Coût à prévoir pour les 6 prochains mois ≃ {est_txt}", font=self.font_rem_item, foreground="#66B3FF")
-        cost_lbl.grid(row=5, column=0, sticky="w", pady=(6, 0))
+        cost_lbl = ttk.Label(
+            card,
+            text=f"Coût à prévoir pour les 6 prochains mois ≃ {est_txt}",
+            font=self.font_rem_item,
+            foreground="#66B3FF",
+            wraplength=1100,
+            justify="left",
+        )
+        cost_lbl.grid(row=5, column=0, sticky="w", pady=(10, 0))
         cost_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
         details = ttk.Frame(card)
@@ -1771,8 +1792,19 @@ class GarageApp(tk.Tk):
 
         photo_box = ttk.Labelframe(body, text="Photo", padding=10)
         photo_box.grid(row=0, column=0, sticky="nw")
-        self.veh_photo_label = ttk.Label(photo_box, text="(aucune photo)")
-        self.veh_photo_label.grid(row=0, column=0, sticky="nw")
+
+        # Zone fixe : empêche l'image de pousser le reste de l'UI (macOS notamment)
+        self.veh_photo_area = ttk.Frame(photo_box, width=VEH_PHOTO_AREA_W, height=VEH_PHOTO_AREA_H)
+        self.veh_photo_area.grid(row=0, column=0, sticky="nw")
+        try:
+            self.veh_photo_area.grid_propagate(False)
+        except Exception:
+            pass
+
+        self.veh_photo_label = ttk.Label(self.veh_photo_area, text="(aucune photo)")
+        # place() ne déclenche pas de recalcul de taille du container
+        self.veh_photo_label.place(relx=0.5, rely=0.5, anchor="center")
+
         self.veh_photo_hint = ttk.Label(photo_box, text="")
         self.veh_photo_hint.grid(row=2, column=0, sticky="w", pady=(6, 0))
 
@@ -1926,7 +1958,7 @@ class GarageApp(tk.Tk):
             except Exception:
                 pass
             img = img.convert("RGBA")
-            img.thumbnail((288, 176))
+            img.thumbnail((VEH_PHOTO_AREA_W, VEH_PHOTO_AREA_H))
 
             tkimg = ImageTk.PhotoImage(img)
             self._veh_photo_img = tkimg  # garder une ref
@@ -1945,10 +1977,14 @@ class GarageApp(tk.Tk):
         energie = self.veh_vars["energie"].get()
         annee = self.veh_vars["annee"].get()
         immat = self.veh_vars["immatriculation"].get()
-        photo_file = None
-        if self._veh_mode == "edit" and self.active_vehicle_id is not None:
-            existing = get_vehicle(self.active_vehicle_id)
-            photo_file = existing["photo_file"] if existing else None
+
+        year_s = str(annee).strip()
+        if year_s and _safe_int(year_s) is None:
+            messagebox.showwarning("Année", "Année invalide : entre un nombre (ex: 2010) ou laisse vide.")
+            return
+
+        existing = get_vehicle(self.active_vehicle_id) if (self._veh_mode == "edit" and self.active_vehicle_id) else None
+        photo_file = existing["photo_file"] if existing else None
 
         if self._veh_photo_src_path:
             try:
@@ -1989,9 +2025,10 @@ class GarageApp(tk.Tk):
         self.vehicles_rows = list_vehicles()
         if not self.vehicles_rows:
             messagebox.showinfo("Info", "Plus aucun véhicule dans la flotte.")
+            # On repasse en état "base vide" sans fermer l'application
             self.active_vehicle_id = None
-            self._vehicle_index_to_id = []
-            self._show_empty_state()
+            self._refresh_all()
+            self._set_status("Plus aucun véhicule.")
             return
 
         self.active_vehicle_id = int(self.vehicles_rows[0]["id"])
@@ -2091,7 +2128,7 @@ class GarageApp(tk.Tk):
         self.veh_vars["immatriculation"].set(r["immatriculation"] or "")
         self.veh_vars["dernier_km"].set(str(last_km_any(self.active_vehicle_id) or ""))
 
-        img = _load_vehicle_photo_tk(r["photo_file"], max_w=288, max_h=176)
+        img = _load_vehicle_photo_tk(r["photo_file"], max_w=VEH_PHOTO_AREA_W, max_h=VEH_PHOTO_AREA_H)
         self._veh_photo_img = img
         if img:
             self.veh_photo_label.config(image=img, text="")

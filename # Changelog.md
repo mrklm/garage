@@ -14,6 +14,8 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 - Les photos sont redimenssionées afin de ne pas modifier l'apparence des fenêtres
 - Le programme ne crash plus si suppression du seul véhucule
+- Redimensionne sans croper les photos
+- Calcul du coût d'entretien moyen par an = moyenne par an & moyenne des années
 
 ## [4.2.2] – 2026-01-01
 
