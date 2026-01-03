@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.2.3 (clean, single-file)
+Garage — v4.3 (clean, single-file)
 
 DB attendue : garage.db (à côté du script)
 Dossier photos : ./assets (à côté du script)
@@ -46,6 +46,34 @@ except Exception:
     PIL_AVAILABLE = False
 
 
+# Matplotlib pour l'onglet Graphiques (optionnel).
+MATPLOTLIB_AVAILABLE = False
+Figure = None
+FigureCanvasTkAgg = None
+NavigationToolbar2Tk = None
+
+try:
+    import matplotlib
+    matplotlib.use("TkAgg")
+    from matplotlib.figure import Figure  # type: ignore
+    MATPLOTLIB_AVAILABLE = True
+except Exception:
+    MATPLOTLIB_AVAILABLE = False
+    Figure = None
+
+if MATPLOTLIB_AVAILABLE:
+    try:
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # type: ignore
+    except Exception:
+        FigureCanvasTkAgg = None
+        MATPLOTLIB_AVAILABLE = False
+
+if MATPLOTLIB_AVAILABLE:
+    try:
+        from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk  # type: ignore
+    except Exception:
+        NavigationToolbar2Tk = None
+
 def resource_path(relative_path: str) -> str:
     """Retourne un chemin absolu compatible PyInstaller (sys._MEIPASS)."""
     base_path = getattr(sys, "_MEIPASS", os.path.abspath(os.path.dirname(__file__)))
@@ -60,13 +88,9 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.2.3"
+APP_TITLE = "Garage v4.3"
 DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
-
-# --- Véhicules : zone photo fixe (évite que la photo décale l’UI) ---
-VEH_PHOTO_AREA_W = 300   # largeur max de l’aperçu photo
-VEH_PHOTO_AREA_H = 200   # hauteur max de l’aperçu photo
 
 
 # ----------------- Helpers -----------------
@@ -280,8 +304,8 @@ def _load_vehicle_photo_tk(photo_file: str | None, max_w=360, max_h=220):
 
     try:
         w, h = img.width(), img.height()
-        sx = max(1, (w + max_w - 1) // max_w)
-        sy = max(1, (h + max_h - 1) // max_h)
+        sx = max(1, int(w / max_w))
+        sy = max(1, int(h / max_h))
         s = max(sx, sy)
         if s > 1:
             img = img.subsample(s, s)
@@ -439,7 +463,7 @@ def insert_vehicle(nom, marque, modele, motorisation, energie, annee, immatricul
                  (modele or "").strip() or None,
                  (motorisation or "").strip() or None,
                  (energie or "").strip() or None,
-                 _safe_int(str(annee).strip()) if str(annee).strip() != "" else None,
+                 int(annee) if str(annee).strip() != "" else None,
                  (immatriculation or "").strip() or None,
                  (photo_file or "").strip() or None))
     vid = int(cur.lastrowid)
@@ -459,7 +483,7 @@ def update_vehicle(vehicle_id: int, nom, marque, modele, motorisation, energie, 
                  (modele or "").strip() or None,
                  (motorisation or "").strip() or None,
                  (energie or "").strip() or None,
-                 _safe_int(str(annee).strip()) if str(annee).strip() != "" else None,
+                 int(annee) if str(annee).strip() != "" else None,
                  (immatriculation or "").strip() or None,
                  (photo_file or "").strip() or None,
                  int(vehicle_id)))
@@ -985,64 +1009,6 @@ def estimate_maintenance_cost_next_months(vehicle_id: int, horizon_months: int =
 
     return total if any_included else None
 
-def entretien_costs_by_year(vehicle_id: int):
-    """Retourne un dict {année:int -> total_cout:float} basé uniquement sur les entretiens.
-
-    - Ne compte que entretiens.cout non NULL
-    - Année extraite de date_iso (format YYYY-MM-DD attendu)
-    """
-    conn = _connect_db()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT SUBSTR(date_iso, 1, 4) AS y, SUM(cout) AS s
-        FROM entretiens
-        WHERE vehicule_id = ? AND cout IS NOT NULL AND TRIM(COALESCE(date_iso,'')) <> ''
-        GROUP BY y
-        ORDER BY y
-        """,
-        (int(vehicle_id),),
-    )
-    rows = cur.fetchall()
-    conn.close()
-
-    out = {}
-    for r in rows:
-        y = r["y"] if isinstance(r, sqlite3.Row) else r[0]
-        s = r["s"] if isinstance(r, sqlite3.Row) else r[1]
-        try:
-            yi = int(y)
-        except Exception:
-            continue
-        try:
-            sf = float(s) if s is not None else 0.0
-        except Exception:
-            sf = 0.0
-        out[yi] = sf
-    return out
-
-
-def entretien_avg_cost_per_year(vehicle_id: int):
-    """Retourne (avg_all_years, detail_string, n_years).
-
-    avg_all_years = moyenne des totaux annuels, sur les années où il existe au moins un entretien chiffré.
-    detail_string = "2019: 380 € • 2020: 420 € ..." (peut être vide)
-    """
-    by_year = entretien_costs_by_year(vehicle_id)
-    if not by_year:
-        return (None, "", 0)
-
-    years = sorted(by_year.keys())
-    totals = [by_year[y] for y in years]
-    n = len(totals)
-    avg = sum(totals) / n if n > 0 else None
-
-    parts = [f"{y}: {_fmt_num(by_year[y], 0)} €" for y in years]
-    detail = " • ".join(parts)
-
-    return (avg, detail, n)
-
-
 
 # ----------------- Modales -----------------
 
@@ -1323,16 +1289,19 @@ class GarageApp(tk.Tk):
         self.tab_vehicules = ttk.Frame(self.nb, padding=10)
         self.tab_pleins = ttk.Frame(self.nb, padding=10)
         self.tab_ent = ttk.Frame(self.nb, padding=10)
+        self.tab_graphs = ttk.Frame(self.nb, padding=10)
 
         self.nb.add(self.tab_general, text="Général")
         self.nb.add(self.tab_vehicules, text="Véhicules")
         self.nb.add(self.tab_pleins, text="Pleins")
         self.nb.add(self.tab_ent, text="Entretiens")
 
+        self.nb.add(self.tab_graphs, text="Graphiques")
         self._build_general_tab()
         self._build_vehicules_tab()
         self._build_pleins_tab()
         self._build_entretiens_tab()
+        self._build_graphs_tab()
 
         # --- Aide : case à cocher globale (toujours visible, centrée sous les onglets) ---
         self.show_help_var = tk.BooleanVar(value=False)
@@ -1676,30 +1645,8 @@ class GarageApp(tk.Tk):
 
         est = estimate_maintenance_cost_next_months(vid, horizon_months=6)
         est_txt = (f"{_fmt_num(est, 0)} €" if est is not None else "—")
-
-        avg_year, _detail_years, n_years = entretien_avg_cost_per_year(vid)
-        avg_txt = (f"{_fmt_num(avg_year, 0)} €" if avg_year is not None else "—")
-
-        avg_lbl = ttk.Label(
-            card,
-            text=f"Coût moyen d'entretien par an ≃ {avg_txt}",
-            font=self.font_rem_item,
-            foreground="#66B3FF",
-            wraplength=1100,
-            justify="left",
-        )
-        avg_lbl.grid(row=4, column=0, sticky="w", pady=(10, 0))
-        avg_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
-
-        cost_lbl = ttk.Label(
-            card,
-            text=f"Coût à prévoir pour les 6 prochains mois ≃ {est_txt}",
-            font=self.font_rem_item,
-            foreground="#66B3FF",
-            wraplength=1100,
-            justify="left",
-        )
-        cost_lbl.grid(row=5, column=0, sticky="w", pady=(10, 0))
+        cost_lbl = ttk.Label(card, text=f"Coût à prévoir pour les 6 prochains mois ≃ {est_txt}", font=self.font_rem_item, foreground="#66B3FF")
+        cost_lbl.grid(row=4, column=0, sticky="w", pady=(10, 0))
         cost_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
         details = ttk.Frame(card)
@@ -1728,7 +1675,7 @@ class GarageApp(tk.Tk):
         add_row("Dernier km", str(last_km_any(vid) or ""), 6)
 
         reminders = ttk.Frame(card)
-        reminders.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(14, 0))
+        reminders.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(14, 0))
         reminders.columnconfigure(0, weight=1)
         ttk.Label(reminders, text="Rappels:", font=self.font_rem_title).grid(row=0, column=0, sticky="w", pady=(0, 6))
 
@@ -1792,19 +1739,8 @@ class GarageApp(tk.Tk):
 
         photo_box = ttk.Labelframe(body, text="Photo", padding=10)
         photo_box.grid(row=0, column=0, sticky="nw")
-
-        # Zone fixe : empêche l'image de pousser le reste de l'UI (macOS notamment)
-        self.veh_photo_area = ttk.Frame(photo_box, width=VEH_PHOTO_AREA_W, height=VEH_PHOTO_AREA_H)
-        self.veh_photo_area.grid(row=0, column=0, sticky="nw")
-        try:
-            self.veh_photo_area.grid_propagate(False)
-        except Exception:
-            pass
-
-        self.veh_photo_label = ttk.Label(self.veh_photo_area, text="(aucune photo)")
-        # place() ne déclenche pas de recalcul de taille du container
-        self.veh_photo_label.place(relx=0.5, rely=0.5, anchor="center")
-
+        self.veh_photo_label = ttk.Label(photo_box, text="(aucune photo)")
+        self.veh_photo_label.grid(row=0, column=0, sticky="nw")
         self.veh_photo_hint = ttk.Label(photo_box, text="")
         self.veh_photo_hint.grid(row=2, column=0, sticky="w", pady=(6, 0))
 
@@ -1958,7 +1894,7 @@ class GarageApp(tk.Tk):
             except Exception:
                 pass
             img = img.convert("RGBA")
-            img.thumbnail((VEH_PHOTO_AREA_W, VEH_PHOTO_AREA_H))
+            img.thumbnail((288, 176))
 
             tkimg = ImageTk.PhotoImage(img)
             self._veh_photo_img = tkimg  # garder une ref
@@ -1978,12 +1914,7 @@ class GarageApp(tk.Tk):
         annee = self.veh_vars["annee"].get()
         immat = self.veh_vars["immatriculation"].get()
 
-        year_s = str(annee).strip()
-        if year_s and _safe_int(year_s) is None:
-            messagebox.showwarning("Année", "Année invalide : entre un nombre (ex: 2010) ou laisse vide.")
-            return
-
-        existing = get_vehicle(self.active_vehicle_id) if (self._veh_mode == "edit" and self.active_vehicle_id) else None
+        existing = get_vehicle(self.active_vehicle_id)
         photo_file = existing["photo_file"] if existing else None
 
         if self._veh_photo_src_path:
@@ -2025,12 +1956,8 @@ class GarageApp(tk.Tk):
         self.vehicles_rows = list_vehicles()
         if not self.vehicles_rows:
             messagebox.showinfo("Info", "Plus aucun véhicule dans la flotte.")
-            # On repasse en état "base vide" sans fermer l'application
-            self.active_vehicle_id = None
-            self._refresh_all()
-            self._set_status("Plus aucun véhicule.")
+            self.destroy()
             return
-
         self.active_vehicle_id = int(self.vehicles_rows[0]["id"])
         self._refresh_all()
         self._set_status("Véhicule supprimé.")
@@ -2128,7 +2055,7 @@ class GarageApp(tk.Tk):
         self.veh_vars["immatriculation"].set(r["immatriculation"] or "")
         self.veh_vars["dernier_km"].set(str(last_km_any(self.active_vehicle_id) or ""))
 
-        img = _load_vehicle_photo_tk(r["photo_file"], max_w=VEH_PHOTO_AREA_W, max_h=VEH_PHOTO_AREA_H)
+        img = _load_vehicle_photo_tk(r["photo_file"], max_w=288, max_h=176)
         self._veh_photo_img = img
         if img:
             self.veh_photo_label.config(image=img, text="")
@@ -2466,6 +2393,528 @@ class GarageApp(tk.Tk):
 
         ttk.Button(form, text="Enregistrer l'entretien", command=self._on_add_entretien).grid(row=3, column=5, sticky="ew", pady=(8, 0))
 
+    # ---------- Graphiques ----------
+    def _build_graphs_tab(self):
+        self.tab_graphs.columnconfigure(0, weight=1)
+        self.tab_graphs.rowconfigure(2, weight=1)
+
+        header = ttk.Frame(self.tab_graphs)
+        header.grid(row=0, column=0, sticky="ew")
+        header.columnconfigure(1, weight=1)
+
+        ttk.Label(header, text="Véhicule :").grid(row=0, column=0, sticky="w")
+        self.graph_vehicle_var = tk.StringVar(value="")
+        self.graph_vehicle_cb = ttk.Combobox(header, textvariable=self.graph_vehicle_var, state="readonly")
+        self.graph_vehicle_cb.grid(row=0, column=1, sticky="ew", padx=(10, 0))
+        self.graph_vehicle_cb.bind("<<ComboboxSelected>>", self._on_graph_vehicle_change)
+
+        controls = ttk.Frame(self.tab_graphs)
+        controls.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        controls.columnconfigure(1, weight=1)
+
+        ttk.Label(controls, text="Vue :").grid(row=0, column=0, sticky="w")
+
+        self.graph_choice_var = tk.StringVar(value="Tous (3 graphes)")
+        self.graph_choice_cb = ttk.Combobox(
+            controls,
+            textvariable=self.graph_choice_var,
+            state="readonly",
+            values=[
+                "Tous (3 graphes)",
+                "1) Conso (L/100 km)",
+                "2) Prix du litre",
+                "3) Coût entretien (€/an)",
+            ],
+            width=24,
+        )
+        self.graph_choice_cb.grid(row=0, column=1, sticky="w", padx=(10, 0))
+        self.graph_choice_cb.bind("<<ComboboxSelected>>", lambda _e: self._refresh_graph())
+
+        # Seuil de masquage conso (appliqué au graphe 1)
+        ttk.Label(controls, text="Conso :").grid(row=0, column=2, sticky="e", padx=(10, 0))
+        self.conso_mask_var = tk.StringVar(value="Masquer au-dessus de 15 L/100")
+        self.conso_mask_cb = ttk.Combobox(
+            controls,
+            textvariable=self.conso_mask_var,
+            state="readonly",
+            values=[
+                "Masquer au-dessus de 10 L/100",
+                "Masquer au-dessus de 15 L/100",
+                "Masquer au-dessus de 20 L/100",
+                "Masquer au-dessus de 25 L/100",
+            ],
+            width=26,
+        )
+        self.conso_mask_cb.grid(row=0, column=3, sticky="e", padx=(10, 0))
+        self.conso_mask_cb.bind("<<ComboboxSelected>>", lambda _e: self._refresh_graph())
+
+        # Zone de rendu
+        self.graph_area = ttk.Frame(self.tab_graphs)
+        self.graph_area.grid(row=2, column=0, sticky="nsew", pady=(12, 0))
+        self.graph_area.columnconfigure(0, weight=1)
+        self.graph_area.rowconfigure(0, weight=1)
+
+        if not MATPLOTLIB_AVAILABLE or Figure is None or FigureCanvasTkAgg is None:
+            ttk.Label(
+                self.graph_area,
+                text="Matplotlib/Tk indisponible. Installe matplotlib et tkinter pour afficher les graphiques.",
+            ).grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
+            return
+
+        self._graph_fig = Figure(figsize=(7.2, 7.6), dpi=100)
+        # 3 axes empilés (une seule page)
+        self._graph_axes = list(self._graph_fig.subplots(nrows=3, ncols=1, sharex=False))
+        self._graph_ax = self._graph_axes[0]  # compat
+
+        self._graph_canvas = FigureCanvasTkAgg(self._graph_fig, master=self.graph_area)
+        self._graph_canvas_widget = self._graph_canvas.get_tk_widget()
+        self._graph_canvas_widget.grid(row=0, column=0, sticky="nsew")
+
+        # Toolbar (optionnelle)
+        if NavigationToolbar2Tk is not None:
+            toolbar = NavigationToolbar2Tk(self._graph_canvas, self.tab_graphs, pack_toolbar=False)
+            toolbar.update()
+            toolbar.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 12))
+
+        self._refresh_graph()
+
+    def _on_graph_vehicle_change(self, _evt=None):
+        idx = self.graph_vehicle_cb.current()
+        if idx is None or idx < 0:
+            return
+        self.active_vehicle_id = self._vehicle_index_to_id[idx]
+        self._refresh_all_tabs_after_vehicle_change(source="graphs")
+
+    def _refresh_graph(self):
+        if not MATPLOTLIB_AVAILABLE or Figure is None or getattr(self, "_graph_canvas", None) is None:
+            return
+        if self.active_vehicle_id is None:
+            return
+
+        fig = self._graph_fig
+        axes = getattr(self, "_graph_axes", None) or [self._graph_ax]
+
+        # Figure dark
+        fig.patch.set_facecolor("#1e1e1e")
+
+        # Clear all axes and reset default positions later
+        for ax in axes:
+            ax.clear()
+            ax.set_aspect("auto")
+
+        choice = (self.graph_choice_var.get() or "").strip()
+        # parse conso mask
+        max_l100 = 15.0
+        try:
+            s = (self.conso_mask_var.get() or "")
+            m = re.search(r"(\d+)", s)
+            if m:
+                max_l100 = float(m.group(1))
+        except Exception:
+            max_l100 = 15.0
+
+        def hide(ax):
+            ax.clear()
+            ax.set_axis_off()
+
+        if choice == "Tous (3 graphes)":
+            # positions standard: 3 lignes
+            for ax in axes:
+                ax.set_axis_on()
+
+            self._plot_conso_per_fill(axes[0], max_l100=max_l100)
+            self._plot_price_per_litre(axes[1])
+            self._plot_entretien_cost_per_year(axes[2])
+
+            # layout stable
+            fig.subplots_adjust(left=0.08, right=0.98, top=0.98, bottom=0.06, hspace=0.35)
+
+        elif choice == "1) Conso (L/100 km)":
+            axes[0].set_axis_on()
+            self._plot_conso_per_fill(axes[0], max_l100=max_l100)
+            # agrandir axe 0
+            axes[0].set_position([0.08, 0.10, 0.90, 0.86])
+            for ax in axes[1:]:
+                hide(ax)
+
+        elif choice == "2) Prix du litre":
+            axes[0].set_axis_on()
+            self._plot_price_per_litre(axes[0])
+            axes[0].set_position([0.08, 0.10, 0.90, 0.86])
+            for ax in axes[1:]:
+                hide(ax)
+
+        elif choice == "3) Coût entretien (€/an)":
+            axes[0].set_axis_on()
+            self._plot_entretien_cost_per_year(axes[0])
+            axes[0].set_position([0.08, 0.10, 0.90, 0.86])
+            for ax in axes[1:]:
+                hide(ax)
+
+        else:
+            axes[0].set_axis_on()
+            self._apply_dark_style(axes[0])
+            self._title_in_ax(axes[0], "Graphiques")
+            axes[0].text(0.5, 0.5, "Vue inconnue.", ha="center", va="center", transform=axes[0].transAxes, color="#dddddd")
+            axes[0].set_position([0.08, 0.10, 0.90, 0.86])
+            for ax in axes[1:]:
+                hide(ax)
+
+        self._graph_canvas.draw_idle()
+
+
+
+    def _apply_dark_style(self, ax):
+        """Applique un style sombre (idempotent) à un axe Matplotlib."""
+        ax.set_facecolor("#1e1e1e")
+        ax.tick_params(colors="#dddddd")
+        ax.xaxis.label.set_color("#dddddd")
+        ax.yaxis.label.set_color("#dddddd")
+        # Grille discrète
+        ax.grid(True, axis="y", linestyle=":", linewidth=0.6, alpha=0.30)
+        # Spines
+        for sp in ax.spines.values():
+            sp.set_color("#777777")
+        ax.title.set_color("#dddddd")
+
+
+
+    def _title_in_ax(self, ax, text_label):
+        """Titre placé dans le graphe, en haut à gauche."""
+        ax.set_title("")
+        ax.text(
+            0.01, 0.99, text_label,
+            transform=ax.transAxes,
+            ha="left", va="top",
+            fontsize=10,
+            color="#dddddd",
+            bbox=dict(boxstyle="round,pad=0.25", facecolor="#000000", edgecolor="#666666", alpha=0.35),
+        )
+
+    def _plot_conso_per_fill(self, ax, max_l100=15.0):
+        """Conso (L/100) robuste (moyenne par blocs de km) + masquage des pics."""
+        self._apply_dark_style(ax)
+        self._title_in_ax(ax, "Conso (L/100 km)")
+
+        WINDOW_KM = 200  # bloc de distance pour calcul représentatif
+
+        conn = _connect_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT date_iso, km, litres
+            FROM pleins
+            WHERE vehicule_id = ? AND km IS NOT NULL AND litres IS NOT NULL
+            ORDER BY km ASC, date_iso ASC, id ASC
+            """,
+            (int(self.active_vehicle_id),),
+        )
+        rows = cur.fetchall()
+        conn.close()
+
+        if not rows or len(rows) < 2:
+            ax.text(0.5, 0.5, "Pas assez de pleins (>= 2).", ha="center", va="center",
+                    transform=ax.transAxes, color="#dddddd")
+            ax.set_ylabel("L/100 km")
+            ax.set_xlabel("")
+            return
+
+        xs = []
+        ys = []
+        masked = 0
+
+        prev_km = None
+        km_cum = 0.0
+        litres_cum = 0.0
+
+        for r in rows:
+            km = _safe_int(r["km"])
+            litres = _safe_float(r["litres"])
+            if km is None or litres is None:
+                continue
+
+            if prev_km is None:
+                prev_km = km
+                continue
+
+            dkm = km - prev_km
+            prev_km = km
+            if dkm <= 0:
+                continue
+
+            km_cum += float(dkm)
+            litres_cum += float(litres)
+
+            if km_cum >= float(WINDOW_KM):
+                conso = (litres_cum / km_cum) * 100.0
+                if conso > float(max_l100):
+                    masked += 1
+                else:
+                    d = _parse_iso_date(r["date_iso"])
+                    xs.append(d if d else km)
+                    ys.append(conso)
+
+                km_cum = 0.0
+                litres_cum = 0.0
+
+        if not xs:
+            ax.text(
+                0.5, 0.5,
+                f"Données insuffisantes (ou tout masqué).\nAstuce : baisse WINDOW_KM ou augmente le seuil.",
+                ha="center", va="center", transform=ax.transAxes, color="#dddddd"
+            )
+            ax.set_ylabel("L/100 km")
+            ax.set_xlabel("")
+            return
+
+        line = ax.plot(xs, ys, marker="o", linewidth=2)[0]
+
+        ax.set_ylabel("L/100 km")
+        ax.set_xlabel("")
+
+        # rotation si dates
+        try:
+            for tick in ax.get_xticklabels():
+                tick.set_rotation(20)
+                tick.set_ha("right")
+        except Exception:
+            pass
+
+        # Compteur points masqués (bas droite)
+        if masked:
+            ax.text(
+                0.99, 0.01,
+                f"{masked} point(s) masqué(s) (> {float(max_l100):.0f} L/100)",
+                transform=ax.transAxes,
+                ha="right", va="bottom",
+                fontsize=8,
+                color="#bbbbbb",
+            )
+
+    def _plot_price_per_litre(self, ax):
+        self._apply_dark_style(ax)
+        self._title_in_ax(ax, "Prix du litre dans le temps")
+
+        conn = _connect_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT date_iso, prix_litre
+            FROM pleins
+            WHERE vehicule_id = ? AND date_iso IS NOT NULL AND prix_litre IS NOT NULL
+            ORDER BY date_iso ASC, id ASC
+            """,
+            (int(self.active_vehicle_id),),
+        )
+        rows = cur.fetchall()
+        conn.close()
+
+        if not rows:
+            ax.text(0.5, 0.5, "Aucun plein avec prix/L à tracer.", ha="center", va="center",
+                    transform=ax.transAxes, color="#dddddd")
+            ax.set_ylabel("€/L")
+            ax.set_xlabel("")
+            return
+
+        xs, ys = [], []
+        for r in rows:
+            d = _parse_iso_date(r["date_iso"])
+            v = _safe_float(r["prix_litre"])
+            if d is None or v is None:
+                continue
+            xs.append(d)
+            ys.append(v)
+
+        if not xs:
+            ax.text(0.5, 0.5, "Données insuffisantes.", ha="center", va="center",
+                    transform=ax.transAxes, color="#dddddd")
+            ax.set_ylabel("€/L")
+            ax.set_xlabel("")
+            return
+
+        ax.plot(xs, ys, marker="o", linewidth=2)
+        ax.set_ylabel("€/L")
+        ax.set_xlabel("")
+        for tick in ax.get_xticklabels():
+            tick.set_rotation(20)
+            tick.set_ha("right")
+
+
+
+    def _plot_entretien_cost_per_year(self, ax):
+        """Coût entretien par an, séparé Entretiens vs Réparations."""
+        self._apply_dark_style(ax)
+        self._title_in_ax(ax, "Coût entretien (€/an)")
+
+        conn = _connect_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT date_iso, cout, kind, intervention, details
+            FROM entretiens
+            WHERE vehicule_id = ? AND date_iso IS NOT NULL AND cout IS NOT NULL
+            ORDER BY date_iso ASC, id ASC
+            """,
+            (int(self.active_vehicle_id),),
+        )
+        rows = cur.fetchall()
+        conn.close()
+
+        if not rows:
+            ax.text(
+                0.5, 0.5, "Aucun entretien avec coût à tracer.",
+                ha="center", va="center", transform=ax.transAxes, color="#dddddd"
+            )
+            ax.set_ylabel("€")
+            ax.set_xlabel("")
+            return
+
+        import unicodedata
+
+        def norm(s):
+            if s is None:
+                return ""
+            s = str(s)
+            s = unicodedata.normalize("NFKD", s)
+            s = "".join(ch for ch in s if not unicodedata.combining(ch))
+            return s.lower().strip()
+
+        repair_keys = (
+            "repar", "depann", "panne", "casse", "diagnost", "garagiste", "garage",
+            "embrayage", "turbo", "inject", "pompe", "alternat", "demarreur",
+            "joint", "culasse", "boite", "distribution", "radiateur", "amortisseur",
+            "triangle", "rotule", "roulement", "cardan", "fuite", "freinage"
+        )
+
+        def is_repair(r):
+            # sqlite3.Row -> accès par index/nom (pas .get)
+            kind = norm(r["kind"]) if "kind" in r.keys() else ""
+            inter = norm(r["intervention"]) if "intervention" in r.keys() else ""
+            det = norm(r["details"]) if "details" in r.keys() else ""
+            blob = f"{kind} {inter} {det}"
+            return any(k in blob for k in repair_keys)
+
+        # Agrégation annuelle
+        year_ent = {}
+        year_rep = {}
+
+        for r in rows:
+            d = _parse_iso_date(r["date_iso"])
+            if not d:
+                continue
+            y = int(d.year)
+            try:
+                cost = float(r["cout"])
+            except Exception:
+                continue
+
+            if is_repair(r):
+                year_rep[y] = year_rep.get(y, 0.0) + cost
+            else:
+                year_ent[y] = year_ent.get(y, 0.0) + cost
+
+        years = sorted(set(year_ent.keys()) | set(year_rep.keys()))
+        if not years:
+            ax.text(
+                0.5, 0.5, "Aucune donnée exploitable.",
+                ha="center", va="center", transform=ax.transAxes, color="#dddddd"
+            )
+            ax.set_ylabel("€")
+            ax.set_xlabel("")
+            return
+
+        ent_vals = [year_ent.get(y, 0.0) for y in years]
+        rep_vals = [year_rep.get(y, 0.0) for y in years]
+
+        import numpy as np
+        x = np.arange(len(years), dtype=float)
+        width = 0.38
+
+        # Barres: couleurs fixées (bleu/orange) pour rester lisible
+        bars_ent = ax.bar(x - width/2, ent_vals, width=width, color="#1f77b4", label="Entretiens")
+        bars_rep = ax.bar(x + width/2, rep_vals, width=width, color="#ff7f0e", label="Réparations")
+
+        ax.set_ylabel("€")
+        ax.set_xlabel("")
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(y) for y in years], color="#dddddd")
+
+        # Légende en haut à droite, compacte
+        leg = ax.legend(loc="upper right", frameon=True, fontsize=9)
+        if leg and leg.get_frame():
+            leg.get_frame().set_facecolor("#1e1e1e")
+            leg.get_frame().set_edgecolor("#666666")
+            leg.get_frame().set_alpha(0.6)
+
+        # Valeurs en € en bas de chaque barre
+        max_val = max(ent_vals + rep_vals) if (ent_vals or rep_vals) else 0.0
+        offset = max(1.0, max_val * 0.02)
+
+        def annotate(bars):
+            for b in bars:
+                h = float(b.get_height())
+                if h <= 0:
+                    continue
+                ax.text(
+                    b.get_x() + b.get_width()/2,
+                    0 + offset,
+                    f"{h:.0f}€",
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                    color="#dddddd",
+                )
+
+        annotate(bars_ent)
+        annotate(bars_rep)
+
+        # Un peu d'air en bas pour les labels
+        ax.set_ylim(bottom=0)
+
+    def _plot_entretien_cost_per_month(self, ax):
+        conn = _connect_db()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT SUBSTR(date_iso, 1, 7) AS ym, SUM(cout) AS total
+            FROM entretiens
+            WHERE vehicule_id = ? AND date_iso IS NOT NULL AND cout IS NOT NULL
+            GROUP BY SUBSTR(date_iso, 1, 7)
+            ORDER BY ym ASC
+            """,
+            (int(self.active_vehicle_id),),
+        )
+        rows = cur.fetchall()
+        conn.close()
+
+        if not rows:
+            ax.text(0.5, 0.5, "Aucun entretien avec coût à tracer.", ha="center", va="center")
+            ax.set_title("Coût entretien par mois")
+            return
+
+        labels = []
+        values = []
+        for r in rows:
+            ym = r["ym"]
+            total = _safe_float(r["total"])
+            if ym and total is not None:
+                labels.append(ym)
+                values.append(total)
+
+        if not labels:
+            ax.text(0.5, 0.5, "Données insuffisantes.", ha="center", va="center")
+            ax.set_title("Coût entretien par mois")
+            return
+
+        ax.bar(labels, values)
+        ax.set_title("Coût entretien par mois")
+        ax.set_ylabel("€")
+        ax.set_xlabel("Mois (YYYY-MM)")
+        # Rotation légère pour lisibilité
+        for tick in ax.get_xticklabels():
+            tick.set_rotation(45)
+            tick.set_ha("right")
+
     def _on_ent_vehicle_change(self, _evt=None):
         idx = self.ent_vehicle_cb.current()
         if idx is None or idx < 0:
@@ -2742,7 +3191,7 @@ class GarageApp(tk.Tk):
     def _show_empty_state(self):
         """État UI quand la base est vide (aucun véhicule)."""
         # Mettre les listes déroulantes à vide si elles existent
-        for attr in ("veh_vehicle_cb", "pl_vehicle_cb", "ent_vehicle_cb"):
+        for attr in ("veh_vehicle_cb", "pl_vehicle_cb", "ent_vehicle_cb", "graph_vehicle_cb"):
             cb = getattr(self, attr, None)
             if cb is not None:
                 try:
@@ -2805,6 +3254,7 @@ class GarageApp(tk.Tk):
         self.veh_vehicle_cb["values"] = labels
         self.pl_vehicle_cb["values"] = labels
         self.ent_vehicle_cb["values"] = labels
+        self.graph_vehicle_cb["values"] = labels
 
         self._refresh_all_tabs_after_vehicle_change(source="init")
 
@@ -2826,6 +3276,8 @@ class GarageApp(tk.Tk):
             self.pl_vehicle_cb.current(idx)
         if source != "entretiens":
             self.ent_vehicle_cb.current(idx)
+        if source != "graphs":
+            self.graph_vehicle_cb.current(idx)
 
         r = get_vehicle(self.active_vehicle_id)
         title = f"Véhicule #{self.active_vehicle_id}"
@@ -2844,6 +3296,10 @@ class GarageApp(tk.Tk):
         self._refresh_type_choices_for_new_entretien()
         self._refresh_entretiens()
         self._refresh_general_overview()
+        try:
+            self._refresh_graph()
+        except Exception:
+            pass
 
         self._set_status(f"Véhicule #{self.active_vehicle_id} — DB: {os.path.basename(DB_FILE)}")
 
