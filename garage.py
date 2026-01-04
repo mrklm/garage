@@ -64,6 +64,32 @@ def ensure_database():
 
 ensure_database()
 
+from pathlib import Path
+
+def ensure_help_file(user_dir: Path) -> Path:
+    """
+    Copie l'aide packagée vers Application Support si absente.
+    Retourne le chemin du fichier d'aide (dans user_dir si possible,
+    sinon le chemin ressource embarqué).
+    """
+    dst = user_dir / "AIDE.md"
+    if dst.exists():
+        return dst
+
+    # Source packagée (PyInstaller) ou en dev (fichier sur disque)
+    src = Path(_resource_path("assets", "AIDE.md"))
+    try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        return dst
+    except Exception:
+        # Si la copie échoue, on ne bloque pas l'app : l'aide restera lisible via src
+        return src
+
+
+HELP_FILE = ensure_help_file(Path(USER_DIR))
+
+
 
 # --- AIDE (style) ---
 HELP_FONT_FAMILY = "Helvetica"
@@ -1947,7 +1973,7 @@ class GarageApp(tk.Tk):
             except Exception:
                 pass
             img = img.convert("RGBA")
-            img.thumbnail((288, 176))
+            img.thumbnail((260, 120))
 
             tkimg = ImageTk.PhotoImage(img)
             self._veh_photo_img = tkimg  # garder une ref
