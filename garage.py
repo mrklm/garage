@@ -364,7 +364,7 @@ def _copy_vehicle_photo(src_path: str, vehicle_id: int | None = None) -> str | N
 
 
 
-def _load_vehicle_photo_tk(photo_file: str | None, max_w=360, max_h=220):
+def _load_vehicle_photo_tk(photo_file: str | None, max_w=270, max_h=165):
     """Charge un PNG via PhotoImage et le réduit (subsample) pour l'affichage."""
     if not photo_file:
         return None
@@ -1455,9 +1455,9 @@ class GarageApp(tk.Tk):
         """Lit AIDE.md (à la racine de l'app) et nettoie le bloc <img> en tête si présent."""
         # AIDE.md est attendu à la racine, au même niveau que garage.py (ou dans le bundle PyInstaller).
         candidates = [
-            resource_path("AIDE.md"),
+            resource_path("assets/AIDE.md"),
             os.path.join(os.path.abspath(os.path.dirname(__file__)), "AIDE.md"),
-            os.path.abspath("AIDE.md"),
+            os.path.abspath("assets/AIDE.md"),
         ]
         txt = ""
         for p in candidates:
@@ -1468,7 +1468,7 @@ class GarageApp(tk.Tk):
         if not txt:
             return (
                 "Aide indisponible\n\n"
-                "Le fichier AIDE.md n'a pas été trouvé à la racine de l'application."
+                "Le fichier AIDE.md n'a pas été trouvé"
             )
 
         # Si le fichier commence par un bloc HTML <p><img ...></p>, on le retire
@@ -2144,7 +2144,7 @@ class GarageApp(tk.Tk):
         self.veh_vars["immatriculation"].set(r["immatriculation"] or "")
         self.veh_vars["dernier_km"].set(str(last_km_any(self.active_vehicle_id) or ""))
 
-        img = _load_vehicle_photo_tk(r["photo_file"], max_w=288, max_h=176)
+        img = _load_vehicle_photo_tk(r["photo_file"], max_w=270, max_h=165)
         self._veh_photo_img = img
         if img:
             self.veh_photo_label.config(image=img, text="")
