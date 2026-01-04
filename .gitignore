@@ -15,3 +15,8 @@ assets/v*_*.png
 # Environnements
 .venv/
 venv/
+
+# PyInstaller
+build/
+dist/
+*.spec
