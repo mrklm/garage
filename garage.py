@@ -2144,7 +2144,7 @@ class GarageApp(tk.Tk):
         self.new_pl_lieu_cb.grid(row=1, column=5, sticky="ew", padx=(6, 0), pady=(8, 0))
         self.new_pl_lieu_cb.bind("<KeyRelease>", lambda e: _apply_autocomplete(self.new_pl_lieu_cb, self._pleins_lieux_all, self.new_pl_lieu.get()))
 
-        ttk.Label(form, text="Astuce : laisse Total vide pour calcul auto (Litres × Prix/L).").grid(row=2, column=0, columnspan=5, sticky="w", pady=(8, 0))
+        ttk.Label(form, text="Astuce : laissez le Total vide pour calcul auto (Litres × Prix/L).").grid(row=2, column=0, columnspan=5, sticky="w", pady=(8, 0))
 
         btn_row = ttk.Frame(form)
         btn_row.grid(row=2, column=5, sticky="ew", pady=(8, 0))
