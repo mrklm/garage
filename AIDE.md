@@ -5,6 +5,7 @@
 🚖 🔧 GARAGE — Aide & Prise en main 🛠️ 🚘️
 
      🔧 Bienvenue dans Garage  🛠️ 
+                v4.3
 
 💻️
 
@@ -199,8 +200,8 @@ C’est normal lors du premier lancement.
 
 🍎 macOS bloque l’application au lancement
 
-- Faites un clic droit sur l’application → Ouvrir
-- Confirmez l’autorisation
+- ⚙️ Allez dans préférences système / 🔒️ Sécurité et confidentialité /
+- 🔐 Cliquez sur autoriser Garage / ✅️ Ouvrir quand même
 
 ---
 
@@ -218,6 +219,9 @@ Garage, c’est :
 - 🚗 un suivi clair de vos véhicules
 - 🔧 un historique complet
 - 🔒 zéro données récupérées
-- 🛠️ un outil simple, pensé pour anticiper l'utilisation et l'usure de vos véhicules.
+- 🛠️ un outil simple, pensé pour anticiper:
+
+- 🚍️ L'usure et les entretiens de vos véhicules
+- 💰️ Votre budget véhicule
 
  🛣️ Bonne route avec garage 🚦
