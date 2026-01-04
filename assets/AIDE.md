@@ -134,6 +134,16 @@ un rappel sera affiché dans l'onglet general en dessous du vehicule:
 
 ---
 
+ 📊 Les Graphiques 📉 (Onglet Graphiques)
+
+ Trois graphes pour voir rapidement:
+
+ - ⛽️ La consomation en L/100km
+ - 📈 Le prix du carburant dans le temps
+ - 💰️ Le coût des entretiens & réparation dans le temps
+
+---
+
 🔐 Données & confidentialité: 
 
 🔒 Garage fonctionne entièrement en local :
@@ -176,8 +186,8 @@ C’est normal lors du premier lancement.
 
 🍎 macOS bloque l’application au lancement
 
-- Faites un clic droit sur l’application → Ouvrir
-- Confirmez l’autorisation
+- ⚙️ Cliquez sur Préférences Système
+- 🔑 Confirmez l’autorisation d'ouvrir Garage
 
 ---
 
