@@ -1,18 +1,19 @@
 # macOS
 .DS_Store
 
-# Bases locales
+# Base locale utilisateur
 garage.db
 
-# Builds distribués (à ne jamais versionner)
+# Builds distribués (anciens exports à ne jamais versionner)
 Garage - Linux -*/
 Garage - MacOs -*/
 Garage - Windows -*
 
-# Assets utilisateurs / anciens tests
-assets/v*_*.png
+# Photos personnelles locales (à ne jamais committer)
+assets/Biche.png
+assets/Titine.png
 
-# Environnements
+# Environnements virtuels
 .venv/
 venv/
 

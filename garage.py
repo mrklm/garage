@@ -24,11 +24,28 @@ from __future__ import annotations
 import os
 import shutil
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+import sys
+
+def _app_dir() -> str:
+    """Dossier où l'app doit écrire ses données (à côté de l'exécutable si frozen)."""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+def _resource_path(*parts: str) -> str:
+    """Chemin vers ressource embarquée (PyInstaller) ou fichier du repo (dev)."""
+    base = getattr(sys, "_MEIPASS", _app_dir())
+    return os.path.join(base, *parts)
+
+BASE_DIR = _app_dir()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 DB_FILE = os.path.join(BASE_DIR, "garage.db")
-DB_TEMPLATE = os.path.join(DATA_DIR, "garage_empty.db")
+
+# modèle :
+# - en dev : repo/data/garage_empty.db
+# - en app compilée : sys._MEIPASS/data/garage_empty.db
+DB_TEMPLATE = _resource_path("data", "garage_empty.db")
 
 
 def ensure_database():
@@ -1665,7 +1682,7 @@ class GarageApp(tk.Tk):
 
         img = _load_vehicle_photo_tk(r["photo_file"], max_w=270, max_h=165)
         self._general_card_imgs[vid] = img
-        photo = ttk.Label(card, text="(aucune photo)")
+        photo = ttk.Label(card, text="(Aucune photo: Ajoutez en une via l'onglet Véhicules)")
         photo.grid(row=3, column=0, sticky="nw")
         if img:
             photo.config(image=img, text="")
