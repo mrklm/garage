@@ -99,7 +99,7 @@ Conservez un historique clair des opérations réalisées sur le véhicule actif
 
 - 🧰 filtres
 
-- 🛞 pneus
+- 🛻 pneus
 
 - 🛑 freins
 
@@ -140,7 +140,7 @@ un rappel sera affiché dans l'onglet general en dessous du vehicule:
 
  - ⛽️ La consomation en L/100km
  - 📈 Le prix du carburant dans le temps
- - 💰️ Le coût des entretiens & réparation dans le temps
+ - 💰️ Le coût des entretiens & réparations dans le temps
 
 ---
 
