@@ -135,6 +135,7 @@ def read_text_file_safely(path: str) -> str:
 
 APP_TITLE = "Garage v4.2.1"
 ASSETS_DIR = resource_path("assets")
+VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
 
 # ----------------- Helpers -----------------
@@ -290,15 +291,19 @@ def _ensure_schema():
 def _ensure_assets_dir():
     os.makedirs(ASSETS_DIR, exist_ok=True)
 
+def _ensure_vehicle_photos_dir():
+    os.makedirs(VEHICLE_PHOTOS_DIR, exist_ok=True)
+
+
 
 def _copy_vehicle_photo(src_path: str, vehicle_id: int | None = None) -> str | None:
-    """Copie une image (PNG/JPG/JPEG/BMP) dans ./assets et retourne le nom PNG stocké en DB.
+    """Copie une image (PNG/JPG/JPEG/BMP) dans le dossier utilisateur et retourne le nom PNG stocké en DB.
 
     Pour fiabiliser l'affichage Tkinter et le packaging, l'image est toujours convertie en PNG.
     """
     if not src_path:
         return None
-    _ensure_assets_dir()
+    _ensure_vehicle_photos_dir()
 
     base = os.path.basename(src_path)
     name, ext = os.path.splitext(base)
@@ -308,10 +313,9 @@ def _copy_vehicle_photo(src_path: str, vehicle_id: int | None = None) -> str | N
     if ext_l not in allowed:
         raise ValueError("Format non supporté. Veuillez choisir une image PNG, JPG/JPEG ou BMP.")
 
-    safe = re.sub(r"[^a-zA-Z0-9._-]+", "_", name).strip("_") or "vehicule"
-    tag = f"v{int(vehicle_id)}_" if vehicle_id else ""
-    out_name = f"{tag}{safe}_{uuid.uuid4().hex[:8]}.png"
-    dst = os.path.join(ASSETS_DIR, out_name)
+    # Nom stable : V<ID>.png (l'ID vient de SQLite, donc ne bouge pas)
+    out_name = f"V{int(vehicle_id)}.png" if vehicle_id else f"Vtmp_{uuid.uuid4().hex[:8]}.png"
+    dst = os.path.join(VEHICLE_PHOTOS_DIR, out_name)
 
     try:
         # Pillow est déjà utilisé dans l'application (Image/ImageTk).
@@ -338,7 +342,12 @@ def _load_vehicle_photo_tk(photo_file: str | None, max_w=360, max_h=220):
     """Charge un PNG via PhotoImage et le réduit (subsample) pour l'affichage."""
     if not photo_file:
         return None
-    path = os.path.join(ASSETS_DIR, photo_file)
+    name = os.path.basename(str(photo_file).replace("\\", "/"))
+    # 1) dossier utilisateur (recommandé)
+    path = os.path.join(VEHICLE_PHOTOS_DIR, name)
+    # 2) compat ancien : ./assets
+    if not os.path.exists(path):
+        path = os.path.join(ASSETS_DIR, name)
     if not os.path.exists(path):
         return None
     try:
@@ -1958,24 +1967,34 @@ class GarageApp(tk.Tk):
         annee = self.veh_vars["annee"].get()
         immat = self.veh_vars["immatriculation"].get()
 
-        existing = get_vehicle(self.active_vehicle_id)
+        existing = get_vehicle(self.active_vehicle_id) if self._veh_mode == "edit" else None
         photo_file = existing["photo_file"] if existing else None
 
-        if self._veh_photo_src_path:
-            try:
-                photo_file = _copy_vehicle_photo(
-                    self._veh_photo_src_path,
-                    self.active_vehicle_id if self._veh_mode == "edit" else None
-                )
-            except Exception as e:
-                messagebox.showerror("Photo", str(e))
-                return
-
         if self._veh_mode == "add":
-            vid = insert_vehicle(nom, marque, modele, motorisation, energie, annee, immat, photo_file=photo_file)
+            # 1) Crée d'abord le véhicule pour obtenir un ID stable (sert aussi à nommer la photo)
+            vid = insert_vehicle(nom, marque, modele, motorisation, energie, annee, immat, photo_file=None)
             self.active_vehicle_id = vid
+
+            # 2) Si une photo a été choisie : copie avec un nom stable V<ID>.png, puis update
+            if self._veh_photo_src_path:
+                try:
+                    photo_file = _copy_vehicle_photo(self._veh_photo_src_path, vid)
+                except Exception as e:
+                    messagebox.showerror("Photo", str(e))
+                    photo_file = None
+
+            update_vehicle(vid, nom, marque, modele, motorisation, energie, annee, immat, photo_file=photo_file)
             self._set_status("Véhicule ajouté.")
+
         else:
+            # Edition : si nouvelle photo choisie, on écrase V<ID>.png
+            if self._veh_photo_src_path:
+                try:
+                    photo_file = _copy_vehicle_photo(self._veh_photo_src_path, self.active_vehicle_id)
+                except Exception as e:
+                    messagebox.showerror("Photo", str(e))
+                    return
+
             update_vehicle(self.active_vehicle_id, nom, marque, modele, motorisation, energie, annee, immat, photo_file=photo_file)
             self._set_status("Véhicule modifié.")
 
