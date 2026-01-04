@@ -20,6 +20,34 @@ Compat :
 from __future__ import annotations
 
 
+# --- Initialisation base de données (modèle -> garage.db) ---
+import os
+import shutil
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+DB_FILE = os.path.join(BASE_DIR, "garage.db")
+DB_TEMPLATE = os.path.join(DATA_DIR, "garage_empty.db")
+
+
+def ensure_database():
+    """
+    Crée garage.db à partir du modèle garage_empty.db
+    si la base n'existe pas encore.
+    """
+    if not os.path.exists(DB_FILE):
+        if not os.path.exists(DB_TEMPLATE):
+            raise FileNotFoundError(
+                f"Base modèle introuvable : {DB_TEMPLATE}"
+            )
+        os.makedirs(DATA_DIR, exist_ok=True)
+        shutil.copy(DB_TEMPLATE, DB_FILE)
+
+
+ensure_database()
+
+
 # --- AIDE (style) ---
 HELP_FONT_FAMILY = "Helvetica"
 HELP_FONT_SIZE = 20          # Taille de la police de l'aide
