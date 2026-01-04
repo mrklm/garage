@@ -4,7 +4,15 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
-## [4.3.1] – 2026-01-03
+
+## [4.3.2] – 2026-01-04
+
+### Corrigé
+
+ - Noms des photos importées: Véhicule n°1 = V1.###
+ - Les photos importées restent en miniatures aprés l'enregistrement 
+
+## [4.3.1] – 2026-01-04
 
 ### Ajouté
 
@@ -46,6 +54,9 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 - Problème de bouton manquant dans l'onglet entretien
 - Problème d'affichage du logo de la page aide sous Linux
+
+## [4.2.2] – 2025-12-31
+
 
 ## [4.2.1] – 2025-12-31
 
