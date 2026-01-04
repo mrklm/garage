@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
+## [4.3.1] – 2026-01-03
+
+### Ajouté
+
+ - Changement de l'infrastructure du projet: 
+
+ - création du dossier \Build (vide) et \data (garage_empty.db)
+ - création d'un fichier requirerments.txt (pillow + matplotlib)
+ - création d'un .gitignore --> pour laisser des chose en local (photos & db perso...)
+
 ## [4.3] – 2026-01-03
 
 ### Ajouté
