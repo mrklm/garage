@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.3.1 (clean, single-file)
+Garage — v4.2.1 (clean, single-file)
 
 DB attendue : garage.db (à côté du script)
 Dossier photos : ./assets (à côté du script)
@@ -23,44 +23,44 @@ from __future__ import annotations
 # --- Initialisation base de données (modèle -> garage.db) ---
 import os
 import shutil
-
 import sys
 
 def _app_dir() -> str:
-    """Dossier où l'app doit écrire ses données (à côté de l'exécutable si frozen)."""
+    """Dossier de l'app (dev) ou de l'exécutable (PyInstaller)."""
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 
 def _resource_path(*parts: str) -> str:
-    """Chemin vers ressource embarquée (PyInstaller) ou fichier du repo (dev)."""
+    """Chemin vers ressource embarquée (PyInstaller) ou repo (dev)."""
     base = getattr(sys, "_MEIPASS", _app_dir())
     return os.path.join(base, *parts)
 
+def _user_data_dir(app_name: str = "Garage") -> str:
+    """Dossier des données utilisateur (écriture fiable sur macOS)."""
+    if sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+        return os.path.join(base, app_name)
+    # Linux/Windows : simple (à côté du script/exe)
+    return _app_dir()
+
+# Où lire les ressources (assets, template db)
 BASE_DIR = _app_dir()
-DATA_DIR = os.path.join(BASE_DIR, "data")
 
-DB_FILE = os.path.join(BASE_DIR, "garage.db")
+# Où écrire les données utilisateur (DB réelle)
+USER_DIR = _user_data_dir("Garage")
+DB_FILE = os.path.join(USER_DIR, "garage.db")
 
-# modèle :
-# - en dev : repo/data/garage_empty.db
-# - en app compilée : sys._MEIPASS/data/garage_empty.db
+# Base modèle embarquée (PyInstaller) ou présente en dev
 DB_TEMPLATE = _resource_path("data", "garage_empty.db")
 
-
 def ensure_database():
-    """
-    Crée garage.db à partir du modèle garage_empty.db
-    si la base n'existe pas encore.
-    """
+    """Crée garage.db à partir du modèle si la base n'existe pas encore."""
     if not os.path.exists(DB_FILE):
         if not os.path.exists(DB_TEMPLATE):
-            raise FileNotFoundError(
-                f"Base modèle introuvable : {DB_TEMPLATE}"
-            )
-        os.makedirs(DATA_DIR, exist_ok=True)
+            raise FileNotFoundError(f"Base modèle introuvable : {DB_TEMPLATE}")
+        os.makedirs(USER_DIR, exist_ok=True)
         shutil.copy(DB_TEMPLATE, DB_FILE)
-
 
 ensure_database()
 
@@ -133,9 +133,8 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.3.1"
-DB_FILE = os.path.join(os.path.dirname(__file__), "garage.db")
-ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
+APP_TITLE = "Garage v4.2.1"
+ASSETS_DIR = resource_path("assets")
 
 
 # ----------------- Helpers -----------------
@@ -1682,7 +1681,7 @@ class GarageApp(tk.Tk):
 
         img = _load_vehicle_photo_tk(r["photo_file"], max_w=270, max_h=165)
         self._general_card_imgs[vid] = img
-        photo = ttk.Label(card, text="(Aucune photo: Ajoutez en une via l'onglet Véhicules)")
+        photo = ttk.Label(card, text="(aucune photo)")
         photo.grid(row=3, column=0, sticky="nw")
         if img:
             photo.config(image=img, text="")
@@ -2789,7 +2788,7 @@ class GarageApp(tk.Tk):
     def _plot_entretien_cost_per_year(self, ax):
         """Coût entretien par an, séparé Entretiens vs Réparations."""
         self._apply_dark_style(ax)
-        self._title_in_ax(ax, "Coût entretiens & réparations (€/an)")
+        self._title_in_ax(ax, "Coût entretien (€/an)")
 
         conn = _connect_db()
         cur = conn.cursor()

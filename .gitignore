@@ -1,5 +1,6 @@
 # macOS
 .DS_Store
+assets/.DS_Store
 
 # Base locale utilisateur
 garage.db
@@ -10,8 +11,8 @@ Garage - MacOs -*/
 Garage - Windows -*
 
 # Photos personnelles locales (à ne jamais committer)
-assets/v1_Biche_32dfdaf2.png
-assets/v2_Titine_92e87cc7.png
+assets/v2_Titine_fb6d10aa.png
+assets/v1_Biche_bec1297b.png
 
 # Environnements virtuels
 .venv/
