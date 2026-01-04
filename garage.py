@@ -2789,7 +2789,7 @@ class GarageApp(tk.Tk):
     def _plot_entretien_cost_per_year(self, ax):
         """Coût entretien par an, séparé Entretiens vs Réparations."""
         self._apply_dark_style(ax)
-        self._title_in_ax(ax, "Coût entretien (€/an)")
+        self._title_in_ax(ax, "Coût entretiens & réparations (€/an)")
 
         conn = _connect_db()
         cur = conn.cursor()
