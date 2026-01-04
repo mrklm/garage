@@ -2846,24 +2846,23 @@ class GarageApp(tk.Tk):
             leg.get_frame().set_edgecolor("#666666")
             leg.get_frame().set_alpha(0.6)
 
-        # Valeurs en € en bas de chaque barre
-        max_val = max(ent_vals + rep_vals) if (ent_vals or rep_vals) else 0.0
-        offset = max(1.0, max_val * 0.02)
-
         def annotate(bars):
             for b in bars:
                 h = float(b.get_height())
                 if h <= 0:
                     continue
+
                 ax.text(
                     b.get_x() + b.get_width()/2,
-                    0 + offset,
+                    h / 2,              # <-- milieu vertical de la barre
                     f"{h:.0f}€",
                     ha="center",
-                    va="bottom",
+                    va="center",        # <-- centré verticalement
                     fontsize=8,
-                    color="#dddddd",
+                    color="#ffffff",    # plus lisible au milieu
+                    fontweight="bold",
                 )
+
 
         annotate(bars_ent)
         annotate(bars_rep)
