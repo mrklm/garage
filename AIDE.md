@@ -5,7 +5,7 @@
 🚖 🔧 GARAGE — Aide & Prise en main 🛠️ 🚘️
 
      🔧 Bienvenue dans Garage  🛠️ 
-                v4.3
+     
 
 💻️
 
@@ -219,6 +219,7 @@ Garage, c’est :
 - 🚗 un suivi clair de vos véhicules
 - 🔧 un historique complet
 - 🔒 zéro données récupérées
+
 - 🛠️ un outil simple, pensé pour anticiper:
 
 - 🚍️ L'usure et les entretiens de vos véhicules
