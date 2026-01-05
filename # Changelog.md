@@ -5,12 +5,45 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 ---
 
+## [4.3.4] – 2026-01-05
+
+### Ajouté
+
+ - Reglage des couleurs facile pour chaque OS
+
+### Corrigé
+
+ - Taille du logo dans aide 
+ - Plus de crash si zero véhicule
+ - Fichier .gitignore
+
+### Amélioré
+
+ - Couleur de l'interface sous Linux
+ - Ajustement des couleurs de polices suivant les zones
+
+---
+
+## [4.3.3] – 2026-01-05
+
+### Corrigé
+
+ - Chemins d'accès photos & garage.db pour Linux 
+ 
+### Amélioré
+
+ - AIDE.md
+
+---
+
 ## [4.3.2] – 2026-01-04
 
 ### Corrigé
 
  - Noms des photos importées: Véhicule n°1 = V1.###
  - Les photos importées restent en miniatures aprés l'enregistrement 
+
+---
 
 ## [4.3.1] – 2026-01-04
 
@@ -22,6 +55,8 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
  - création d'un fichier requirerments.txt (pillow + matplotlib)
  - création d'un .gitignore --> pour laisser des chose en local (photos & db perso...)
 
+---
+
 ## [4.3] – 2026-01-03
 
 ### Ajouté
@@ -30,6 +65,8 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 - la conso L/100km 
 - L'évolution des prix des entretiens et des réparations par années
 - L'évolution du prix du carburant par années
+
+---
 
 ## [4.2.3] – 2026-01-02
 
@@ -44,6 +81,8 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 - Redimensionne sans croper les photos
 - Calcul du coût d'entretien moyen par an = moyenne par an & moyenne des années
 
+---
+
 ## [4.2.2] – 2026-01-01
 
 ### Ajouté
@@ -55,14 +94,15 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 - Problème de bouton manquant dans l'onglet entretien
 - Problème d'affichage du logo de la page aide sous Linux
 
+---
+
 ## [4.2.2] – 2025-12-31
-
-
-## [4.2.1] – 2025-12-31
 
 ### Ajouté
 
 - Possibilité de changer la couleur la taille de la police & la couleur du fond de l'AIDE (au début du code)
+
+---
 
 ## [4.2] – 2025-12-30
 
@@ -70,6 +110,7 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 -Fichier AIDE.md affiché au démarage si pas de véhicule (1er démarage) + case à cocher pour l'afficher
 
+---
 
 ## [4.1.2] – 2025-12-30
 
@@ -80,11 +121,15 @@ supérieur à 6 mois et qu'il faut le faire dans moins de 6 mois alors il passe 
 
 -Augmentation de la taille de police et changement de la couleur de la ligne "Coût à prevoir" dans l'onglet general.
 
+---
+
 ## [4.1.1] – 2025-12-30
 
 ### Modifié 
 
 -Mise en page onglet vehicule et général
+
+---
 
 ## [4.1.0] – 2025-12-30
 
@@ -92,6 +137,8 @@ supérieur à 6 mois et qu'il faut le faire dans moins de 6 mois alors il passe 
 
 -Une section "Préconisations Constructeur" dans l'onglet vehicule pour y noter
  par exemple: type d'huile, pression des pneumatiques, frequences des entretiens...
+
+--- 
 
 ## [4.0.0] – 2025-12-19
 
@@ -102,12 +149,16 @@ supérieur à 6 mois et qu'il faut le faire dans moins de 6 mois alors il passe 
  apparaisse dans l'onglet "Général". 
 
 
+---
+
 ## [3.1.2] – 2025-12-18
 
 ### Modifié 
 
 - Correction de fautes et soucis de lisibilité.
 - Ré affiche la conso moyenne qui été pérdue dans les méandres de la v3.0
+
+---
 
 ## [3.1.1] – 2025-12-18
 
@@ -116,6 +167,8 @@ supérieur à 6 mois et qu'il faut le faire dans moins de 6 mois alors il passe 
 - Prise en compte des KM de la section entretien pour afficher dans KM actuels sous la photo de 
  la voiture. 
 
+---
+
 ## [3.1.0] – 2025-12-18
 
 ### Ajouté
@@ -123,11 +176,15 @@ supérieur à 6 mois et qu'il faut le faire dans moins de 6 mois alors il passe 
 - Fonction de previsionnel des couts futurs (dernier prix des carburants enregistrés, estimation
   du cout des entretiens à venir dans les 6 prochains mois en ce basant sur les dernieres factures.
 
+---
+
 ## [3.0.1] – 2025-12-17
 
 ### Modifié
 
 - Placement de texte, tailles et styles de police
+
+---
 
 ## [3.0.0] – 2025-12-17
 
@@ -137,9 +194,11 @@ supérieur à 6 mois et qu'il faut le faire dans moins de 6 mois alors il passe 
   M-A-J plein ou Entretien, les details technique des voitures, la conso moyenne au litre / 100km, et les alertes.
 
 Les autres onglets sonts:
--Les pleins
--les Entretiens
--Les options (à venir)
+- Les pleins
+- les Entretiens
+- Les options (à venir)
+
+---
 
 ## [2.5.4] – 2025-12-17
 
