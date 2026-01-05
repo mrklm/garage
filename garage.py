@@ -34,6 +34,8 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+from pathlib import Path
+
 
 def _app_dir() -> str:
     """Dossier de l'app (dev) ou de l'exécutable (PyInstaller)."""
@@ -41,10 +43,12 @@ def _app_dir() -> str:
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 
+
 def _resource_path(*parts: str) -> str:
-    """Chemin vers ressource embarquée (PyInstaller) ou repo (dev)."""
+    """Chemin vers une ressource embarquée (PyInstaller) ou repo (dev)."""
     base = getattr(sys, "_MEIPASS", _app_dir())
     return os.path.join(base, *parts)
+
 
 def resource_path(relative_path: str) -> str:
     """Alias rétro-compatible pour les anciens appels."""
@@ -77,49 +81,45 @@ BASE_DIR = _app_dir()
 
 # Où écrire les données utilisateur (DB réelle)
 USER_DIR = _user_data_dir("Garage")
-os.makedirs(USER_DIR, exist_ok=True)  # garantit la création du dossier utilisateur
+os.makedirs(USER_DIR, exist_ok=True)
+
 DB_FILE = os.path.join(USER_DIR, "garage.db")
 
 # Base modèle embarquée (PyInstaller) ou présente en dev
 DB_TEMPLATE = _resource_path("data", "garage_empty.db")
 
-def ensure_database():
+
+def ensure_database() -> None:
     """Crée garage.db à partir du modèle si la base n'existe pas encore."""
     if not os.path.exists(DB_FILE):
         if not os.path.exists(DB_TEMPLATE):
             raise FileNotFoundError(f"Base modèle introuvable : {DB_TEMPLATE}")
-        os.makedirs(USER_DIR, exist_ok=True)
         shutil.copy(DB_TEMPLATE, DB_FILE)
 
-ensure_database()
-
-from pathlib import Path
 
 def ensure_help_file(user_dir: Path) -> Path:
-    """
-    Copie l'aide packagée vers Application Support si absente.
-    Retourne le chemin du fichier d'aide (dans user_dir si possible,
+    """Copie l'aide packagée vers USER_DIR si absente.
+
+    Retourne le chemin du fichier d'aide (dans USER_DIR si possible,
     sinon le chemin ressource embarqué).
     """
     dst = user_dir / "AIDE.md"
     if dst.exists():
         return dst
 
-    # Source packagée (PyInstaller) ou en dev (fichier sur disque)
     src = Path(_resource_path("assets", "AIDE.md"))
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
         return dst
     except Exception:
-        # Si la copie échoue, on ne bloque pas l'app : l'aide restera lisible via src
+        # Si la copie échoue, on ne bloque pas l'app.
         return src
 
 
+# Assure DB + aide au démarrage (sans rien écraser)
+ensure_database()
 HELP_FILE = ensure_help_file(Path(USER_DIR))
-
-
-
 # --- AIDE (style) ---
 HELP_FONT_FAMILY = "Helvetica"
 HELP_FONT_SIZE = 20          # Taille de la police de l'aide
@@ -1342,6 +1342,8 @@ class GarageApp(tk.Tk):
     def __init__(self):
         super().__init__()
 
+        self._apply_platform_theme() 
+
         # Fonts
         _base = tkfont.nametofont("TkDefaultFont")
         _fam = _base.actual("family")
@@ -1357,7 +1359,7 @@ class GarageApp(tk.Tk):
         self.minsize(1180, 720)
 
         if not os.path.exists(DB_FILE):
-            messagebox.showerror("DB introuvable", f"Impossible de trouver :\n{DB_FILE}\n\nMets garage.db à côté du script.")
+            messagebox.showerror("DB introuvable", f"Impossible de trouver :\n{DB_FILE}\n\nLa base est créée automatiquement dans le dossier de données utilisateur.")
             raise SystemExit(1)
 
         _ensure_schema()
@@ -1382,6 +1384,100 @@ class GarageApp(tk.Tk):
 
         self._build_ui()
         self._refresh_all()
+
+    def _apply_platform_theme(self) -> None:
+        import sys
+        from tkinter import ttk
+
+        is_mac = sys.platform == "darwin"
+        is_linux = sys.platform.startswith("linux")
+
+        # Palette par OS (ajuste si besoin)
+        if is_linux:
+            BG     = "#1E1E1E"   # Dark mode asphalte
+            FG     = "#F2F2F2"   
+            PANEL  = "#2A2A2A"
+            FIELD  = "#333333"
+            ACCENT = "#FF6F00"   
+
+        elif is_mac:
+            BG = "#ECECEC"      # ajusté --> ok
+            FG = "#111111"
+            PANEL = "#E6E6E6"
+            FIELD = "#FFFFFF"
+            ACCENT = "#DADADA"
+        else:
+            BG = "#E0E0E0"
+            FG = "#111111"
+            PANEL = "#DADADA"
+            FIELD = "#FFFFFF"
+            ACCENT = "#D0D0D0"
+
+        # --- Tk (classique) ---
+        # Affecte au root + palette par défaut pour tk widgets
+        self.configure(bg=BG)
+        try:
+            self.option_add("*Background", BG)
+            self.option_add("*Foreground", FG)
+            self.option_add("*insertBackground", FG)
+            self.option_add("*selectBackground", ACCENT)
+            self.option_add("*selectForeground", FG)
+        except Exception:
+            pass
+
+        # --- ttk (thémé) ---
+        style = ttk.Style(self)
+
+        # Sur Linux, garder le thème système (Adwaita) mais surcharger les couleurs
+        # (sur macOS idem, ça évite de casser l'apparence native)
+        style.configure(".", background=BG, foreground=FG)
+
+        # Frames / Panes / Notebook
+        style.configure("TFrame", background=BG)
+        style.configure("TLabelframe", background=BG)
+        style.configure("TLabelframe.Label", background=BG, foreground=FG)
+
+        style.configure("TNotebook", background=BG, borderwidth=0)
+        style.configure("TNotebook.Tab", background=PANEL, foreground=FG)
+        style.map("TNotebook.Tab",
+                background=[("selected", BG)],
+                foreground=[("selected", FG)])
+
+        # Labels, Buttons
+        style.configure("TLabel", background=BG, foreground=FG)
+        style.configure("TButton", padding=6)
+
+        
+        # Entrées
+        style.configure("TEntry", fieldbackground=FIELD, foreground=FG)
+
+        # Combobox (champ fermé)
+        style.configure(
+            "TCombobox",
+            fieldbackground=FIELD,
+            background=PANEL,
+            foreground=FG,
+            arrowcolor=FG,
+        )
+
+        # Combobox (liste déroulante + sélection)
+        style.map(
+            "TCombobox",
+            fieldbackground=[("readonly", FIELD)],
+            background=[("readonly", PANEL)],
+            foreground=[("readonly", FG)],
+            selectbackground=[("readonly", ACCENT)],
+            selectforeground=[("readonly", FG)],
+        )
+
+
+        # Treeview (listes / tableaux)
+        style.configure("Treeview", background=FIELD, fieldbackground=FIELD, foreground=FG)
+        style.configure("Treeview.Heading", background=PANEL, foreground=FG)
+
+        # Garde les valeurs pour un usage ponctuel
+        self._ui_colors = {"BG": BG, "FG": FG, "PANEL": PANEL, "FIELD": FIELD, "ACCENT": ACCENT}
+        
 
     # ---------- UI Shell ----------
     def _build_ui(self):
