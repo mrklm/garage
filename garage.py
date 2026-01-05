@@ -1470,6 +1470,26 @@ class GarageApp(tk.Tk):
             selectforeground=[("readonly", FG)],
         )
 
+            # --- IMPORTANT : états readonly/disabled (sinon gris illisible sur thème sombre) ---
+        style.map(
+            "TEntry",
+            fieldbackground=[("readonly", FIELD), ("disabled", FIELD)],
+            foreground=[("readonly", FG), ("disabled", FG)],
+            insertcolor=[("readonly", FG), ("disabled", FG)],
+        )
+
+        style.map(
+            "TCombobox",
+            fieldbackground=[("readonly", FIELD), ("disabled", FIELD)],
+            foreground=[("readonly", FG), ("disabled", FG)],
+            selectbackground=[("readonly", ACCENT)],
+            selectforeground=[("readonly", FG)],
+        )
+
+        # (optionnel) la zone de liste dropdown de la combobox (selon thèmes)
+        style.configure("TCombobox", selectbackground=ACCENT, selectforeground=FG)
+
+
 
         # Treeview (listes / tableaux)
         style.configure("Treeview", background=FIELD, fieldbackground=FIELD, foreground=FG)
