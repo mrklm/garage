@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' "/Users/klm/Documents/klm/Fichiers Python/Garage/.venv/bin/python3.13" "$0" "$@"
+'''exec' "/home/klm/Documents/Fichiers Python/garage/.venv/bin/python3" "$0" "$@"
 ' '''
 # -*- coding: utf-8 -*-
 import re
