@@ -3,20 +3,30 @@
 """
 Garage — v4.3.2 (clean, single-file)
 
-DB attendue : garage.db (à côté du script)
-Dossier photos : ./assets (à côté du script)
+Données utilisateur :
+- Base de données : garage.db dans le dossier utilisateur
+- Photos véhicules : dossier utilisateur (vehicle_photos)
+- Aide : AIDE.md copiée dans le dossier utilisateur si absente
+
+Conventions d’emplacement :
+- macOS : ~/Library/Application Support/Garage
+- Linux : ~/.local/share/Garage (XDG)
+- Windows : %APPDATA%\\Garage
 
 Fonctions :
-- Flotte de véhicules (CRUD + photo PNG copiée dans ./assets)
+- Flotte de véhicules (CRUD + photos utilisateur)
 - Pleins (CRUD + autocomplétion Lieu)
 - Entretiens (types + CRUD)
-- Onglet Général : 2 véhicules par page, conso moyenne, état batterie, coût estimé, rappels filtrés (uniquement cochés)
+- Onglet Général : 2 véhicules par page, conso moyenne, état batterie,
+  coût estimé, rappels filtrés (uniquement cochés)
+- Onglet graphiques (3 graphes)
 
 Compat :
 - Tkinter standard
 - SQLite
 - Python 3.10+ (OK 3.13)
 """
+
 from __future__ import annotations
 
 
@@ -36,19 +46,38 @@ def _resource_path(*parts: str) -> str:
     base = getattr(sys, "_MEIPASS", _app_dir())
     return os.path.join(base, *parts)
 
+def resource_path(relative_path: str) -> str:
+    """Alias rétro-compatible pour les anciens appels."""
+    return _resource_path(relative_path)
+
+
 def _user_data_dir(app_name: str = "Garage") -> str:
-    """Dossier des données utilisateur (écriture fiable sur macOS)."""
+    """Dossier des données utilisateur (écriture fiable cross-platform)."""
+    # macOS
     if sys.platform == "darwin":
         base = os.path.expanduser("~/Library/Application Support")
         return os.path.join(base, app_name)
-    # Linux/Windows : simple (à côté du script/exe)
+
+    # Linux (XDG)
+    if sys.platform.startswith("linux"):
+        base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+        return os.path.join(base, app_name)
+
+    # Windows
+    if sys.platform.startswith("win"):
+        base = os.environ.get("APPDATA") or os.path.expanduser("~")
+        return os.path.join(base, app_name)
+
+    # fallback ultime
     return _app_dir()
 
-# Où lire les ressources (assets, template db)
+
+# Où lire les ressources (assets, template db)cp ~/Bureau/V1.png"/home/klm/snap/codium/495/.local/share/Garage/V1.png"
 BASE_DIR = _app_dir()
 
 # Où écrire les données utilisateur (DB réelle)
 USER_DIR = _user_data_dir("Garage")
+os.makedirs(USER_DIR, exist_ok=True)  # garantit la création du dossier utilisateur
 DB_FILE = os.path.join(USER_DIR, "garage.db")
 
 # Base modèle embarquée (PyInstaller) ou présente en dev
@@ -145,10 +174,14 @@ if MATPLOTLIB_AVAILABLE:
     except Exception:
         NavigationToolbar2Tk = None
 
-def resource_path(relative_path: str) -> str:
-    """Retourne un chemin absolu compatible PyInstaller (sys._MEIPASS)."""
+def resource_path_legacy(relative_path: str) -> str:
+    """Ancien helper (laissé pour compat interne) — ne pas utiliser."""
     base_path = getattr(sys, "_MEIPASS", os.path.abspath(os.path.dirname(__file__)))
     return os.path.join(base_path, relative_path)
+
+def resource_path(relative_path: str) -> str:
+    """Alias rétro-compatible : conserve les anciens appels resource_path(...)."""
+    return resource_path_legacy(relative_path)
 
 
 def read_text_file_safely(path: str) -> str:
@@ -364,7 +397,7 @@ def _copy_vehicle_photo(src_path: str, vehicle_id: int | None = None) -> str | N
 
 
 
-def _load_vehicle_photo_tk(photo_file: str | None, max_w=270, max_h=165):
+def _load_vehicle_photo_tk(photo_file: str | None, max_w=360, max_h=220):
     """Charge un PNG via PhotoImage et le réduit (subsample) pour l'affichage."""
     if not photo_file:
         return None
@@ -2144,7 +2177,7 @@ class GarageApp(tk.Tk):
         self.veh_vars["immatriculation"].set(r["immatriculation"] or "")
         self.veh_vars["dernier_km"].set(str(last_km_any(self.active_vehicle_id) or ""))
 
-        img = _load_vehicle_photo_tk(r["photo_file"], max_w=270, max_h=165)
+        img = _load_vehicle_photo_tk(r["photo_file"], max_w=288, max_h=176)
         self._veh_photo_img = img
         if img:
             self.veh_photo_label.config(image=img, text="")
