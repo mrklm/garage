@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.3.2 (clean, single-file)
+Garage — v4.3.4 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -72,7 +72,7 @@ def _user_data_dir(app_name: str = "Garage") -> str:
     return _app_dir()
 
 
-# Où lire les ressources (assets, template db)cp ~/Bureau/V1.png"/home/klm/snap/codium/495/.local/share/Garage/V1.png"
+# Où lire les ressources (assets, template db)
 BASE_DIR = _app_dir()
 
 # Où écrire les données utilisateur (DB réelle)
@@ -127,6 +127,10 @@ HELP_TEXT_COLOR = "#F2F2F2"  # Couleur du texte de l'aide
 HELP_BG = "#2B2B2B"          # Fond de l'aide (gris très sombre)
 HELP_LOGO_MAX_SIZE = 220     # Taille maximale du logo (px)
 
+# Logo dans l'aide (plafond strict, indépendant du layout)
+HELP_LOGO_MAX_WIDTH = 180
+HELP_LOGO_MAX_HEIGHT = 90
+
 import os
 import re
 import sqlite3
@@ -174,16 +178,6 @@ if MATPLOTLIB_AVAILABLE:
     except Exception:
         NavigationToolbar2Tk = None
 
-def resource_path_legacy(relative_path: str) -> str:
-    """Ancien helper (laissé pour compat interne) — ne pas utiliser."""
-    base_path = getattr(sys, "_MEIPASS", os.path.abspath(os.path.dirname(__file__)))
-    return os.path.join(base_path, relative_path)
-
-def resource_path(relative_path: str) -> str:
-    """Alias rétro-compatible : conserve les anciens appels resource_path(...)."""
-    return resource_path_legacy(relative_path)
-
-
 def read_text_file_safely(path: str) -> str:
     """Lit un fichier texte en UTF-8, retourne une chaîne vide en cas d'échec."""
     try:
@@ -192,7 +186,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.3.2"
+APP_TITLE = "Garage v4.3.4"
 ASSETS_DIR = resource_path("assets")
 VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
@@ -1504,84 +1498,106 @@ class GarageApp(tk.Tk):
                 "Le fichier AIDE.md n'a pas été trouvé"
             )
 
-        # Si le fichier commence par un bloc HTML <p><img ...></p>, on le retire
+        # Si le fichier commence par un bloc HTML (souvent <p align="center"><img ...></p>),
+        # on le retire. Certains éditeurs ajoutent ça en tête du Markdown.
         lines = txt.splitlines()
-        if lines and "<img" in "\n".join(lines[:10]):
-            cleaned = []
-            skipping = False
-            removed_any = False
-            for line in lines:
-                l = line.strip().lower()
-                if not removed_any and (l.startswith("<p") and "align" in l):
-                    skipping = True
-                    removed_any = True
-                    continue
-                if skipping:
+
+        # On ne traite que si un <img ...> apparaît très tôt dans le fichier
+        head = "\n".join(lines[:15]).lower()
+        if "<img" in head and "<p" in head:
+            i = 0
+            # saute les éventuelles lignes vides au début
+            while i < len(lines) and lines[i].strip() == "":
+                i += 1
+
+            # si on tombe sur un <p ...> on commence à skipper
+            if i < len(lines) and lines[i].strip().lower().startswith("<p"):
+                i += 1
+                # skip jusqu'au </p> inclus (en tolérant multi-lignes)
+                while i < len(lines):
+                    l = lines[i].strip().lower()
                     if "</p>" in l:
-                        skipping = False
-                    continue
-                cleaned.append(line)
-            txt = "\n".join(cleaned).lstrip()
+                        i += 1
+                        break
+                    i += 1
+
+                # retire aussi les lignes vides juste après le bloc
+                while i < len(lines) and lines[i].strip() == "":
+                    i += 1
+
+                txt = "\n".join(lines[i:]).lstrip()
+
 
         return txt
 
     def _load_help_into_widget(self) -> None:
-        """Charge l'aide dans le widget et centre l'affichage (alignement "Centré")."""
+        """Charge l'aide dans le widget et centre l'affichage."""
         if not hasattr(self, "help_text"):
             return
 
         content = self._read_help_md()
 
+        self.help_text.config(state="normal")
+        self.help_text.delete("1.0", "end")
+
+        # Supprime uniquement le tag qu'on gère
         try:
-            self.help_text.config(state="normal")
-            self.help_text.delete("1.0", "end")
-
-            # Nettoie uniquement nos tags (évite de toucher aux tags internes de Tk)
-            for t in ("help", "center", "center_all"):
-                try:
-                    self.help_text.tag_delete(t)
-                except Exception:
-                    pass
-
-            # Tag unique : centrage réel + couleur du texte
-            self.help_text.tag_configure("center", justify="center", foreground=HELP_TEXT_COLOR)
-            self.help_text.insert("1.0", content, "center")
-            self.help_text.config(state="disabled")
+            self.help_text.tag_delete("center")
         except Exception:
-            try:
-                self.help_text.config(state="disabled")
-            except Exception:
-                pass
+            pass
+
+        self.help_text.tag_configure("center", justify="center", foreground=HELP_TEXT_COLOR)
+        self.help_text.insert("1.0", content, "center")
+        self.help_text.config(state="disabled")
+
+
     def _load_logo_image(self) -> None:
-        """Charge le logo PNG (assets/Logo.png) et l'affiche si possible."""
+        """Charge le logo PNG (assets/logo.png) et l'affiche en taille raisonnable."""
         if not hasattr(self, "help_logo_label"):
             return
 
         # Chemins possibles (dev + bundle PyInstaller)
         candidates = [
+            # PyInstaller / resource_path
+            resource_path(os.path.join("assets", "logo.png")),
             resource_path(os.path.join("assets", "Logo.png")),
+
+            # dev : à côté du fichier
+            os.path.join(os.path.abspath(os.path.dirname(__file__)), "assets", "logo.png"),
             os.path.join(os.path.abspath(os.path.dirname(__file__)), "assets", "Logo.png"),
+
+            # dev : depuis cwd
+            os.path.abspath(os.path.join("assets", "logo.png")),
             os.path.abspath(os.path.join("assets", "Logo.png")),
         ]
         logo_path = next((p for p in candidates if os.path.exists(p)), "")
 
         if not logo_path:
-            # Fallback texte si fichier introuvable
             try:
                 self.help_logo_label.config(text="Garage", image="")
             except Exception:
                 pass
             return
 
+        max_px = int(HELP_LOGO_MAX_SIZE)
+
         try:
             if PIL_AVAILABLE:
                 img = Image.open(logo_path)
-                img.thumbnail((HELP_LOGO_MAX_SIZE, HELP_LOGO_MAX_SIZE))
+                img.thumbnail((max_px, max_px))  # garde les proportions
                 self._logo_img = ImageTk.PhotoImage(img)
                 self.help_logo_label.config(image=self._logo_img, text="")
             else:
-                # Fallback Tk (moins fiable sur certains macOS)
-                self._logo_img = tk.PhotoImage(file=logo_path)
+                # Fallback Tk : pas de resize natif -> on subsample pour éviter un logo géant
+                img = tk.PhotoImage(file=logo_path)
+
+                w, h = img.width(), img.height()
+                # facteur entier >=1
+                factor = max(1, int(max(w, h) / max_px)) if max(w, h) > max_px else 1
+                if factor > 1:
+                    img = img.subsample(factor, factor)
+
+                self._logo_img = img
                 self.help_logo_label.config(image=self._logo_img, text="")
         except Exception:
             try:
@@ -1589,74 +1605,83 @@ class GarageApp(tk.Tk):
             except Exception:
                 pass
 
+
+
     # ---------- Général ----------
     def _build_general_tab(self):
+        """Construit l'onglet Général (cartes + panneau Aide superposé)."""
+        self.general_page = 0
+
         self.tab_general.columnconfigure(0, weight=1)
+        self.tab_general.rowconfigure(0, weight=0)
         self.tab_general.rowconfigure(1, weight=1)
 
+        # Barre du haut (navigation pages)
         head = ttk.Frame(self.tab_general)
         head.grid(row=0, column=0, sticky="ew")
-        head.columnconfigure(1, weight=1)
+        head.columnconfigure(0, weight=1)
 
         nav = ttk.Frame(head)
-        nav.grid(row=0, column=1, sticky="e")
+        nav.grid(row=0, column=0, sticky="e")
+
         self.btn_prev = ttk.Button(nav, text="◀", width=3, command=self._general_prev_page)
-        self.btn_next = ttk.Button(nav, text="▶", width=3, command=self._general_next_page)
         self.lbl_page = ttk.Label(nav, text="")
+        self.btn_next = ttk.Button(nav, text="▶", width=3, command=self._general_next_page)
+
         self.btn_prev.grid(row=0, column=0, padx=(0, 6))
         self.lbl_page.grid(row=0, column=1, padx=(0, 6))
         self.btn_next.grid(row=0, column=2)
 
+        # Zone cartes (aperçu véhicules)
         self.general_cards = ttk.Frame(self.tab_general)
         self.general_cards.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
         self.general_cards.columnconfigure(0, weight=1)
         self.general_cards.columnconfigure(1, weight=1)
         self.general_cards.rowconfigure(0, weight=1)
 
-        # --- Aide (logo + texte) : superposé à l'aperçu Général ---
+        # Zone aide (superposée, affichée/masquée via checkbox)
         self.help_frame = ttk.Frame(self.tab_general)
         self.help_frame.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
         self.help_frame.columnconfigure(0, weight=1)
         self.help_frame.rowconfigure(1, weight=1)
 
-        # Logo (affiché par l'UI, pas par le Markdown)
-        self.help_logo_frame = ttk.Frame(self.help_frame)
-        self.help_logo_frame.grid(row=0, column=0, sticky="ew")
-        self.help_logo_frame.columnconfigure(0, weight=1)
+        # Logo (ligne 0, ne s'étire pas)
+        self.help_logo_label = ttk.Label(self.help_frame, text="")
+        self.help_logo_label.grid(row=0, column=0, sticky="n", pady=(0, 10))
 
-        self.help_logo_label = ttk.Label(self.help_logo_frame)
-        self.help_logo_label.grid(row=0, column=0, pady=(0, 8))
+        # --- Zone texte + scrollbar (ligne 1, s'étire) ---
+        help_text_frame = ttk.Frame(self.help_frame)
+        help_text_frame.grid(row=1, column=0, sticky="nsew")
 
-        self._load_logo_image()
+        help_text_frame.columnconfigure(0, weight=1)
+        help_text_frame.rowconfigure(1, weight=1)
 
-        # Zone texte d'aide (fond blanc)
-        self.help_text_container = tk.Frame(self.help_frame, bg="white")
-        self.help_text_container.grid(row=1, column=0, sticky="nsew")
-        self.help_text_container.columnconfigure(0, weight=1)
-        self.help_text_container.rowconfigure(0, weight=1)
+        help_scroll = ttk.Scrollbar(help_text_frame, orient="vertical")
+        help_scroll.grid(row=0, column=1, sticky="ns")
 
         self.help_text = tk.Text(
-            self.help_text_container,
+            help_text_frame,
             wrap="word",
             bg=HELP_BG,
-            fg="black",
-            font=(HELP_FONT_FAMILY, HELP_FONT_SIZE),
-            relief="flat",
+            fg=HELP_TEXT_COLOR,
             bd=0,
-            padx=12,
-            pady=10,
+            highlightthickness=0,
+            font=(HELP_FONT_FAMILY, HELP_FONT_SIZE),
+            yscrollcommand=help_scroll.set,
         )
-        self.help_scroll = ttk.Scrollbar(self.help_text_container, orient="vertical", command=self.help_text.yview)
-        self.help_text.configure(font=(HELP_FONT_FAMILY, HELP_FONT_SIZE), bg=HELP_BG, fg=HELP_TEXT_COLOR, insertbackground=HELP_TEXT_COLOR)
-
         self.help_text.grid(row=0, column=0, sticky="nsew")
-        self.help_scroll.grid(row=0, column=1, sticky="ns")
+        help_scroll.config(command=self.help_text.yview)
 
-        # L'aide est masquée par défaut (la case à cocher pilote l'affichage)
-        self.help_frame.grid_remove()
+        # Remplit logo + aide
+        self._load_logo_image()
+        self._load_help_into_widget()
 
-        self.general_page = 0
 
+        # Par défaut, on masque l'aide (on affiche les cartes)
+        try:
+            self.help_frame.grid_remove()
+        except Exception:
+            pass
     def _general_prev_page(self):
         if self.general_page > 0:
             self.general_page -= 1
@@ -2078,7 +2103,9 @@ class GarageApp(tk.Tk):
         self.vehicles_rows = list_vehicles()
         if not self.vehicles_rows:
             messagebox.showinfo("Info", "Plus aucun véhicule dans la flotte.")
-            self.destroy()
+            self.active_vehicle_id = None
+            self._refresh_all()
+            self._set_status("Plus aucun véhicule.")
             return
         self.active_vehicle_id = int(self.vehicles_rows[0]["id"])
         self._refresh_all()
