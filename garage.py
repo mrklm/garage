@@ -1397,16 +1397,6 @@ class GarageApp(tk.Tk):
 
                # bibli de themes pour le selecteur
         THEMES = {
-            # ===== Thèmes clairs =====
-            "[Clair] AIRKLM (Day flight)": dict(
-                BG="#EAF6FF", PANEL="#D6EEF9", FIELD="#FFFFFF",
-                FG="#0B2A3F", FIELD_FG="#0B2A3F", ACCENT="#00A1DE"
-            ),
-            "[Clair] Foggy Morning": dict(
-                BG="#E6E7E8", PANEL="#D4D7DB", FIELD="#FFFFFF",
-                FG="#1E1F22", FIELD_FG="#1E1F22", ACCENT="#6B7C93"
-            ),
-
             # ===== Thèmes sombres (sobres / quotidiens) =====
             "[Sombre] Midnight Garage": dict(
                 BG="#151515", PANEL="#1F1F1F", FIELD="#2A2A2A",
@@ -1416,40 +1406,64 @@ class GarageApp(tk.Tk):
                 BG="#0B1E2D", PANEL="#102A3D", FIELD="#16384F",
                 FG="#EAF6FF", FIELD_FG="#FFFFFF", ACCENT="#00A1DE"
             ),
-            "[Sombre] Cold Steel": dict(
-                BG="#11161C", PANEL="#1C232B", FIELD="#26303A",
-                FG="#DCE3EA", FIELD_FG="#F5FAFF", ACCENT="#5FA8FF"
+            "[Sombre] Café Serré": dict(
+                BG="#1B120C", PANEL="#2A1C14", FIELD="#3A281D",
+                FG="#F2E6D8", FIELD_FG="#FFF4E6", ACCENT="#C28E5C"
             ),
-            "[Sombre] Café Noir": dict(
-                BG="#1C1713", PANEL="#2A211B", FIELD="#3A2E2A",
-                FG="#EDE2D4", FIELD_FG="#FFF2E2", ACCENT="#C88A5A"
+            "[Sombre] Matrix Glitch": dict(
+                BG="#000A00", PANEL="#001F00", FIELD="#003300",
+                FG="#00FF66", FIELD_FG="#66FF99", ACCENT="#00FF00"
             ),
-
+            "[Sombre] Miami Vice 1987": dict(
+                BG="#14002E", PANEL="#2B0057", FIELD="#004D4D",
+                FG="#FFF0FF", FIELD_FG="#FFFFFF", ACCENT="#00FFD5"
+            ),
+            # ===== Thèmes clairs =====
+            "[Clair] AIRKLM (Day flight)": dict(
+                BG="#EAF6FF", PANEL="#D6EEF9", FIELD="#FFFFFF",
+                FG="#0B2A3F", FIELD_FG="#0B2A3F", ACCENT="#00A1DE"
+            ),
+            "[Clair] Foggy Morning": dict(
+                BG="#E6E7E8", PANEL="#D4D7DB", FIELD="#FFFFFF",
+                FG="#1E1F22", FIELD_FG="#1E1F22", ACCENT="#6B7C93"
+            ),
+            "[Clair] Latte Vanille": dict(
+                BG="#FAF6F1", PANEL="#EFE6DC", FIELD="#FFFFFF",
+                FG="#3D2E22", FIELD_FG="#3D2E22", ACCENT="#D8B892"
+            ),
+            "[Clair] Miel La Divette": dict(
+                BG="#E6B65C", PANEL="#F5E6CC", FIELD="#FFFFFF",
+                FG="#50371A", FIELD_FG="#50371A", ACCENT="#F2B705"
+            ),
             # ===== Thèmes Pouêt-Pouêt (mais distincts) =====
             "[Pouêt-Pouêt] Cyber Licorne": dict(
                 BG="#1A0026", PANEL="#2E004F", FIELD="#3D0066",
                 FG="#F6E7FF", FIELD_FG="#FFFFFF", ACCENT="#FF2CF7"
             ),
-            "[Pouêt-Pouêt] Zombie Terminal": dict(
-                BG="#060A06", PANEL="#0F1A0F", FIELD="#162916",
-                FG="#9AFF9A", FIELD_FG="#C8FFC8", ACCENT="#00FF5A"
-            ),
-            "[Pouêt-Pouêt] Turbo Pink": dict(
+            "[Pouêt-Pouêt] Barbie Apocalypse": dict(
                 BG="#FF1493", PANEL="#004D40", FIELD="#1B5E20",
                 FG="#E8FFF8", FIELD_FG="#FFFFFF", ACCENT="#FFEB3B"
             ),
-            "[Pouêt-Pouêt] Vert Radioactif": dict(
-                BG="#000F00", PANEL="#002600", FIELD="#00FF00",
-                FG="#E6FFE6", FIELD_FG="#FFFFFF", ACCENT="#00FF66"
+             "[Pouêt-Pouêt] Ocean Bubblegum": dict(
+                BG="#00A6C8", PANEL="#0083A1", FIELD="#00C7B7",
+                FG="#082026", FIELD_FG="#082026", ACCENT="#FF4FD8"
             ),
-            "[Pouêt-Pouêt] Electric Shock": dict(
-                BG="#00111F", PANEL="#00264D", FIELD="#003F7F",
-                FG="#E6F2FF", FIELD_FG="#FFFFFF", ACCENT="#00B7FF"
 
+            "[Pouêt-Pouêt] Lava Tangerine": dict(
+                BG="#FF4A1C", PANEL="#E63B10", FIELD="#FF7A00",
+                FG="#1A0B00", FIELD_FG="#1A0B00", ACCENT="#00E5FF"
+            ),
+
+            "[Pouêt-Pouêt] Toxic Grape": dict(
+                BG="#7A00FF", PANEL="#5B00C9", FIELD="#B000FF",
+                FG="#0F001A", FIELD_FG="#0F001A", ACCENT="#39FF14"
+            ),
+
+            "[Pouêt-Pouêt] Lemon Splash": dict(
+                BG="#FFF200", PANEL="#E6D800", FIELD="#FFF7A6",
+                FG="#1A1A00", FIELD_FG="#1A1A00", ACCENT="#0066FF"
+            ),           
         }
-
-
-
         self._themes = THEMES
         self._theme_names = list(THEMES.keys())
 
@@ -1498,6 +1512,8 @@ class GarageApp(tk.Tk):
             self.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
             self.option_add("*TCombobox*Listbox.selectForeground", FIELD_FG)
             self.option_add("*TCombobox*Listbox.font", "TkDefaultFont")
+            self.option_add("*TCombobox*Listbox.width", 60)
+          
 
 
         # Sur Linux, garder le thème système (Adwaita) mais surcharger les couleurs
@@ -1793,7 +1809,16 @@ class GarageApp(tk.Tk):
             except Exception:
                 pass
 
+    # forcer la largeur combobox selection thème
 
+    def _set_combobox_dropdown_width(self, cb: ttk.Combobox, chars: int) -> None:
+        """Force la largeur (en caractères) de la liste déroulante d'une ttk.Combobox (surtout utile sur Windows)."""
+        try:
+            popdown = self.tk.call("ttk::combobox::PopdownWindow", cb)
+            # Listbox interne : <popdown>.f.l
+            self.tk.call(f"{popdown}.f.l", "configure", "-width", int(chars))
+        except Exception:
+            pass
 
     # ---------- Général ----------
     def _build_general_tab(self):
@@ -1825,9 +1850,11 @@ class GarageApp(tk.Tk):
             textvariable=self.theme_var,
             values=theme_values,
             state="readonly",
-            width=22,
+            width=30,
         )
-        self.theme_cb.grid(row=0, column=1, padx=(8, 0), sticky="w")
+        self.theme_cb.grid(row=0, column=1, padx=(8, 0), sticky="e")
+        self._set_combobox_dropdown_width(self.theme_cb, 60)
+
         self.theme_cb.bind("<<ComboboxSelected>>", self._on_theme_change)
 
         # --- Zone droite : navigation pages (ton code existant) ---
