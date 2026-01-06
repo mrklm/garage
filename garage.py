@@ -1342,6 +1342,8 @@ class GarageApp(tk.Tk):
     def __init__(self):
         super().__init__()
 
+        self._theme_name = "Midnight Garage"
+
         self._apply_platform_theme() 
 
         # Fonts
@@ -1391,27 +1393,45 @@ class GarageApp(tk.Tk):
 
         is_mac = sys.platform == "darwin"
         is_linux = sys.platform.startswith("linux")
+        is_windows = sys.platform.startswith("win")
 
-        # Palette par OS (ajuste si besoin)
-        if is_linux:
-            BG     = "#1E1E1E"   # Dark mode asphalte
-            FG     = "#F2F2F2"   
-            PANEL  = "#2A2A2A"
-            FIELD  = "#333333"
-            ACCENT = "#FF6F00"   
+               # bibli de themes pour le selecteur
+        THEMES = {
+            "Midnight Garage": dict(
+                BG="#151515", PANEL="#1F1F1F", FIELD="#2A2A2A",
+                FG="#EAEAEA", FIELD_FG="#F0F0F0", ACCENT="#FF9800"
+            ),
+            "Cyber Licorne": dict(
+                BG="#1A0026", PANEL="#2E004F", FIELD="#3D0066",
+                FG="#F6E7FF", FIELD_FG="#FFFFFF", ACCENT="#FF2CF7"
+            ),
+            "Zombie Terminal": dict(
+                BG="#060A06", PANEL="#0F1A0F", FIELD="#162916",
+                FG="#9AFF9A", FIELD_FG="#C8FFC8", ACCENT="#00FF5A"
+            ),
+            "Simpsons IDE": dict(
+                BG="#1E1B00", PANEL="#2A2600", FIELD="#3A3400",
+                FG="#FFF4A3", FIELD_FG="#FFF9CC", ACCENT="#FFD90F"
+            ),
+        }
 
-        elif is_mac:
-            BG = "#ECECEC"      # ajusté --> ok
-            FG = "#111111"
-            PANEL = "#E6E6E6"
-            FIELD = "#FFFFFF"
-            ACCENT = "#DADADA"
-        else:
-            BG = "#E0E0E0"
-            FG = "#111111"
-            PANEL = "#DADADA"
-            FIELD = "#FFFFFF"
-            ACCENT = "#D0D0D0"
+        self._themes = THEMES
+        self._theme_names = list(THEMES.keys())
+
+        theme_name = getattr(self, "_theme_name", "Midnight Garage")
+        t = THEMES.get(theme_name, THEMES["Midnight Garage"])
+
+        BG = t["BG"]
+        PANEL = t["PANEL"]
+        FIELD = t["FIELD"]
+        FG = t["FG"]
+        FIELD_FG = t["FIELD_FG"]
+        ACCENT = t["ACCENT"]
+
+
+        # Texte dans les champs (par défaut = FG si non défini)
+        FIELD_FG = locals().get("FIELD_FG", FG)
+
 
         # --- Tk (classique) ---
         # Affecte au root + palette par défaut pour tk widgets
@@ -1427,6 +1447,21 @@ class GarageApp(tk.Tk):
 
         # --- ttk (thémé) ---
         style = ttk.Style(self)
+
+        # Windows : thèmes natifs parfois “bloquants” -> forcer un thème modifiable
+        if is_windows:
+            try:
+                style.theme_use("clam")
+            except Exception:
+                style.theme_use("default")
+
+            # Dropdown Combobox (la liste) : c'est un Listbox Tk, pas 100% ttk
+            self.option_add("*TCombobox*Listbox.background", FIELD)
+            self.option_add("*TCombobox*Listbox.foreground", FIELD_FG)
+            self.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
+            self.option_add("*TCombobox*Listbox.selectForeground", FIELD_FG)
+            self.option_add("*TCombobox*Listbox.font", "TkDefaultFont")
+
 
         # Sur Linux, garder le thème système (Adwaita) mais surcharger les couleurs
         # (sur macOS idem, ça évite de casser l'apparence native)
@@ -1449,15 +1484,15 @@ class GarageApp(tk.Tk):
 
         
         # Entrées
-        style.configure("TEntry", fieldbackground=FIELD, foreground=FG)
+        style.configure("TEntry", fieldbackground=FIELD, foreground=FIELD_FG)
 
         # Combobox (champ fermé)
         style.configure(
             "TCombobox",
             fieldbackground=FIELD,
             background=PANEL,
-            foreground=FG,
-            arrowcolor=FG,
+            foreground=FIELD_FG,
+            arrowcolor=FIELD_FG,
         )
 
         # Combobox (liste déroulante + sélection)
@@ -1465,38 +1500,38 @@ class GarageApp(tk.Tk):
             "TCombobox",
             fieldbackground=[("readonly", FIELD)],
             background=[("readonly", PANEL)],
-            foreground=[("readonly", FG)],
+            foreground=[("readonly", FIELD_FG)],
             selectbackground=[("readonly", ACCENT)],
-            selectforeground=[("readonly", FG)],
+            selectforeground=[("readonly", FIELD_FG)],
         )
 
-            # --- IMPORTANT : états readonly/disabled (sinon gris illisible sur thème sombre) ---
+        # --- IMPORTANT : états readonly/disabled (sinon gris illisible sur thème sombre) ---
         style.map(
             "TEntry",
             fieldbackground=[("readonly", FIELD), ("disabled", FIELD)],
-            foreground=[("readonly", FG), ("disabled", FG)],
-            insertcolor=[("readonly", FG), ("disabled", FG)],
+            foreground=[("readonly", FIELD_FG), ("disabled", FIELD_FG)],
+            insertcolor=[("readonly", FIELD_FG), ("disabled", FIELD_FG)],
         )
 
         style.map(
             "TCombobox",
             fieldbackground=[("readonly", FIELD), ("disabled", FIELD)],
-            foreground=[("readonly", FG), ("disabled", FG)],
+            foreground=[("readonly", FIELD_FG), ("disabled", FIELD_FG)],
             selectbackground=[("readonly", ACCENT)],
-            selectforeground=[("readonly", FG)],
+            selectforeground=[("readonly", FIELD_FG)],
         )
 
         # (optionnel) la zone de liste dropdown de la combobox (selon thèmes)
-        style.configure("TCombobox", selectbackground=ACCENT, selectforeground=FG)
+        style.configure("TCombobox", selectbackground=ACCENT, selectforeground=FIELD_FG)
 
 
 
         # Treeview (listes / tableaux)
-        style.configure("Treeview", background=FIELD, fieldbackground=FIELD, foreground=FG)
+        style.configure("Treeview", background=FIELD, fieldbackground=FIELD, foreground=FIELD_FG)
         style.configure("Treeview.Heading", background=PANEL, foreground=FG)
 
         # Garde les valeurs pour un usage ponctuel
-        self._ui_colors = {"BG": BG, "FG": FG, "PANEL": PANEL, "FIELD": FIELD, "ACCENT": ACCENT}
+        self._ui_colors = {"BG": BG, "FG": FG, "PANEL": PANEL, "FIELD": FIELD, "FIELD_FG": FIELD_FG, "ACCENT": ACCENT}
         
 
     # ---------- UI Shell ----------
@@ -1730,15 +1765,38 @@ class GarageApp(tk.Tk):
 
         self.tab_general.columnconfigure(0, weight=1)
         self.tab_general.rowconfigure(0, weight=0)
-        self.tab_general.rowconfigure(1, weight=1)
+        self.tab_general.rowconfigure(1, weight=0)
 
         # Barre du haut (navigation pages)
         head = ttk.Frame(self.tab_general)
         head.grid(row=0, column=0, sticky="ew")
         head.columnconfigure(0, weight=1)
 
+        # --- Zone gauche : sélecteur de thème ---
+        theme_bar = ttk.Frame(head)
+        theme_bar.grid(row=0, column=1, sticky="e", padx=(0, 8))
+
+
+        ttk.Label(theme_bar, text="Thème :").grid(row=0, column=0, sticky="w")
+
+        theme_values = getattr(self, "_theme_names", ["Midnight Garage"])
+        current = getattr(self, "_theme_name", theme_values[0])
+
+        self.theme_var = tk.StringVar(value=current)
+        self.theme_cb = ttk.Combobox(
+            theme_bar,
+            textvariable=self.theme_var,
+            values=theme_values,
+            state="readonly",
+            width=22,
+        )
+        self.theme_cb.grid(row=0, column=1, padx=(8, 0), sticky="w")
+        self.theme_cb.bind("<<ComboboxSelected>>", self._on_theme_change)
+
+        # --- Zone droite : navigation pages (ton code existant) ---
         nav = ttk.Frame(head)
         nav.grid(row=0, column=0, sticky="e")
+
 
         self.btn_prev = ttk.Button(nav, text="◀", width=3, command=self._general_prev_page)
         self.lbl_page = ttk.Label(nav, text="")
@@ -1963,6 +2021,23 @@ class GarageApp(tk.Tk):
 
         if shown == 0:
             ttk.Label(reminders, text="(Rappels désactivés pour ce véhicule)", font=self.font_rem_item).grid(row=1, column=0, sticky="w")
+
+    # bouton combobox selecteur de themes
+
+    def _on_theme_change(self, _evt=None) -> None:
+        name = self.theme_var.get().strip()
+        if not name:
+            return
+
+        self._theme_name = name
+        self._apply_platform_theme()
+
+        # petit refresh UI
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
+
 
     # ---------- Véhicules ----------
     def _build_vehicules_tab(self):

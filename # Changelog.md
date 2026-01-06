@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
+## [4.4] – 2026-01-06
+
+### Ajouté
+
+ - Fonction selecteur de thèmes 
 
 ## [4.3.4] – 2026-01-05
 
