@@ -4,7 +4,7 @@
 
 🚗🔧 GARAGE — Aide & Prise en main 🔧🚗
 
-     🛠️ Bienvenue dans Garage  🛠️ 
+     🛠️ Bienvenue dans Garage 🛠️ 
 
 Garage est un logiciel pour suivre simplement les informations essentiels de vos véhicules.
 
