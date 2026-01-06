@@ -1397,29 +1397,66 @@ class GarageApp(tk.Tk):
 
                # bibli de themes pour le selecteur
         THEMES = {
-            "Midnight Garage": dict(
+            # ===== Thèmes clairs =====
+            "[Clair] AIRKLM (Day flight)": dict(
+                BG="#EAF6FF", PANEL="#D6EEF9", FIELD="#FFFFFF",
+                FG="#0B2A3F", FIELD_FG="#0B2A3F", ACCENT="#00A1DE"
+            ),
+            "[Clair] Foggy Morning": dict(
+                BG="#E6E7E8", PANEL="#D4D7DB", FIELD="#FFFFFF",
+                FG="#1E1F22", FIELD_FG="#1E1F22", ACCENT="#6B7C93"
+            ),
+
+            # ===== Thèmes sombres (sobres / quotidiens) =====
+            "[Sombre] Midnight Garage": dict(
                 BG="#151515", PANEL="#1F1F1F", FIELD="#2A2A2A",
                 FG="#EAEAEA", FIELD_FG="#F0F0F0", ACCENT="#FF9800"
             ),
-            "Cyber Licorne": dict(
+            "[Sombre] AIRKLM (Night flight)": dict(
+                BG="#0B1E2D", PANEL="#102A3D", FIELD="#16384F",
+                FG="#EAF6FF", FIELD_FG="#FFFFFF", ACCENT="#00A1DE"
+            ),
+            "[Sombre] Cold Steel": dict(
+                BG="#11161C", PANEL="#1C232B", FIELD="#26303A",
+                FG="#DCE3EA", FIELD_FG="#F5FAFF", ACCENT="#5FA8FF"
+            ),
+            "[Sombre] Café Noir": dict(
+                BG="#1C1713", PANEL="#2A211B", FIELD="#3A2E2A",
+                FG="#EDE2D4", FIELD_FG="#FFF2E2", ACCENT="#C88A5A"
+            ),
+
+            # ===== Thèmes Pouêt-Pouêt (mais distincts) =====
+            "[Pouêt-Pouêt] Cyber Licorne": dict(
                 BG="#1A0026", PANEL="#2E004F", FIELD="#3D0066",
                 FG="#F6E7FF", FIELD_FG="#FFFFFF", ACCENT="#FF2CF7"
             ),
-            "Zombie Terminal": dict(
+            "[Pouêt-Pouêt] Zombie Terminal": dict(
                 BG="#060A06", PANEL="#0F1A0F", FIELD="#162916",
                 FG="#9AFF9A", FIELD_FG="#C8FFC8", ACCENT="#00FF5A"
             ),
-            "Simpsons IDE": dict(
-                BG="#1E1B00", PANEL="#2A2600", FIELD="#3A3400",
-                FG="#FFF4A3", FIELD_FG="#FFF9CC", ACCENT="#FFD90F"
+            "[Pouêt-Pouêt] Turbo Pink": dict(
+                BG="#FF1493", PANEL="#004D40", FIELD="#1B5E20",
+                FG="#E8FFF8", FIELD_FG="#FFFFFF", ACCENT="#FFEB3B"
             ),
+            "[Pouêt-Pouêt] Vert Radioactif": dict(
+                BG="#000F00", PANEL="#002600", FIELD="#00FF00",
+                FG="#E6FFE6", FIELD_FG="#FFFFFF", ACCENT="#00FF66"
+            ),
+            "[Pouêt-Pouêt] Electric Shock": dict(
+                BG="#00111F", PANEL="#00264D", FIELD="#003F7F",
+                FG="#E6F2FF", FIELD_FG="#FFFFFF", ACCENT="#00B7FF"
+
         }
+
+
 
         self._themes = THEMES
         self._theme_names = list(THEMES.keys())
 
         theme_name = getattr(self, "_theme_name", "Midnight Garage")
-        t = THEMES.get(theme_name, THEMES["Midnight Garage"])
+        default_theme = next(iter(THEMES.values()))
+        t = THEMES.get(theme_name, default_theme)
+
 
         BG = t["BG"]
         PANEL = t["PANEL"]
