@@ -1382,7 +1382,7 @@ class GarageApp(tk.Tk):
         self._type_name_to_id = {}
         self.selected_type_id = None
 
-        self.status = tk.StringVar(value=f"DB: {os.path.basename(DB_FILE)}")
+        self.status = tk.StringVar(value="")
 
         self._build_ui()
         self._refresh_all()
@@ -1629,10 +1629,6 @@ class GarageApp(tk.Tk):
             command=self._on_help_toggle,
         )
         self.chk_show_help.grid(row=0, column=0)
-
-        ttk.Label(self, textvariable=self.status, relief="sunken", anchor="w", padding=(10, 4)).grid(
-            row=2, column=0, sticky="ew", padx=10, pady=(0, 10)
-        )
 
     def _set_status(self, txt: str):
         self.status.set(txt)
@@ -3647,7 +3643,7 @@ class GarageApp(tk.Tk):
 
         # Status bar
         try:
-            self._set_status(f"Aucun véhicule — DB: {os.path.basename(DB_FILE)}")
+            self._set_status("")
         except Exception:
             pass
 
@@ -3734,7 +3730,7 @@ class GarageApp(tk.Tk):
         except Exception:
             pass
 
-        self._set_status(f"Véhicule #{self.active_vehicle_id} — DB: {os.path.basename(DB_FILE)}")
+        self._set_status("")
 
 
 def main():
