@@ -11,6 +11,10 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
  - Supperssion du tiret au dessus des années de la courbe €/litre 
 
+### Amélioré
+
+- Suppression du message en bas "garage.db"
+
 ---
 
 ## [4.4.1] – 2026-01-07
