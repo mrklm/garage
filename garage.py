@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.4.2 (clean, single-file)
+Garage — v4.4.3 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -186,7 +186,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.4.2"
+APP_TITLE = "Garage v4.4.3"
 ASSETS_DIR = resource_path("assets")
 VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
@@ -408,10 +408,13 @@ def _load_vehicle_photo_tk(photo_file: str | None, max_w=360, max_h=220):
     except Exception:
         return None
 
+    import math
+
+
     try:
         w, h = img.width(), img.height()
-        sx = max(1, int(w / max_w))
-        sy = max(1, int(h / max_h))
+        sx = max(1, math.ceil(w / max_w))
+        sy = max(1, math.ceil(h / max_h))
         s = max(sx, sy)
         if s > 1:
             img = img.subsample(s, s)
@@ -1824,7 +1827,7 @@ class GarageApp(tk.Tk):
 
         self.tab_general.columnconfigure(0, weight=1)
         self.tab_general.rowconfigure(0, weight=0)
-        self.tab_general.rowconfigure(1, weight=0)
+        self.tab_general.rowconfigure(1, weight=1)
 
         # Barre du haut (navigation pages)
         head = ttk.Frame(self.tab_general)
@@ -1869,14 +1872,14 @@ class GarageApp(tk.Tk):
 
         # Zone cartes (aperçu véhicules)
         self.general_cards = ttk.Frame(self.tab_general)
-        self.general_cards.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        self.general_cards.grid(row=1, column=0, sticky="nsew", pady=(0, 0))
         self.general_cards.columnconfigure(0, weight=1)
         self.general_cards.columnconfigure(1, weight=1)
         self.general_cards.rowconfigure(0, weight=1)
 
         # Zone aide (superposée, affichée/masquée via checkbox)
         self.help_frame = ttk.Frame(self.tab_general)
-        self.help_frame.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        self.help_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 0))
         self.help_frame.columnconfigure(0, weight=1)
         self.help_frame.rowconfigure(1, weight=1)
 
@@ -1966,23 +1969,22 @@ class GarageApp(tk.Tk):
     def _build_general_card(self, r, row: int, col: int, colspan: int):
         vid = int(r["id"])
         title = r["nom"] or f"Véhicule #{vid}"
-
-        card = ttk.Frame(self.general_cards, padding=14)
-        card.grid(row=row, column=col, columnspan=colspan, sticky="nsew", padx=10, pady=10)
+        card = ttk.Frame(self.general_cards, padding=(12, 6))
+        card.grid(row=row, column=col, columnspan=colspan, sticky="nsew", padx=8, pady=(0, 4))
         self.general_cards.columnconfigure(col, weight=1)
         self.general_cards.rowconfigure(row, weight=1)
         card.columnconfigure(1, weight=1)
 
         card.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
-
         title_lbl = ttk.Label(card, text=title, font=self.font_card_title, anchor="center")
-        title_lbl.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         title_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
+        title_lbl.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 0))
+
 
         cons = conso_moy_l100(vid)
         cons_txt = (f"{_fmt_num(cons, 2)} L/100 km" if cons is not None else "—")
         conso_lbl = ttk.Label(card, text=f"Conso moy. : {cons_txt}", font=self.font_info2_bold, foreground="#66B3FF")
-        conso_lbl.grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        conso_lbl.grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 4))
         conso_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
         vbat = get_last_battery_voltage(vid)
@@ -2004,7 +2006,7 @@ class GarageApp(tk.Tk):
             bat_msg = f"{bat_msg} ({vbat:.2f} V)"
         bat_line = ttk.Label(card, text=f"État de la Batterie : {bat_msg}", font=self.font_info2_bold,
                              foreground=bat_color, wraplength=1100, justify="left")
-        bat_line.grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 12))
+        bat_line.grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 6))
         bat_line.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
         img = _load_vehicle_photo_tk(r["photo_file"], max_w=270, max_h=165)
@@ -2018,7 +2020,7 @@ class GarageApp(tk.Tk):
         est = estimate_maintenance_cost_next_months(vid, horizon_months=6)
         est_txt = (f"{_fmt_num(est, 0)} €" if est is not None else "—")
         cost_lbl = ttk.Label(card, text=f"Coût à prévoir pour les 6 prochains mois ≃ {est_txt}", font=self.font_rem_item, foreground="#66B3FF")
-        cost_lbl.grid(row=4, column=0, sticky="w", pady=(10, 0))
+        cost_lbl.grid(row=4, column=0, sticky="w", pady=(6, 0))
         cost_lbl.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
         details = ttk.Frame(card)
@@ -2047,9 +2049,9 @@ class GarageApp(tk.Tk):
         add_row("Dernier km", str(last_km_any(vid) or ""), 6)
 
         reminders = ttk.Frame(card)
-        reminders.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(14, 0))
+        reminders.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(6, 0))
         reminders.columnconfigure(0, weight=1)
-        ttk.Label(reminders, text="Rappels:", font=self.font_rem_title).grid(row=0, column=0, sticky="w", pady=(0, 6))
+        ttk.Label(reminders, text="Rappels:", font=self.font_rem_title).grid(row=0, column=0, sticky="w", pady=(0, 2))
 
         types = list_vehicle_types(vid)
         line_row = 1
@@ -2667,10 +2669,14 @@ class GarageApp(tk.Tk):
 
     # ---------- Entretiens ----------
     def _build_entretiens_tab(self):
-        self.tab_ent.columnconfigure(0, weight=1)
+        self.tab_ent.columnconfigure(0, weight=1, minsize=520)
 
         # Permet au tableau des entretiens (au centre) de s\'étendre, tout en gardant le formulaire visible en bas
-        self.tab_ent.rowconfigure(2, weight=1)
+        # Répartition verticale : on garantit une hauteur mini pour la liste "Entretiens"
+        self.tab_ent.rowconfigure(0, weight=0)               # header
+        self.tab_ent.rowconfigure(1, weight=0)               # types
+        self.tab_ent.rowconfigure(2, weight=1, minsize=140)  # liste entretiens (prioritaire)
+        self.tab_ent.rowconfigure(3, weight=0)               # formulaire
 
         header = ttk.Frame(self.tab_ent)
         header.grid(row=0, column=0, sticky="ew")
@@ -2686,7 +2692,7 @@ class GarageApp(tk.Tk):
         self.ent_header_label.grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
         box_type = ttk.Labelframe(self.tab_ent, text="Type d'entretien (pour ce véhicule)", padding=10)
-        box_type.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        box_type.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
         for c in range(6):
             box_type.columnconfigure(c, weight=1 if c in (1, 3, 5) else 0)
 
@@ -2708,6 +2714,9 @@ class GarageApp(tk.Tk):
         box_list = ttk.Frame(box_type)
         box_list.grid(row=2, column=0, columnspan=6, sticky="nsew", pady=(12, 0))
         box_list.columnconfigure(0, weight=1)
+        box_type.rowconfigure(2, weight=1)
+        box_list.rowconfigure(0, weight=1)
+
 
         self.tree_types = ttk.Treeview(box_list, columns=("rappel", "type", "freq"), show="headings", height=6)
         self.tree_types.grid(row=0, column=0, sticky="nsew")
@@ -2722,15 +2731,23 @@ class GarageApp(tk.Tk):
 
         ysb_t = ttk.Scrollbar(box_list, orient="vertical", command=self.tree_types.yview)
         ysb_t.grid(row=0, column=1, sticky="ns")
-        self.tree_types.configure(yscroll=ysb_t.set)
+        self.tree_types.configure(yscrollcommand=ysb_t.set)
+
 
         list_box = ttk.Labelframe(self.tab_ent, text="Entretiens", padding=10)
         list_box.grid(row=2, column=0, sticky="nsew", pady=(12, 0))
         list_box.columnconfigure(0, weight=1)
-        list_box.rowconfigure(0, weight=1)
+        list_box.rowconfigure(0, weight=1, minsize=90)
 
         cols = ("id", "date", "km", "type", "kind", "cout", "by", "vbat", "details")
-        self.tree_ent = ttk.Treeview(list_box, columns=cols, show="headings", height=10)
+
+        # --- Frame technique : Treeview + scrollbars (pour que les barres restent visibles en fenêtre étroite) ---
+        tv_frame = ttk.Frame(list_box)
+        tv_frame.grid(row=0, column=0, sticky="nsew")
+        tv_frame.columnconfigure(0, weight=1)
+        tv_frame.rowconfigure(0, weight=1)
+
+        self.tree_ent = ttk.Treeview(tv_frame, columns=cols, show="headings", height=10)
         self.tree_ent.grid(row=0, column=0, sticky="nsew")
 
         heads = {
@@ -2742,11 +2759,14 @@ class GarageApp(tk.Tk):
             self.tree_ent.heading(c, text=heads[c])
             self.tree_ent.column(c, width=widths[c], anchor="w", stretch=True)
 
-        ysb = ttk.Scrollbar(list_box, orient="vertical", command=self.tree_ent.yview)
+        ysb = ttk.Scrollbar(tv_frame, orient="vertical", command=self.tree_ent.yview)
         ysb.grid(row=0, column=1, sticky="ns")
+
         xsb = ttk.Scrollbar(list_box, orient="horizontal", command=self.tree_ent.xview)
         xsb.grid(row=1, column=0, sticky="ew")
+
         self.tree_ent.configure(yscroll=ysb.set, xscroll=xsb.set)
+
 
         actions = ttk.Frame(list_box)
         actions.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0))

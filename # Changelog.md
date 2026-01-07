@@ -3,6 +3,16 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+
+---
+
+## [4.4.3] – 2026-01-07
+
+### Corrigé
+
+- Limitation de la taille des Photos dans l'onglet Général pour windows 
+- Compression possible des listes entretiens sans pousser le bas de la page hors de l'écran
+
 ---
 
 ## [4.4.2] – 2026-01-07
@@ -10,6 +20,7 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 ### Corrigé
 
  - Supperssion du tiret au dessus des années de la courbe €/litre 
+ - Modification du calcul de la taille des Photos dans l'onglet Général pour windows
 
 ### Amélioré
 
