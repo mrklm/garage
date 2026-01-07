@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.3.4 (clean, single-file)
+Garage — v4.4.2 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -186,7 +186,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.3.4"
+APP_TITLE = "Garage v4.4.2"
 ASSETS_DIR = resource_path("assets")
 VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
@@ -1402,7 +1402,7 @@ class GarageApp(tk.Tk):
                 BG="#151515", PANEL="#1F1F1F", FIELD="#2A2A2A",
                 FG="#EAEAEA", FIELD_FG="#F0F0F0", ACCENT="#FF9800"
             ),
-            "[Sombre] AIRKLM (Night flight)": dict(
+            "[Sombre] AIR-KLM Night flight": dict(
                 BG="#0B1E2D", PANEL="#102A3D", FIELD="#16384F",
                 FG="#EAF6FF", FIELD_FG="#FFFFFF", ACCENT="#00A1DE"
             ),
@@ -1410,7 +1410,7 @@ class GarageApp(tk.Tk):
                 BG="#1B120C", PANEL="#2A1C14", FIELD="#3A281D",
                 FG="#F2E6D8", FIELD_FG="#FFF4E6", ACCENT="#C28E5C"
             ),
-            "[Sombre] Matrix Glitch": dict(
+            "[Sombre] Matrix Déjà Vu": dict(
                 BG="#000A00", PANEL="#001F00", FIELD="#003300",
                 FG="#00FF66", FIELD_FG="#66FF99", ACCENT="#00FF00"
             ),
@@ -1418,12 +1418,16 @@ class GarageApp(tk.Tk):
                 BG="#14002E", PANEL="#2B0057", FIELD="#004D4D",
                 FG="#FFF0FF", FIELD_FG="#FFFFFF", ACCENT="#00FFD5"
             ),
+            "[Sombre] Cyber Licorne": dict(
+                BG="#1A0026", PANEL="#2E004F", FIELD="#3D0066",
+                FG="#F6E7FF", FIELD_FG="#FFFFFF", ACCENT="#FF2CF7"
+            ),
             # ===== Thèmes clairs =====
-            "[Clair] AIRKLM (Day flight)": dict(
+            "[Clair] AIR-KLM Day flight": dict(
                 BG="#EAF6FF", PANEL="#D6EEF9", FIELD="#FFFFFF",
                 FG="#0B2A3F", FIELD_FG="#0B2A3F", ACCENT="#00A1DE"
             ),
-            "[Clair] Foggy Morning": dict(
+            "[Clair] Matin Brumeux": dict(
                 BG="#E6E7E8", PANEL="#D4D7DB", FIELD="#FFFFFF",
                 FG="#1E1F22", FIELD_FG="#1E1F22", ACCENT="#6B7C93"
             ),
@@ -1431,39 +1435,36 @@ class GarageApp(tk.Tk):
                 BG="#FAF6F1", PANEL="#EFE6DC", FIELD="#FFFFFF",
                 FG="#3D2E22", FIELD_FG="#3D2E22", ACCENT="#D8B892"
             ),
-            "[Clair] Miel La Divette": dict(
+            "[Clair] Miellerie La Divette": dict(
                 BG="#E6B65C", PANEL="#F5E6CC", FIELD="#FFFFFF",
                 FG="#50371A", FIELD_FG="#50371A", ACCENT="#F2B705"
             ),
             # ===== Thèmes Pouêt-Pouêt (mais distincts) =====
-            "[Pouêt] Cyber Licorne": dict(
-                BG="#1A0026", PANEL="#2E004F", FIELD="#3D0066",
-                FG="#F6E7FF", FIELD_FG="#FFFFFF", ACCENT="#FF2CF7"
-            ),
-            "[Pouêt] Barbie Apocalypse": dict(
-                BG="#FF1493", PANEL="#004D40", FIELD="#1B5E20",
-                FG="#E8FFF8", FIELD_FG="#FFFFFF", ACCENT="#FFEB3B"
-            ),
-             "[Pouêt] Ocean Bubblegum": dict(
+             "[Pouêt] Chewing-gum Océan": dict(
                 BG="#00A6C8", PANEL="#0083A1", FIELD="#00C7B7",
                 FG="#082026", FIELD_FG="#082026", ACCENT="#FF4FD8"
             ),
-
-            "[Pouêt] Lava Tangerine": dict(
+            "[Pouêt] Pamplemousse": dict(
                 BG="#FF4A1C", PANEL="#E63B10", FIELD="#FF7A00",
                 FG="#1A0B00", FIELD_FG="#1A0B00", ACCENT="#00E5FF"
             ),
-
-            "[Pouêt] Toxic Grape": dict(
+            "[Pouêt] Raisin Toxique": dict(
                 BG="#7A00FF", PANEL="#5B00C9", FIELD="#B000FF",
                 FG="#0F001A", FIELD_FG="#0F001A", ACCENT="#39FF14"
             ),
-
-            "[Pouêt] Lemon Splash": dict(
+            "[Pouêt] Citron qui pique": dict(
                 BG="#FFF200", PANEL="#E6D800", FIELD="#FFF7A6",
                 FG="#1A1A00", FIELD_FG="#1A1A00", ACCENT="#0066FF"
-            ),           
-        }
+            ),  
+            "[Pouêt] Barbie Apocalypse": dict(
+                BG="#FF1493", PANEL="#004D40", FIELD="#1B5E20",
+                FG="#E8FFF8", FIELD_FG="#FFFFFF", ACCENT="#FFEB3B" 
+            ),   
+            "[Pouêt] Compagnie Créole": dict(
+                BG="#8B3A1A", PANEL="#F2C94C", FIELD="#FFFFFF",
+                FG="#5A2E0C", FIELD_FG="#5A2E0C", ACCENT="#8B3A1A"
+            ),    
+       }
         self._themes = THEMES
         self._theme_names = list(THEMES.keys())
 
@@ -3097,9 +3098,35 @@ class GarageApp(tk.Tk):
 
     def _plot_price_per_litre(self, ax):
         self._apply_dark_style(ax)
-        self._title_in_ax(ax, "Prix du litre dans le temps")
+
+        # Titre adapté à l'énergie du véhicule
+        energie = ""
+        try:
+            v = get_vehicle(int(self.active_vehicle_id))
+            energie = (v["energie"] or "").strip()
+        except Exception:
+            energie = ""
+
+        def _fuel_phrase(e: str) -> str:
+            e_low = e.lower()
+            if any(k in e_low for k in ("ess", "sp95", "sp98", "e10")):
+                return "d’essence"
+            if any(k in e_low for k in ("dies", "gazo", "gasoil", "gazole")):
+                return "de gasoil"
+            if "e85" in e_low:
+                return "d’E85"
+            if "gpl" in e_low:
+                return "de GPL"
+            # fallback générique
+            return "d’" + e if e[:1].lower() in "aeiouyàâäéèêëîïôöùûüœ" else "de " + e
+
+        if energie:
+            self._title_in_ax(ax, f"Prix du litre {_fuel_phrase(energie)} dans le temps")
+        else:
+            self._title_in_ax(ax, "Prix du litre dans le temps")
 
         conn = _connect_db()
+
         cur = conn.cursor()
         cur.execute(
             """
@@ -3242,6 +3269,9 @@ class GarageApp(tk.Tk):
         ax.set_xlabel("")
         ax.set_xticks(x)
         ax.set_xticklabels([str(y) for y in years], color="#dddddd")
+
+        # suppression du trait qui donne l'impression d'un repere année precis   
+        ax.tick_params(axis="x", which="both", length=0)
 
         # Légende en haut à droite, compacte
         leg = ax.legend(loc="upper right", frameon=True, fontsize=9)
