@@ -4,16 +4,33 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 ---
+
+## [4.4.2] – 2026-01-07
+
+### Corrigé
+
+ - Supperssion du tiret au dessus des années de la courbe €/litre 
+
+---
+
+## [4.4.1] – 2026-01-07
+
+### Ajouté
+
+ - Le type d'énergie selon le vehicule est affiché dans le titre de la courbe €/litre
+
+### Amélioré
+ 
+ - Sélection et ajustement des couleurs de 16 Thèmes
+ - Ajustement de la largeur de le combobox sélecteur de thèmes
+
+---
+
 ## [4.4] – 2026-01-06
 
 ### Ajouté
 
  - Fonction selecteur de thèmes 
- - Sélection et ajustement des couleurs de 15 Thèmes
-
- ### Corrigé
-
- - Ajustement de la largeur de le combobox sélecteur de thèmes
 
  ---
 
