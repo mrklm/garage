@@ -9,6 +9,13 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 ### Ajouté
 
  - Fonction selecteur de thèmes 
+ - Sélection et ajustement des couleurs de 15 Thèmes
+
+ ### Corrigé
+
+ - Ajustement de la largeur de le combobox sélecteur de thèmes
+
+ ---
 
 ## [4.3.4] – 2026-01-05
 
