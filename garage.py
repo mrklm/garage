@@ -1436,30 +1436,30 @@ class GarageApp(tk.Tk):
                 FG="#50371A", FIELD_FG="#50371A", ACCENT="#F2B705"
             ),
             # ===== Thèmes Pouêt-Pouêt (mais distincts) =====
-            "[Pouêt-Pouêt] Cyber Licorne": dict(
+            "[Pouêt] Cyber Licorne": dict(
                 BG="#1A0026", PANEL="#2E004F", FIELD="#3D0066",
                 FG="#F6E7FF", FIELD_FG="#FFFFFF", ACCENT="#FF2CF7"
             ),
-            "[Pouêt-Pouêt] Barbie Apocalypse": dict(
+            "[Pouêt] Barbie Apocalypse": dict(
                 BG="#FF1493", PANEL="#004D40", FIELD="#1B5E20",
                 FG="#E8FFF8", FIELD_FG="#FFFFFF", ACCENT="#FFEB3B"
             ),
-             "[Pouêt-Pouêt] Ocean Bubblegum": dict(
+             "[Pouêt] Ocean Bubblegum": dict(
                 BG="#00A6C8", PANEL="#0083A1", FIELD="#00C7B7",
                 FG="#082026", FIELD_FG="#082026", ACCENT="#FF4FD8"
             ),
 
-            "[Pouêt-Pouêt] Lava Tangerine": dict(
+            "[Pouêt] Lava Tangerine": dict(
                 BG="#FF4A1C", PANEL="#E63B10", FIELD="#FF7A00",
                 FG="#1A0B00", FIELD_FG="#1A0B00", ACCENT="#00E5FF"
             ),
 
-            "[Pouêt-Pouêt] Toxic Grape": dict(
+            "[Pouêt] Toxic Grape": dict(
                 BG="#7A00FF", PANEL="#5B00C9", FIELD="#B000FF",
                 FG="#0F001A", FIELD_FG="#0F001A", ACCENT="#39FF14"
             ),
 
-            "[Pouêt-Pouêt] Lemon Splash": dict(
+            "[Pouêt] Lemon Splash": dict(
                 BG="#FFF200", PANEL="#E6D800", FIELD="#FFF7A6",
                 FG="#1A1A00", FIELD_FG="#1A1A00", ACCENT="#0066FF"
             ),           
@@ -1850,7 +1850,7 @@ class GarageApp(tk.Tk):
             textvariable=self.theme_var,
             values=theme_values,
             state="readonly",
-            width=30,
+            width=27,
         )
         self.theme_cb.grid(row=0, column=1, padx=(8, 0), sticky="e")
         self._set_combobox_dropdown_width(self.theme_cb, 60)
