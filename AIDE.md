@@ -134,6 +134,7 @@ un rappel sera affiché dans l'onglet general en dessous du vehicule:
 
 ---
 
+
  📊 Les Graphiques 📉 (Onglet Graphiques)
 
  Trois graphes pour voir rapidement:
@@ -171,6 +172,30 @@ Astuce -->
 Le fichier ou sont stockées toute les informaions est une "base de donnée SQL" il es très leger, 
 Une fois toutes les infos renseignées, envoyez vous le fichier "garage.db" par courriel de cette
 mannière vous pourrez le récuperer à tout moment. 
+
+Vous trouverez le fichier garage.db à cet emplacement:
+
+Sous Windows : \Users\klm\Appdata\Roaming\Garage>
+
+Pour Mac et Linux, il sera caché, taper cette commande dans un terminal pour ouvrir le dossier:
+
+Sous MacOS --> open "$HOME/Library/Application Support/Garage"
+
+Sous Linux --> xdg-open ~/.local/share/Garage
+
+---
+
+👓️ Visibilité 🦉
+
+En haut a droite de l'ecran vous trouverez un sélecteur de thème:
+
+vous pouvez ajuster les couleur avec cette fonction:
+
+Plusieurs thèmes sont proposés:
+
+- 🕶️ Des thèmes Sombres
+- 👓️ Des thèmesClairs
+- 🤡 Des thèmes Rigolos
 
 ---
 
