@@ -11,6 +11,7 @@ Elle permet de gérer :
 - les véhicules (type, photo, caractéristiques),
 - les entretiens réalisés et à prévoir, avec leurs fréquences constructeur,
 - les pleins de carburant.
+- Votre budget véhicule.
 
 L’onglet **Général** affiche automatiquement :
 
@@ -30,14 +31,14 @@ https://github.com/mrklm/garage/releases
 ### Applications standalone (recommandé)
 
 - **Linux (recommandé)**  
-  - `Garage-x86_64.AppImage`  
-  - `Garage-linux-x86_64-v4.2.2.tar.gz` (alternative)
+  - `Garage-linux-x86_64-v4.4.3-x86_64.AppImage`  
+  - `Garage-4.4.3-linux-x86_64.tar.gz` (alternative)
 
 - **macOS**  
-  - `Garage - MacOs - v 4.2.2.zip`
+  - `Garage - MacOs - v 4.4.4.zip`
 
 - **Windows**  
-  - `Garage - Windows - v4.2.2.zip`
+  - `Garage - Windows - v4.4.3.zip`
 
 ---
 
@@ -53,7 +54,7 @@ chmod +x Garage-x86_64.AppImage
 ### Option 2 — Archive `.tar.gz`
 
 ```bash
-tar -xzf Garage-linux-x86_64-v4.2.2.tar.gz
+tar -xzf Garage-4.4.3-linux-x86_64.tar.gz
 cd Garage
 ./Garage
 ```
