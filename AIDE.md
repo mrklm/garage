@@ -187,14 +187,14 @@ Sous Linux --> xdg-open ~/.local/share/Garage
 
 👓️ Visibilité 🦉
 
-En haut a droite de l'ecran vous trouverez un sélecteur de thème:
+En haut à droite de l'ecran vous trouverez un sélecteur de thème:
 
-vous pouvez ajuster les couleur avec cette fonction:
+vous pouvez ajuster les couleurs avec cette fonction:
 
-Plusieurs thèmes sont proposés:
+Plusieurs thèmes y sont proposés:
 
 - 🕶️ Des thèmes Sombres
-- 👓️ Des thèmesClairs
+- 👓️ Des thèmes Clairs
 - 🤡 Des thèmes Rigolos
 
 ---
