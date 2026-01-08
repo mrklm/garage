@@ -169,7 +169,7 @@ Pour sauvegarder l’ensemble de vos informations :
 
 Astuce --> 
 
-Le fichier ou sont stockées toute les informaions est une "base de donnée SQL" il es très leger, 
+Le fichier .db ou sont stockées toutes les informations est une "base de donnée SQL" il est très leger, 
 Une fois toutes les infos renseignées, envoyez vous le fichier "garage.db" par courriel ou copier
 le sur une clé USB de cette mannière vous pourrez le récuperer à tout moment. 
 
@@ -177,7 +177,7 @@ Vous trouverez le fichier garage.db à cet emplacement:
 
 🪟 Sous Windows : \Users\klm\Appdata\Roaming\Garage>
 
-Pour Mac et Linux, il est caché, tapez cette commande dans un terminal pour ouvrir le dossier:
+Pour Mac et Linux, il est caché, tapez cette commande dans un terminal pour ouvrir le répertoire:
 
 🍎 Sous MacOS --> open "$HOME/Library/Application Support/Garage"
 
