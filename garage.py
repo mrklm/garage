@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.4.3 (clean, single-file)
+Garage — v4.4.4 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -186,7 +186,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.4.3"
+APP_TITLE = "Garage v4.4.4"
 ASSETS_DIR = resource_path("assets")
 VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
@@ -1483,10 +1483,8 @@ class GarageApp(tk.Tk):
         FIELD_FG = t["FIELD_FG"]
         ACCENT = t["ACCENT"]
 
-
         # Texte dans les champs (par défaut = FG si non défini)
         FIELD_FG = locals().get("FIELD_FG", FG)
-
 
         # --- Tk (classique) ---
         # Affecte au root + palette par défaut pour tk widgets
@@ -1500,25 +1498,26 @@ class GarageApp(tk.Tk):
         except Exception:
             pass
 
-        # --- ttk (thémé) ---
+        # --- ttk (thèmes/widgets ttk) ---
         style = ttk.Style(self)
 
-        # Windows : thèmes natifs parfois “bloquants” -> forcer un thème modifiable
-        if is_windows:
-            try:
-                style.theme_use("clam")
-            except Exception:
-                style.theme_use("default")
 
-            # Dropdown Combobox (la liste) : c'est un Listbox Tk, pas 100% ttk
-            self.option_add("*TCombobox*Listbox.background", FIELD)
-            self.option_add("*TCombobox*Listbox.foreground", FIELD_FG)
-            self.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
-            self.option_add("*TCombobox*Listbox.selectForeground", FIELD_FG)
-            self.option_add("*TCombobox*Listbox.font", "TkDefaultFont")
-            self.option_add("*TCombobox*Listbox.width", 60)
-          
+        # macOS (aqua) et Windows : thèmes natifs parfois “bloquants” -> forcer un thème modifiable
+        if is_windows or is_mac:
+            for candidate in ("clam", "alt", "default"):
+                try:
+                    style.theme_use(candidate)
+                    break
+                except Exception:
+                    pass
 
+        # Dropdown Combobox (la liste) : c'est un Listbox Tk -> toutes plateformes
+        self.option_add("*TCombobox*Listbox.background", FIELD)
+        self.option_add("*TCombobox*Listbox.foreground", FIELD_FG)
+        self.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
+        self.option_add("*TCombobox*Listbox.selectForeground", FIELD_FG)
+        self.option_add("*TCombobox*Listbox.font", "TkDefaultFont")
+        self.option_add("*TCombobox*Listbox.width", 60)
 
         # Sur Linux, garder le thème système (Adwaita) mais surcharger les couleurs
         # (sur macOS idem, ça évite de casser l'apparence native)
