@@ -175,7 +175,7 @@ le sur une clé USB de cette mannière vous pourrez le récuperer à tout moment
 
 Vous trouverez le fichier garage.db à cet emplacement:
 
-🪟 Sous Windows : \Users\klm\Appdata\Roaming\Garage>
+🪟 Sous Windows : \Users\"votre dossier"\Appdata\Roaming\Garage>
 
 Pour Mac et Linux, il est caché, tapez cette commande dans un terminal pour ouvrir le répertoire:
 
