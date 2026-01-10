@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.4.4 (clean, single-file)
+Garage — v4.4.5 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -195,7 +195,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.4.4"
+APP_TITLE = "Garage v4.4.5"
 ASSETS_DIR = resource_path("assets")
 VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
@@ -1838,14 +1838,27 @@ class GarageApp(tk.Tk):
             if PIL_AVAILABLE:
                 img = Image.open(logo_path).convert("RGBA")
 
+                # --- HiDPI / Retina : on calcule un facteur d'échelle Tk ---
+                try:
+                    tk_scale = float(self.tk.call("tk", "scaling"))  # souvent ~2.0 sur Retina
+                    
+                except Exception:
+                    tk_scale = 1.0
+                if tk_scale < 1.0:
+                    tk_scale = 1.0
+
+                target_px = int(max_px * tk_scale)
+
                 w, h = img.size
-                scale = min(max_px / w, max_px / h)
-                new_size = (int(w * scale), int(h * scale))
+                scale = min(target_px / w, target_px / h)
+                new_w = max(1, int(w * scale))
+                new_h = max(1, int(h * scale))
 
-                img = img.resize(new_size, Image.LANCZOS)
+                img = img.resize((new_w, new_h), Image.LANCZOS)
+
                 self._logo_img = ImageTk.PhotoImage(img)
-
                 self.help_logo_label.config(image=self._logo_img, text="")
+                
             else:
                 # Fallback Tk : pas de resize natif -> on subsample pour éviter un logo géant
                 img = tk.PhotoImage(file=logo_path)
