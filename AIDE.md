@@ -10,7 +10,8 @@
 
  🚌    🚐    🚕    🚗    🚙    🛻    🚚    🚛   🛺
 
-Garage est un logiciel pour suivre simplement les informations essentiels de vos véhicules.
+Garage est un logiciel pour suivre simplement
+les informations essentiels de vos véhicules.
 
  🚜.   🏎️    🏍️    🛵    🚲️   🛴   🛥️    🛩️    🚁
 
