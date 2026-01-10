@@ -1,12 +1,19 @@
 <p align="center">
-  <img src="assets/Logo.png" alt="Garage" width="160">
+  <img src="assets/Logo.png" alt="Garage">
 </p>
 
 🚗🔧 GARAGE — Aide & Prise en main 🔧🚗
 
-     🛠️ Bienvenue dans Garage  🛠️ 
+     🛠️ Bienvenue dans Garage 🛠️ 
 
-Garage est un logiciel pour suivre simplement les informations essentiels de vos véhicules.
+💻️
+
+ 🚌    🚐    🚕    🚗    🚙    🛻    🚚    🚛   🛺
+
+Garage est un logiciel pour suivre simplement
+les informations essentiels de vos véhicules.
+
+ 🚜.   🏎️    🏍️    🛵    🚲️   🛴   🛥️    🛩️    🚁
 
 ---
 
@@ -134,6 +141,7 @@ un rappel sera affiché dans l'onglet general en dessous du vehicule:
 
 ---
 
+
  📊 Les Graphiques 📉 (Onglet Graphiques)
 
  Trois graphes pour voir rapidement:
@@ -157,7 +165,7 @@ Vos données restent sur votre ordinateur.
 
 ---
 
-💾 Sauvegarde des données (recommandé)  
+💾 Sauvegarde des données (recommandé) 🗃️
 
 
 Pour sauvegarder l’ensemble de vos informations :
@@ -168,9 +176,33 @@ Pour sauvegarder l’ensemble de vos informations :
 
 Astuce --> 
 
-Le fichier ou sont stockées toute les informaions est une "base de donnée SQL" il es très leger, 
-Une fois toutes les infos renseignées, envoyez vous le fichier "garage.db" par courriel de cette
-mannière vous pourrez le récuperer à tout moment. 
+Le fichier .db ou sont stockées toutes les informations est une "base de donnée SQL" il est très leger, 
+Une fois toutes les infos renseignées, envoyez vous le fichier "garage.db" par courriel ou copier
+le sur une clé USB de cette mannière vous pourrez le récuperer à tout moment. 
+
+Vous trouverez le fichier garage.db à cet emplacement:
+
+🪟 Sous Windows : \Users\"votre dossier"\Appdata\Roaming\Garage>
+
+Pour Mac et Linux, il est caché, tapez cette commande dans un terminal pour ouvrir le répertoire:
+
+🍎 Sous MacOS --> open "$HOME/Library/Application Support/Garage"
+
+🐧 Sous Linux --> xdg-open ~/.local/share/Garage
+
+---
+
+👓️ Visibilité 🦉
+
+En haut à droite de l'ecran vous trouverez un sélecteur de thème:
+
+vous pouvez ajuster les couleurs avec cette fonction:
+
+Plusieurs thèmes y sont proposés:
+
+- 🕶️ Des thèmes Sombres
+- 👓️ Des thèmes Clairs
+- 🤡 Des thèmes Rigolos
 
 ---
 
@@ -207,4 +239,4 @@ Garage, c’est :
 - 🔒 zéro données récupérées
 - 🛠️ un outil simple, pensé pour anticiper l'utilisation et l'usure de vos véhicules.
 
-Bonne route avec garage 🚦
+ 🛣️ Bonne route avec garage 🚦
