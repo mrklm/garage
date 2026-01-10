@@ -25,9 +25,9 @@ L’onglet **Général** affiche automatiquement :
 
 ## Aperçu
 
-![Scction Aide](docs/screenshots/aide.png)
-![Fenêtre principale](docs/screenshots/general.png)
-![Fenêtre Graphes](docs/screenshots/graphes.png)
+![Scction Aide](screenshots/aide.png)
+![Fenêtre principale](screenshots/general.png)
+![Fenêtre Graphes](screenshots/graphes.png)
 
 ---
 
