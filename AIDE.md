@@ -6,7 +6,13 @@
 
      🛠️ Bienvenue dans Garage 🛠️ 
 
+💻️
+
+ 🚌    🚐    🚕    🚗    🚙    🛻    🚚    🚛   🛺
+
 Garage est un logiciel pour suivre simplement les informations essentiels de vos véhicules.
+
+ 🚜.   🏎️    🏍️    🛵    🚲️   🛴   🛥️    🛩️    🚁
 
 ---
 
@@ -232,4 +238,4 @@ Garage, c’est :
 - 🔒 zéro données récupérées
 - 🛠️ un outil simple, pensé pour anticiper l'utilisation et l'usure de vos véhicules.
 
-Bonne route avec garage 🚦
+ 🛣️ Bonne route avec garage 🚦
