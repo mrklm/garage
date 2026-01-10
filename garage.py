@@ -121,11 +121,20 @@ def ensure_help_file(user_dir: Path) -> Path:
 ensure_database()
 HELP_FILE = ensure_help_file(Path(USER_DIR))
 # --- AIDE (style) ---
-HELP_FONT_FAMILY = "Helvetica"
-HELP_FONT_SIZE = 20          # Taille de la police de l'aide
-HELP_TEXT_COLOR = "#F2F2F2"  # Couleur du texte de l'aide
-HELP_BG = "#2B2B2B"          # Fond de l'aide (gris très sombre)
-HELP_LOGO_MAX_SIZE = 220     # Taille maximale du logo (px)
+HELP_FONT_FAMILY = "TkDefaultFont"  # Police de TK pour eviter le ghost des emojis ésseulés
+HELP_FONT_SIZE = 20                 # Taille de la police de l'aide
+HELP_TEXT_COLOR = "#F2F2F2"       # Couleur du texte de l'aide
+HELP_BG = "#2B2B2B"               # Fond de l'aide (gris très sombre)
+HELP_LOGO_MAX_SIZE = 220            # Taille maximale du logo (px)
+
+#tag special pour laisser passer les emojis ésseulés
+
+if sys.platform == "darwin":
+    HELP_EMOJI_FONT_FAMILY = "Apple Color Emoji"
+elif sys.platform.startswith("win"):
+    HELP_EMOJI_FONT_FAMILY = "Segoe UI Emoji"
+else:
+    HELP_EMOJI_FONT_FAMILY = "Noto Color Emoji"
 
 # Logo dans l'aide (plafond strict, indépendant du layout)
 HELP_LOGO_MAX_WIDTH = 180
@@ -1742,15 +1751,56 @@ class GarageApp(tk.Tk):
 
         self.help_text.config(state="normal")
         self.help_text.delete("1.0", "end")
-
-        # Supprime uniquement le tag qu'on gère
+        
+        # bloc qui fait en sorte d'aficher les emojis meme seuls sur une ligne, et en cross OS
         try:
             self.help_text.tag_delete("center")
         except Exception:
             pass
-
         self.help_text.tag_configure("center", justify="center", foreground=HELP_TEXT_COLOR)
-        self.help_text.insert("1.0", content, "center")
+
+        # --- Tag spécifique pour les lignes emoji-only ---
+        try:
+            self.help_text.tag_delete("emoji")
+        except Exception:
+            pass
+
+        try:
+            self.help_text.tag_configure(
+                "emoji",
+                justify="center",
+                foreground=HELP_TEXT_COLOR,
+                font=(HELP_EMOJI_FONT_FAMILY, HELP_FONT_SIZE),
+            )
+        except Exception:
+            # Si la police emoji n'est pas dispo, on garde au moins centrage + couleur
+            self.help_text.tag_configure(
+                "emoji",
+                justify="center",
+                foreground=HELP_TEXT_COLOR,
+            )
+
+
+
+        self.help_text.mark_set("insert", "1.0")
+        for line in content.splitlines():
+            stripped = line.strip()
+
+            if stripped == "":
+                self.help_text.insert("end", "\n")
+                continue
+
+            # Lignes avec lettres/chiffres : centrées via le tag "center"
+            if any(ch.isalnum() for ch in stripped):
+                self.help_text.insert("end", line + "\n", "center")
+            else:
+                # Lignes sans alphanum (---, emojis, symboles) : centrées aussi
+                # Supprime tabulations et espaces qui créent de grands écarts entre emojis dans Tk
+                clean = line.replace("\t", "").replace(" ", "")
+                self.help_text.insert("end", clean + "\n", "emoji")
+
+
+
         self.help_text.config(state="disabled")
 
 
@@ -1786,9 +1836,15 @@ class GarageApp(tk.Tk):
 
         try:
             if PIL_AVAILABLE:
-                img = Image.open(logo_path)
-                img.thumbnail((max_px, max_px))  # garde les proportions
+                img = Image.open(logo_path).convert("RGBA")
+
+                w, h = img.size
+                scale = min(max_px / w, max_px / h)
+                new_size = (int(w * scale), int(h * scale))
+
+                img = img.resize(new_size, Image.LANCZOS)
                 self._logo_img = ImageTk.PhotoImage(img)
+
                 self.help_logo_label.config(image=self._logo_img, text="")
             else:
                 # Fallback Tk : pas de resize natif -> on subsample pour éviter un logo géant
