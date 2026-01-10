@@ -27,11 +27,12 @@ L’onglet **Général** affiche automatiquement :
 
 ![Scction Aide](screenshots/aide.png)
 ![Fenêtre principale](screenshots/general.png)
+![Fenêtre Véhicule](screenshots/vehicule.png)
+![Fenêtre Pleins](screenshots/plein.png)
+![Fenêtre Entretiens](screenshots/entretiens.png)
 ![Fenêtre Graphes](screenshots/graphes.png)
 
 ---
-
-
 
 ## 📥 Téléchargement
 
@@ -41,8 +42,8 @@ https://github.com/mrklm/garage/releases
 ### Applications standalone (recommandé)
 
 - **Linux (recommandé)**  
-  - `Garage-linux-x86_64-v4.4.3-x86_64.AppImage`  
-  - `Garage-4.4.3-linux-x86_64.tar.gz` (alternative)
+  - `Garage-linux-x86_64-v4.4.4-x86_64.AppImage`  
+  - `Garage-4.4.4-linux-x86_64.tar.gz` (alternative)
 
 - **macOS**  
   - `Garage - MacOs - v 4.4.4.zip`
@@ -64,7 +65,7 @@ chmod +x Garage-x86_64.AppImage
 ### Option 2 — Archive `.tar.gz`
 
 ```bash
-tar -xzf Garage-4.4.3-linux-x86_64.tar.gz
+tar -xzf Garage-4.4.4-linux-x86_64.tar.gz
 cd Garage
 ./Garage
 ```
