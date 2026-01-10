@@ -1,6 +1,8 @@
 # macOS
 .DS_Store
-assets/.DS_Store
+
+# VSC
+.vscode/
 
 # Base locale utilisateur
 garage.db
@@ -22,3 +24,4 @@ venv/
 build/
 dist/
 *.spec
+

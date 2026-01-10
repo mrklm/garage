@@ -23,6 +23,16 @@ L’onglet **Général** affiche automatiquement :
 - Des graphiques de la conso L/100km del l'évolution dans le temps des prix -entretiens /réparations /carburant.
 ---
 
+## Aperçu
+
+![Scction Aide](docs/screenshots/aide.png)
+![Fenêtre principale](docs/screenshots/general.png)
+![Fenêtre Graphes](docs/screenshots/graphes.png)
+
+---
+
+
+
 ## 📥 Téléchargement
 
 👉 Les versions compilées sont disponibles dans la section **Releases** :  
