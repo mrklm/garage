@@ -21,7 +21,15 @@ assets/v1.png
 venv/
 
 # PyInstaller
-build/
+# Builds / packaging
+AppDir/
+Garage-*-linux-*/
 dist/
+<<<<<<< HEAD
 *.spec
 
+=======
+build/
+*.AppImage
+squashfs-root/
+>>>>>>> fc35797 (chore: stop tracking venv and ignore build artifacts)
