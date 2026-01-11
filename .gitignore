@@ -19,6 +19,13 @@ desktop.ini
 garage.db
 
 # =========================
+# Python cache
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+
+# =========================
 # Environnements virtuels
 # =========================
 .venv/
@@ -31,15 +38,19 @@ build/
 dist/
 *.spec
 
-# Linux AppImage
+# Linux AppImage (artefacts de build)
 AppDir/
-*.AppImage
 squashfs-root/
+*.AppImage
 
 # =========================
 # Releases (artefacts finaux)
 # =========================
 releases/
+SHA256SUMS-*.txt
+
+# (optionnel) exports de répertoires versionnés dans les noms
+Garage-*-linux-*/
 
 # =========================
 # Exports nommés (anciens builds)
@@ -53,6 +64,7 @@ Garage - Windows -*
 # =========================
 assets/v1.png
 assets/v2.png
+
 # =========================
 # les .bin
 # =========================
