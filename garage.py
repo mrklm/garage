@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.4.3 (clean, single-file)
+Garage — v4.4.5 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -121,11 +121,20 @@ def ensure_help_file(user_dir: Path) -> Path:
 ensure_database()
 HELP_FILE = ensure_help_file(Path(USER_DIR))
 # --- AIDE (style) ---
-HELP_FONT_FAMILY = "Helvetica"
-HELP_FONT_SIZE = 20          # Taille de la police de l'aide
-HELP_TEXT_COLOR = "#F2F2F2"  # Couleur du texte de l'aide
-HELP_BG = "#2B2B2B"          # Fond de l'aide (gris très sombre)
-HELP_LOGO_MAX_SIZE = 220     # Taille maximale du logo (px)
+HELP_FONT_FAMILY = "TkDefaultFont"  # Police de TK pour eviter le ghost des emojis ésseulés
+HELP_FONT_SIZE = 20                 # Taille de la police de l'aide
+HELP_TEXT_COLOR = "#F2F2F2"       # Couleur du texte de l'aide
+HELP_BG = "#2B2B2B"               # Fond de l'aide (gris très sombre)
+HELP_LOGO_MAX_SIZE = 220            # Taille maximale du logo (px)
+
+#tag special pour laisser passer les emojis ésseulés
+
+if sys.platform == "darwin":
+    HELP_EMOJI_FONT_FAMILY = "Apple Color Emoji"
+elif sys.platform.startswith("win"):
+    HELP_EMOJI_FONT_FAMILY = "Segoe UI Emoji"
+else:
+    HELP_EMOJI_FONT_FAMILY = "Noto Color Emoji"
 
 # Logo dans l'aide (plafond strict, indépendant du layout)
 HELP_LOGO_MAX_WIDTH = 180
@@ -186,7 +195,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.4.3"
+APP_TITLE = "Garage v4.4.5"
 ASSETS_DIR = resource_path("assets")
 VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
@@ -1483,10 +1492,8 @@ class GarageApp(tk.Tk):
         FIELD_FG = t["FIELD_FG"]
         ACCENT = t["ACCENT"]
 
-
         # Texte dans les champs (par défaut = FG si non défini)
         FIELD_FG = locals().get("FIELD_FG", FG)
-
 
         # --- Tk (classique) ---
         # Affecte au root + palette par défaut pour tk widgets
@@ -1500,25 +1507,26 @@ class GarageApp(tk.Tk):
         except Exception:
             pass
 
-        # --- ttk (thémé) ---
+        # --- ttk (thèmes/widgets ttk) ---
         style = ttk.Style(self)
 
-        # Windows : thèmes natifs parfois “bloquants” -> forcer un thème modifiable
-        if is_windows:
-            try:
-                style.theme_use("clam")
-            except Exception:
-                style.theme_use("default")
 
-            # Dropdown Combobox (la liste) : c'est un Listbox Tk, pas 100% ttk
-            self.option_add("*TCombobox*Listbox.background", FIELD)
-            self.option_add("*TCombobox*Listbox.foreground", FIELD_FG)
-            self.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
-            self.option_add("*TCombobox*Listbox.selectForeground", FIELD_FG)
-            self.option_add("*TCombobox*Listbox.font", "TkDefaultFont")
-            self.option_add("*TCombobox*Listbox.width", 60)
-          
+        # macOS (aqua) et Windows : thèmes natifs parfois “bloquants” -> forcer un thème modifiable
+        if is_windows or is_mac:
+            for candidate in ("clam", "alt", "default"):
+                try:
+                    style.theme_use(candidate)
+                    break
+                except Exception:
+                    pass
 
+        # Dropdown Combobox (la liste) : c'est un Listbox Tk -> toutes plateformes
+        self.option_add("*TCombobox*Listbox.background", FIELD)
+        self.option_add("*TCombobox*Listbox.foreground", FIELD_FG)
+        self.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
+        self.option_add("*TCombobox*Listbox.selectForeground", FIELD_FG)
+        self.option_add("*TCombobox*Listbox.font", "TkDefaultFont")
+        self.option_add("*TCombobox*Listbox.width", 60)
 
         # Sur Linux, garder le thème système (Adwaita) mais surcharger les couleurs
         # (sur macOS idem, ça évite de casser l'apparence native)
@@ -1743,15 +1751,56 @@ class GarageApp(tk.Tk):
 
         self.help_text.config(state="normal")
         self.help_text.delete("1.0", "end")
-
-        # Supprime uniquement le tag qu'on gère
+        
+        # bloc qui fait en sorte d'aficher les emojis meme seuls sur une ligne, et en cross OS
         try:
             self.help_text.tag_delete("center")
         except Exception:
             pass
-
         self.help_text.tag_configure("center", justify="center", foreground=HELP_TEXT_COLOR)
-        self.help_text.insert("1.0", content, "center")
+
+        # --- Tag spécifique pour les lignes emoji-only ---
+        try:
+            self.help_text.tag_delete("emoji")
+        except Exception:
+            pass
+
+        try:
+            self.help_text.tag_configure(
+                "emoji",
+                justify="center",
+                foreground=HELP_TEXT_COLOR,
+                font=(HELP_EMOJI_FONT_FAMILY, HELP_FONT_SIZE),
+            )
+        except Exception:
+            # Si la police emoji n'est pas dispo, on garde au moins centrage + couleur
+            self.help_text.tag_configure(
+                "emoji",
+                justify="center",
+                foreground=HELP_TEXT_COLOR,
+            )
+
+
+
+        self.help_text.mark_set("insert", "1.0")
+        for line in content.splitlines():
+            stripped = line.strip()
+
+            if stripped == "":
+                self.help_text.insert("end", "\n")
+                continue
+
+            # Lignes avec lettres/chiffres : centrées via le tag "center"
+            if any(ch.isalnum() for ch in stripped):
+                self.help_text.insert("end", line + "\n", "center")
+            else:
+                # Lignes sans alphanum (---, emojis, symboles) : centrées aussi
+                # Supprime tabulations et espaces qui créent de grands écarts entre emojis dans Tk
+                clean = line.replace("\t", "").replace(" ", "")
+                self.help_text.insert("end", clean + "\n", "emoji")
+
+
+
         self.help_text.config(state="disabled")
 
 
@@ -1787,10 +1836,29 @@ class GarageApp(tk.Tk):
 
         try:
             if PIL_AVAILABLE:
-                img = Image.open(logo_path)
-                img.thumbnail((max_px, max_px))  # garde les proportions
+                img = Image.open(logo_path).convert("RGBA")
+
+                # --- HiDPI / Retina : on calcule un facteur d'échelle Tk ---
+                try:
+                    tk_scale = float(self.tk.call("tk", "scaling"))  # souvent ~2.0 sur Retina
+                    
+                except Exception:
+                    tk_scale = 1.0
+                if tk_scale < 1.0:
+                    tk_scale = 1.0
+
+                target_px = int(max_px * tk_scale)
+
+                w, h = img.size
+                scale = min(target_px / w, target_px / h)
+                new_w = max(1, int(w * scale))
+                new_h = max(1, int(h * scale))
+
+                img = img.resize((new_w, new_h), Image.LANCZOS)
+
                 self._logo_img = ImageTk.PhotoImage(img)
                 self.help_logo_label.config(image=self._logo_img, text="")
+                
             else:
                 # Fallback Tk : pas de resize natif -> on subsample pour éviter un logo géant
                 img = tk.PhotoImage(file=logo_path)
