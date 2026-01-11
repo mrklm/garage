@@ -6,6 +6,14 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 ---
 
+## [4.4.4] – 2026-01-07
+
+### Corrigé
+
+ - Ajustement pour faire fonctionner les thèmes sous macOS
+
+---
+
 ## [4.4.3] – 2026-01-07
 
 ### Corrigé
