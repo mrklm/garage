@@ -1,35 +1,55 @@
+# =========================
+# OS
+# =========================
 # macOS
 .DS_Store
 
-# VSC
+# Windows
+Thumbs.db
+desktop.ini
+
+# =========================
+# IDE / Editors
+# =========================
 .vscode/
 
-# Base locale utilisateur
+# =========================
+# Données locales utilisateur
+# =========================
 garage.db
 
-# Builds distribués (anciens exports à ne jamais versionner)
+# =========================
+# Environnements virtuels
+# =========================
+.venv/
+venv/
+
+# =========================
+# PyInstaller / builds
+# =========================
+build/
+dist/
+*.spec
+
+# Linux AppImage
+AppDir/
+*.AppImage
+squashfs-root/
+
+# =========================
+# Releases (artefacts finaux)
+# =========================
+releases/
+
+# =========================
+# Exports nommés (anciens builds)
+# =========================
 Garage - Linux -*/
 Garage - MacOs -*/
 Garage - Windows -*
 
-# Photos personnelles locales (à ne jamais committer)
-assets/v2.png
+# =========================
+# Assets locaux non versionnés
+# =========================
 assets/v1.png
-
-# Environnements virtuels
-.venv/
-venv/
-
-# PyInstaller
-# Builds / packaging
-AppDir/
-Garage-*-linux-*/
-dist/
-<<<<<<< HEAD
-*.spec
-
-=======
-build/
-*.AppImage
-squashfs-root/
->>>>>>> fc35797 (chore: stop tracking venv and ignore build artifacts)
+assets/v2.png
