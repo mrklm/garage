@@ -47,10 +47,10 @@ https://github.com/mrklm/garage/releases
   - `Garage v4.4.5 linux-x86_64.tar.gz` (alternative)
 
 - **macOS**  
-  - `Garage - MacOs - v 4.4.4.zip`
+  - `Garage-4.4.5-macOS-x86_64.dmg `
 
 - **Windows**  
-  - `Garage - Windows - v4.4.3.zip`
+  - `Garage-v4.4.5-windows-x86_64-portable.zip`
 
 ---
 
