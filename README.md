@@ -1,8 +1,9 @@
 # GARAGE
 
-![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
 ![License](https://img.shields.io/badge/license-GPLv3-blue)
-![Version](https://img.shields.io/badge/version-4.2.2-green)
+![Version](https://img.shields.io/badge/version-4.4.5-green)
+
 
 **Garage** est une application simple et autonome pour suivre les informations essentielles de vos véhicules.
 
@@ -42,8 +43,8 @@ https://github.com/mrklm/garage/releases
 ### Applications standalone (recommandé)
 
 - **Linux (recommandé)**  
-  - `Garage-linux-x86_64-v4.4.4-x86_64.AppImage`  
-  - `Garage-4.4.4-linux-x86_64.tar.gz` (alternative)
+  - `Garagev4.4.5-linux-x86_64.Appimage`  
+  - `Garage v4.4.5 linux-x86_64.tar.gz` (alternative)
 
 - **macOS**  
   - `Garage - MacOs - v 4.4.4.zip`
@@ -58,14 +59,14 @@ https://github.com/mrklm/garage/releases
 ### Option 1 — AppImage (recommandé)
 
 ```bash
-chmod +x Garage-x86_64.AppImage
+chmod +x Garagev4.4.5-linux-x86_64.Appimage
 ./Garage-x86_64.AppImage
 ```
 
 ### Option 2 — Archive `.tar.gz`
 
 ```bash
-tar -xzf Garage-4.4.4-linux-x86_64.tar.gz
+tar -xzf Garage v4.4.5 linux-x86_64.tar.gz
 cd Garage
 ./Garage
 ```
