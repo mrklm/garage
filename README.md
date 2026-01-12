@@ -21,7 +21,7 @@ L’onglet **Général** affiche automatiquement :
 - la consommation moyenne (L/100 km),
 - une estimation des coûts à prévoir sur les six prochains mois,
 - l’état de la batterie (si renseigné).
-- Des graphiques de la conso L/100km del l'évolution dans le temps des prix -entretiens /réparations /carburant.
+- Des graphiques de la conso L/100km de l'évolution dans le temps des prix -entretiens /réparations /carburant.
 ---
 
 ## Aperçu
@@ -42,7 +42,7 @@ https://github.com/mrklm/garage/releases
 
 ### Applications standalone (recommandé)
 
-- **Linux (recommandé)**  
+- **Linux**  
   - `Garagev4.4.5-linux-x86_64.Appimage`  
   - `Garage v4.4.5 linux-x86_64.tar.gz` (alternative)
 
