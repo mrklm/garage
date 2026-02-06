@@ -9,7 +9,7 @@ set -euo pipefail
 #
 # À lancer à la racine du repo (là où il y a garage.py, assets/, data/, etc.)
 
-VERSION="4.4.5"
+VERSION="4.4.6"
 KEEP_BUILD_DIRS="0"
 
 while [[ $# -gt 0 ]]; do
