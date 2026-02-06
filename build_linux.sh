@@ -1,4 +1,3 @@
-cat > build_linux.sh <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -26,7 +25,10 @@ RELEASES_DIR="${ROOT_DIR}/releases"
 APPIMAGE_OUT="${APP_NAME}-linux-${ARCH}-v${VERSION}.AppImage"
 TAR_DIR="${APP_NAME}-${VERSION}-linux-${ARCH}"
 TAR_OUT="${TAR_DIR}.tar.gz"
-SHA_OUT="SHA256SUMS-${APP_NAME}-v${VERSION}.txt"
+
+# SHA:
+SHA_SUMS_OUT="SHA256SUMS-${APP_NAME}-v${VERSION}.txt"
+APPIMAGE_SHA_OUT="${APPIMAGE_OUT}.sha256"
 
 # ---- helpers -------------------------------------------------
 die() { echo "❌ $*" >&2; exit 1; }
@@ -43,6 +45,11 @@ command -v wget   >/dev/null 2>&1 || die "wget introuvable (sudo apt install wge
 
 mkdir -p "${RELEASES_DIR}"
 
+info "Python utilisé : $(command -v python)"
+info "Version Python : $(python3 --version || true)"
+info "Target ARCH    : ${ARCH}"
+info "Version build  : ${VERSION}"
+
 # ---- venv ---------------------------------------------------
 info "Création / activation du venv .venv"
 if [[ ! -d "${ROOT_DIR}/.venv" ]]; then
@@ -52,10 +59,8 @@ fi
 # shellcheck disable=SC1091
 source "${ROOT_DIR}/.venv/bin/activate"
 
-info "Python utilisé : $(which python)"
-info "Version Python : $(python --version)"
-info "Target ARCH    : ${ARCH}"
-info "Version build  : ${VERSION}"
+info "Python venv : $(which python)"
+info "Version venv: $(python --version)"
 
 # ---- pip deps -----------------------------------------------
 info "Mise à jour pip / setuptools / wheel"
@@ -71,8 +76,8 @@ else
 fi
 
 # ---- clean old artifacts ------------------------------------
-info "Nettoyage anciens artefacts (build/, dist/, *.spec)"
-rm -rf "${BUILD_DIR}" "${DIST_DIR}" ./*.spec
+info "Nettoyage anciens artefacts (build/, dist/, *.spec, AppDir/)"
+rm -rf "${BUILD_DIR}" "${DIST_DIR}" ./*.spec "${APPDIR}"
 
 # ---- PyInstaller build --------------------------------------
 info "Build PyInstaller (--onefile)"
@@ -92,7 +97,7 @@ pyinstaller --noconfirm --clean \
 [[ -x "${DIST_DIR}/${APP_NAME}" ]] || die "Binaire dist/${APP_NAME} introuvable."
 
 # ---- smoke test ---------------------------------------------
-info "Test rapide du binaire PyInstaller"
+info "Test rapide du binaire PyInstaller (smoke test)"
 set +e
 "${DIST_DIR}/${APP_NAME}" >/dev/null 2>&1 &
 PID=$!
@@ -100,11 +105,10 @@ sleep 1
 kill "$PID" >/dev/null 2>&1 || true
 wait "$PID" >/dev/null 2>&1 || true
 set -e
-ok "Le binaire se lance (test smoke OK)."
+ok "Le binaire se lance (smoke OK)."
 
 # ---- AppDir -------------------------------------------------
 info "Préparation AppDir"
-rm -rf "${APPDIR}"
 mkdir -p "${APPDIR}/usr/bin"
 
 cp "${DIST_DIR}/${APP_NAME}" "${APPDIR}/usr/bin/${APP_NAME}"
@@ -129,16 +133,21 @@ Terminal=false
 EOF
 
 # ---- AppRun -------------------------------------------------
-cat > "${APPDIR}/AppRun" <<'EOF'
+cat > "${APPDIR}/AppRun" <<EOF
 #!/bin/sh
-HERE="$(dirname "$(readlink -f "$0")")"
-exec "$HERE/usr/bin/Garage" "$@"
+HERE="\$(dirname "\$(readlink -f "\$0")")"
+exec "\$HERE/usr/bin/${APP_NAME}" "\$@"
 EOF
 chmod +x "${APPDIR}/AppRun"
 
 # ---- appimagetool -------------------------------------------
+# appimagetool continuous fourni ici est x86_64.
+if [[ "${ARCH}" != "x86_64" ]]; then
+  die "appimagetool téléchargé (x86_64) incompatible avec ARCH=${ARCH}. Utiliser un appimagetool adapté."
+fi
+
 if [[ ! -f "${APPIMAGE_TOOL}" ]]; then
-  info "Téléchargement appimagetool"
+  info "Téléchargement appimagetool (x86_64)"
   wget -O "${APPIMAGE_TOOL}" \
     https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
   chmod +x "${APPIMAGE_TOOL}"
@@ -148,6 +157,7 @@ fi
 
 # ---- Build AppImage -----------------------------------------
 info "Création AppImage : ${RELEASES_DIR}/${APPIMAGE_OUT}"
+rm -f "${RELEASES_DIR}/${APPIMAGE_OUT}"
 "${APPIMAGE_TOOL}" "${APPDIR}" "${RELEASES_DIR}/${APPIMAGE_OUT}"
 [[ -f "${RELEASES_DIR}/${APPIMAGE_OUT}" ]] || die "AppImage non créée."
 ok "AppImage créée : ${RELEASES_DIR}/${APPIMAGE_OUT}"
@@ -159,28 +169,31 @@ mkdir -p "${ROOT_DIR}/${TAR_DIR}"
 cp "${DIST_DIR}/${APP_NAME}" "${ROOT_DIR}/${TAR_DIR}/${APP_NAME}"
 chmod +x "${ROOT_DIR}/${TAR_DIR}/${APP_NAME}"
 
-tar czvf "${RELEASES_DIR}/${TAR_OUT}" "${TAR_DIR}" >/dev/null
+tar czf "${RELEASES_DIR}/${TAR_OUT}" "${TAR_DIR}"
 [[ -f "${RELEASES_DIR}/${TAR_OUT}" ]] || die "tar.gz non créée."
 ok "tar.gz créé : ${RELEASES_DIR}/${TAR_OUT}"
 
 # ---- checksums ----------------------------------------------
-info "SHA256 (optionnel)"
+info "SHA256"
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum "${RELEASES_DIR}/${APPIMAGE_OUT}" "${RELEASES_DIR}/${TAR_OUT}" \
-    | tee "${RELEASES_DIR}/${SHA_OUT}" >/dev/null
-  ok "SHA256SUMS généré : ${RELEASES_DIR}/${SHA_OUT}"
+  # 1) fichier sha dédié AppImage
+  ( cd "${RELEASES_DIR}" && sha256sum "${APPIMAGE_OUT}" > "${APPIMAGE_SHA_OUT}" )
+  ok "SHA AppImage : ${RELEASES_DIR}/${APPIMAGE_SHA_OUT}"
+
+  # 2) fichier global (AppImage + tar.gz)
+  (
+    cd "${RELEASES_DIR}"
+    sha256sum "${APPIMAGE_OUT}" "${TAR_OUT}" > "${SHA_SUMS_OUT}"
+  )
+  ok "SHA256SUMS : ${RELEASES_DIR}/${SHA_SUMS_OUT}"
 else
   info "sha256sum absent → skip"
 fi
 
 ok "FINI ✅"
 echo
-echo "Fichiers prêts à publier :"
+echo "Fichiers prêts :"
 echo " - ${RELEASES_DIR}/${APPIMAGE_OUT}"
+echo " - ${RELEASES_DIR}/${APPIMAGE_SHA_OUT} (si sha256sum dispo)"
 echo " - ${RELEASES_DIR}/${TAR_OUT}"
-echo " - ${RELEASES_DIR}/${SHA_OUT} (si généré)"
-echo
-echo "Astuce git : ajoute 'releases/' à .gitignore (artefacts de release)."
-SH
-
-chmod +x build_linux.sh
+echo " - ${RELEASES_DIR}/${SHA_SUMS_OUT} (si sha256sum dispo)"
