@@ -6,6 +6,17 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 ---
 
+## [4.4.6] – 2026-01-07
+
+### Modifié
+
+ - Quand un entretien est à faire dans moins d'un mois, on indique le nombre de jours
+   et plus "0 mois" --> et aujourd'hui à la plae de 0 jours
+
+ - L'entretien "Tension Batterie" est placé en premier des entretiens, les autres en ordre alphabetique  
+
+---
+
 ## [4.4.4] – 2026-01-07
 
 ### Corrigé

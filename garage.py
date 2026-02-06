@@ -35,6 +35,8 @@ import os
 import shutil
 import sys
 from pathlib import Path
+import calendar
+
 
 
 def _app_dir() -> str:
@@ -195,7 +197,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.4.5"
+APP_TITLE = "Garage v4.4.6"
 ASSETS_DIR = resource_path("assets")
 VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
@@ -547,6 +549,18 @@ def _month_diff(d1: date, d2: date) -> int:
         m -= 1
     return max(0, m)
 
+def _add_months(d: date, months: int) -> date:
+    """Ajoute N mois à une date (gestion des fins de mois)."""
+    if months is None:
+        return d
+    # Convertit (année, mois) en index de mois absolu, ajoute, puis reconvertit
+    m0 = (d.year * 12) + (d.month - 1) + int(months)
+    y = m0 // 12
+    m = (m0 % 12) + 1
+
+    last_day = calendar.monthrange(y, m)[1]
+    day = min(d.day, last_day)
+    return date(y, m, day)
 
 # ----------------- DB API : Véhicules -----------------
 
@@ -766,7 +780,8 @@ def list_vehicle_types(vehicle_id: int):
                    FROM vehicule_entretien_types vtt
                    JOIN entretien_types t ON t.id = vtt.type_id
                    WHERE vtt.vehicule_id = ?
-                   ORDER BY t.nom COLLATE NOCASE""", (int(vehicle_id),))
+                   ORDER BY CASE WHEN LOWER(t.nom) = 'tension batterie' THEN 0 ELSE 1 END, t.nom COLLATE NOCASE
+                                      """, (vehicle_id,))
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -884,10 +899,13 @@ def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_mon
         km_left = pk - (int(current_km) - int(last_km))
 
     months_left = None
+    due_date = None
     if pm is not None:
         d_last = _parse_iso_date(last_date_iso)
         if d_last:
             months_left = pm - _month_diff(d_last, date.today())
+            due_date = _add_months(d_last, pm)
+
 
     overdue = False
     if km_left is not None and km_left <= 0:
@@ -899,16 +917,40 @@ def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_mon
         parts = []
         if km_left is not None and km_left <= 0:
             parts.append(f"{abs(km_left)} km")
+
         if months_left is not None and months_left <= 0:
-            parts.append(f"{abs(months_left)} mois")
+            if due_date is not None:
+                days_over = (date.today() - due_date).days
+                if 0 <= days_over < 31:
+                    if days_over == 0:
+                        parts.append("aujourd’hui")
+                    else:
+                        parts.append(f"{days_over} jours")
+                else:
+                    parts.append(f"{abs(months_left)} mois")
+            else:
+                parts.append(f"{abs(months_left)} mois")
+
         suffix = " / ".join(parts) if parts else ""
         return (False, "red", f"À faire depuis {suffix}".strip())
+
     else:
         parts = []
         if km_left is not None:
             parts.append(f"{km_left} km")
+
         if months_left is not None:
-            parts.append(f"{months_left} mois")
+            if due_date is not None:
+                days_left = (due_date - date.today()).days
+                if days_left == 0:
+                    parts.append("aujourd’hui")
+                elif 0 < days_left < 31:
+                    parts.append(f"{days_left} jours")
+                else:
+                    parts.append(f"{months_left} mois")
+            else:
+                parts.append(f"{months_left} mois")
+
         suffix = " / ".join(parts) if parts else ""
         if not suffix:
             return (True, "green", "OK")
@@ -922,7 +964,6 @@ def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_mon
             return (True, "orange", f"À faire dans {suffix}".strip())
 
         return (True, "green", f"À faire dans {suffix}".strip())
-
 
 def list_entretiens_full(vehicle_id: int):
     conn = _connect_db()
