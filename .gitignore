@@ -30,6 +30,8 @@ __pycache__/
 # =========================
 .venv/
 venv/
+-/
+
 
 # =========================
 # PyInstaller / builds
@@ -80,3 +82,12 @@ assets/v2.png
 # creation de .ICNS
 # =========================
 *.iconset/
+
+# =========================
+# Releases (variantes de nommage)
+# =========================
+release/
+*.zip
+*.tar.gz
+*.dmg
+*.exe
