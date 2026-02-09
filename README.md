@@ -2,7 +2,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
 ![License](https://img.shields.io/badge/license-GPLv3-blue)
-![Version](https://img.shields.io/badge/version-4.4.5-green)
+![Version](https://img.shields.io/badge/version-4.4.6-green)
 
 
 **Garage** est une application simple et autonome pour suivre les informations essentielles de vos véhicules.
@@ -43,14 +43,18 @@ https://github.com/mrklm/garage/releases
 ### Applications standalone (recommandé)
 
 - **Linux**  
-  - `Garagev4.4.5-linux-x86_64.Appimage`  
-  - `Garage v4.4.5 linux-x86_64.tar.gz` (alternative)
+  - `Garagev4.4.6-linux-x86_64.Appimage`
+  - `Garagev4.4.6-linux-x86_64.Appimage.sha` 
+  - `Garage v4.4.6 linux-x86_64.tar.gz`
+  - `Garage v4.4.6 linux-x86_64.tar.gz.sha`
 
 - **macOS**  
-  - `Garage-4.4.5-macOS-x86_64.dmg `
+  - `Garage-4.4.6-macOS-x86_64.dmg `
+  - `Garage-4.4.6-macOS-x86_64.dmg.sha `
 
 - **Windows**  
-  - `Garage-v4.4.5-windows-x86_64-portable.zip`
+  - `Garage-v4.4.6-windows-x86_64.zip`
+  - `Garage-v4.4.6-windows-x86_64.zip.sha`
 
 ---
 
