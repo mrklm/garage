@@ -6,6 +6,14 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 ---
 
+## [4.4.9] – 2026-05-18
+
+### Corrigé
+
+- Stabilisation des runners GitHub Actions pour le build multi-OS.
+
+---
+
 ## [4.4.8] – 2026-05-18
 
 ### Ajouté
