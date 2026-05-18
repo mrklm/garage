@@ -6,6 +6,14 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 ---
 
+## [4.4.11] – 2026-05-18
+
+### Amélioré
+
+- Releases GitHub plus lisibles avec titre Garage et artefacts groupés par OS.
+
+---
+
 ## [4.4.10] – 2026-05-18
 
 ### Corrigé
