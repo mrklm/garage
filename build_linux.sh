@@ -7,11 +7,11 @@ set -euo pipefail
 #
 # Usage:
 #   ./build_linux.sh              -> version par défaut
-#   ./build_linux.sh 4.4.7        -> version passée en argument
+#   ./build_linux.sh 4.4.8        -> version passée en argument
 # ----------------------------------------------------
 
 APP_NAME="Garage"
-DEFAULT_VERSION="4.4.7"
+DEFAULT_VERSION="4.4.8"
 VERSION="${1:-$DEFAULT_VERSION}"
 ARCH="$(uname -m)"   # ex: x86_64, aarch64
 
@@ -22,13 +22,14 @@ APPDIR="${ROOT_DIR}/AppDir"
 APPIMAGE_TOOL="${ROOT_DIR}/appimagetool.AppImage"
 RELEASES_DIR="${ROOT_DIR}/releases"
 
-APPIMAGE_OUT="${APP_NAME}-linux-${ARCH}-v${VERSION}.AppImage"
-TAR_DIR="${APP_NAME}-${VERSION}-linux-${ARCH}"
+APPIMAGE_OUT="${APP_NAME}v${VERSION}-linux-${ARCH}.Appimage"
+TAR_DIR="${APP_NAME} v${VERSION} linux-${ARCH}"
 TAR_OUT="${TAR_DIR}.tar.gz"
 
 # SHA:
 SHA_SUMS_OUT="SHA256SUMS-${APP_NAME}-v${VERSION}.txt"
-APPIMAGE_SHA_OUT="${APPIMAGE_OUT}.sha256"
+APPIMAGE_SHA_OUT="${APPIMAGE_OUT}.sha"
+TAR_SHA_OUT="${TAR_OUT}.sha"
 
 # ---- helpers -------------------------------------------------
 die() { echo "❌ $*" >&2; exit 1; }
@@ -176,9 +177,11 @@ ok "tar.gz créé : ${RELEASES_DIR}/${TAR_OUT}"
 # ---- checksums ----------------------------------------------
 info "SHA256"
 if command -v sha256sum >/dev/null 2>&1; then
-  # 1) fichier sha dédié AppImage
+  # 1) fichiers sha dédiés aux artefacts historiques
   ( cd "${RELEASES_DIR}" && sha256sum "${APPIMAGE_OUT}" > "${APPIMAGE_SHA_OUT}" )
   ok "SHA AppImage : ${RELEASES_DIR}/${APPIMAGE_SHA_OUT}"
+  ( cd "${RELEASES_DIR}" && sha256sum "${TAR_OUT}" > "${TAR_SHA_OUT}" )
+  ok "SHA tar.gz : ${RELEASES_DIR}/${TAR_SHA_OUT}"
 
   # 2) fichier global (AppImage + tar.gz)
   (
@@ -196,4 +199,5 @@ echo "Fichiers prêts :"
 echo " - ${RELEASES_DIR}/${APPIMAGE_OUT}"
 echo " - ${RELEASES_DIR}/${APPIMAGE_SHA_OUT} (si sha256sum dispo)"
 echo " - ${RELEASES_DIR}/${TAR_OUT}"
+echo " - ${RELEASES_DIR}/${TAR_SHA_OUT} (si sha256sum dispo)"
 echo " - ${RELEASES_DIR}/${SHA_SUMS_OUT} (si sha256sum dispo)"

@@ -4,12 +4,12 @@ set -euo pipefail
 # build-macos.sh — Garage macOS (Intel x86_64) DMG
 # Usage:
 #   ./build-macos.sh
-#   ./build-macos.sh -v 4.4.7
-#   ./build-macos.sh -v 4.4.7 --keep
+#   ./build-macos.sh -v 4.4.8
+#   ./build-macos.sh -v 4.4.8 --keep
 #
 # À lancer à la racine du repo (là où il y a garage.py, assets/, data/, etc.)
 
-VERSION="4.4.7"
+VERSION="4.4.8"
 KEEP_BUILD_DIRS="0"
 
 while [[ $# -gt 0 ]]; do
@@ -155,13 +155,13 @@ hdiutil create \
 
 # --- SHA256 à côté (pratique pour release GitHub)
 if command -v shasum >/dev/null 2>&1; then
-  (cd releases && shasum -a 256 "$DMG_NAME" > "${DMG_NAME}.sha256")
-  echo "==> SHA256: releases/${DMG_NAME}.sha256"
+  (cd releases && shasum -a 256 "$DMG_NAME" > "${DMG_NAME}.sha")
+  echo "==> SHA256: releases/${DMG_NAME}.sha"
 fi
 
 echo
 echo "✅ OK"
 echo "DMG:   $DMG_PATH"
-if [[ -f "releases/${DMG_NAME}.sha256" ]]; then
-  echo "SHA:   releases/${DMG_NAME}.sha256"
+if [[ -f "releases/${DMG_NAME}.sha" ]]; then
+  echo "SHA:   releases/${DMG_NAME}.sha"
 fi

@@ -1,9 +1,9 @@
-<#  build-windows.ps1 — Garage (Windows) v4.4.7
+<#  build-windows.ps1 — Garage (Windows) v4.4.8
     Script de build Windows (portable) pour un repo multi-OS.
 
     Usage (PowerShell, a la racine du repo) :
       .\build-windows.ps1
-      .\build-windows.ps1 -Version 4.4.7
+      .\build-windows.ps1 -Version 4.4.8
       .\build-windows.ps1 -AppsDir "$env:USERPROFILE\Apps"
       .\build-windows.ps1 -KeepBuildDirs
 
@@ -14,7 +14,7 @@
 
 [CmdletBinding()]
 param(
-  [string]$Version = "4.4.7",
+  [string]$Version = "4.4.8",
   [switch]$KeepBuildDirs,
   [string]$AppsDir = ""
 )
@@ -44,9 +44,9 @@ $Activate = Join-Path $VenvDir "Scripts\Activate.ps1"
 
 $DistExe  = Join-Path $Root "dist\Garage.exe"
 $OutDir   = Join-Path $Root "releases"
-$ZipName  = "Garage-v$Version-windows-x86_64-portable.zip"
+$ZipName  = "Garage-v$Version-windows-x86_64.zip"
 $ZipPath  = Join-Path $OutDir $ZipName
-$HashPath = "$ZipPath.sha256"
+$HashPath = "$ZipPath.sha"
 
 Info "Build Windows - Garage v$Version"
 Info "Repo: $Root"

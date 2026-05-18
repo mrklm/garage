@@ -6,6 +6,14 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 ---
 
+## [4.4.8] – 2026-05-18
+
+### Ajouté
+
+- Build multi-OS automatisé via GitHub Actions.
+
+---
+
 ## [4.4.7] – 2026-05-18
 
 ### Corrigé
