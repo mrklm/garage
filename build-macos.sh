@@ -4,12 +4,12 @@ set -euo pipefail
 # build-macos.sh — Garage macOS (Intel x86_64) DMG
 # Usage:
 #   ./build-macos.sh
-#   ./build-macos.sh -v 4.4.5
-#   ./build-macos.sh -v 4.4.5 --keep
+#   ./build-macos.sh -v 4.4.7
+#   ./build-macos.sh -v 4.4.7 --keep
 #
 # À lancer à la racine du repo (là où il y a garage.py, assets/, data/, etc.)
 
-VERSION="4.4.6"
+VERSION="4.4.7"
 KEEP_BUILD_DIRS="0"
 
 while [[ $# -gt 0 ]]; do
@@ -106,6 +106,22 @@ if [[ ! -d "$APP_PATH" ]]; then
   echo "Erreur: $APP_PATH introuvable après PyInstaller." >&2
   exit 1
 fi
+
+# PyInstaller expose les ressources via sys._MEIPASS. Dans les builds macOS
+# récents, cet emplacement est Contents/Frameworks ; on vérifie explicitement
+# la base modèle pour éviter un crash au premier lancement sur un profil neuf.
+EXPECTED_DB_TEMPLATE="${APP_PATH}/Contents/Frameworks/data/garage_empty.db"
+if [[ ! -f "$EXPECTED_DB_TEMPLATE" ]]; then
+  FOUND_DB_TEMPLATE="$(find "$APP_PATH/Contents" -path '*/data/garage_empty.db' -type f -print -quit)"
+  if [[ -n "$FOUND_DB_TEMPLATE" ]]; then
+    mkdir -p "$(dirname "$EXPECTED_DB_TEMPLATE")"
+    cp "$FOUND_DB_TEMPLATE" "$EXPECTED_DB_TEMPLATE"
+  else
+    echo "Erreur: data/garage_empty.db absent du bundle macOS." >&2
+    exit 1
+  fi
+fi
+echo "==> Base modèle embarquée: ${EXPECTED_DB_TEMPLATE#${APP_PATH}/}"
 
 # --- Création DMG
 DMG_NAME="Garage-${VERSION}-macOS-${ARCH_TAG}.dmg"

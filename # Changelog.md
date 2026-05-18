@@ -6,6 +6,15 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 ---
 
+## [4.4.7] – 2026-05-18
+
+### Corrigé
+
+- Démarrage possible sur une nouvelle installation macOS sans base existante.
+- Vérification de l'inclusion de `garage_empty.db` dans le build macOS.
+
+---
+
 ## [4.4.6] – 2026-01-07
 
 ### Modifié

@@ -1,9 +1,9 @@
-<#  build-windows.ps1 — Garage (Windows) v4.4.5
+<#  build-windows.ps1 — Garage (Windows) v4.4.7
     Script de build Windows (portable) pour un repo multi-OS.
 
     Usage (PowerShell, a la racine du repo) :
       .\build-windows.ps1
-      .\build-windows.ps1 -Version 4.4.5
+      .\build-windows.ps1 -Version 4.4.7
       .\build-windows.ps1 -AppsDir "$env:USERPROFILE\Apps"
       .\build-windows.ps1 -KeepBuildDirs
 
@@ -14,7 +14,7 @@
 
 [CmdletBinding()]
 param(
-  [string]$Version = "4.4.5",
+  [string]$Version = "4.4.7",
   [switch]$KeepBuildDirs,
   [string]$AppsDir = ""
 )

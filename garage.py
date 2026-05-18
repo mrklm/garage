@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.4.6 (clean, single-file)
+Garage — v4.4.7 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -33,6 +33,7 @@ from __future__ import annotations
 # --- Initialisation base de données (modèle -> garage.db) ---
 import os
 import shutil
+import sqlite3
 import sys
 from pathlib import Path
 import calendar
@@ -94,9 +95,13 @@ DB_TEMPLATE = _resource_path("data", "garage_empty.db")
 def ensure_database() -> None:
     """Crée garage.db à partir du modèle si la base n'existe pas encore."""
     if not os.path.exists(DB_FILE):
-        if not os.path.exists(DB_TEMPLATE):
-            raise FileNotFoundError(f"Base modèle introuvable : {DB_TEMPLATE}")
-        shutil.copy(DB_TEMPLATE, DB_FILE)
+        os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
+        if os.path.exists(DB_TEMPLATE):
+            shutil.copy(DB_TEMPLATE, DB_FILE)
+        else:
+            # Secours pour les builds incomplets : _ensure_schema() créera
+            # ensuite les tables minimales au démarrage de l'interface.
+            sqlite3.connect(DB_FILE).close()
 
 
 def ensure_help_file(user_dir: Path) -> Path:
@@ -197,7 +202,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.4.6"
+APP_TITLE = "Garage v4.4.7"
 ASSETS_DIR = resource_path("assets")
 VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
