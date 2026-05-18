@@ -6,6 +6,14 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 ---
 
+## [4.4.10] – 2026-05-18
+
+### Corrigé
+
+- Utilisation d'un runner macOS Intel plus disponible pour le build GitHub Actions.
+
+---
+
 ## [4.4.9] – 2026-05-18
 
 ### Corrigé

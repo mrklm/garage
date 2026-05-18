@@ -6,7 +6,7 @@ on:
       version:
         description: "Version sans le v initial"
         required: true
-        default: "4.4.9"
+        default: "4.4.10"
   push:
     tags:
       - "v*"
@@ -20,7 +20,7 @@ env:
 jobs:
   build-macos:
     name: macOS x86_64
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
 
