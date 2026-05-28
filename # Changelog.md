@@ -4,6 +4,41 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+
+
+---
+
+## [4.4.16] – 2026-05-28
+
+### Corrigé
+
+- Tk et matplotlib doivent fonctionner
+- Contour du vehicule séléctionné 
+- Les entretiens longs passe en orange le dernier mois.
+
+---
+
+## [4.4.15] – 2026-05-28
+
+### Corrigé
+
+- Mise a plats de la versions
+
+---
+
+## [4.4.14] – 2026-05-28
+
+### Corrigé
+
+- Les Builds embarquent TKinter et matplotlib
+
+---
+
+## [4.4.13] – 2026-05-28
+
+### Corrigé
+
+- Couleurs des Decomptes.
 ---
 
 ## [4.4.12] – 2026-05-28

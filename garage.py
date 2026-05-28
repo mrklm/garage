@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.4.15 (clean, single-file)
+Garage — v4.4.16 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -151,6 +151,7 @@ import os
 import re
 import sqlite3
 import shutil
+import tempfile
 import uuid
 import tkinter as tk
 import tkinter.font as tkfont
@@ -171,28 +172,43 @@ MATPLOTLIB_AVAILABLE = False
 Figure = None
 FigureCanvasTkAgg = None
 NavigationToolbar2Tk = None
+MATPLOTLIB_ERROR = ""
 
-try:
-    import matplotlib
-    matplotlib.use("TkAgg")
-    from matplotlib.figure import Figure  # type: ignore
-    MATPLOTLIB_AVAILABLE = True
-except Exception:
-    MATPLOTLIB_AVAILABLE = False
-    Figure = None
 
-if MATPLOTLIB_AVAILABLE:
+def _ensure_matplotlib_available() -> bool:
+    """Charge Matplotlib/TkAgg à la demande, après l'initialisation Tk."""
+    global MATPLOTLIB_AVAILABLE, MATPLOTLIB_ERROR
+    global Figure, FigureCanvasTkAgg, NavigationToolbar2Tk
+
+    if MATPLOTLIB_AVAILABLE and Figure is not None and FigureCanvasTkAgg is not None:
+        return True
+
     try:
-        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # type: ignore
-    except Exception:
-        FigureCanvasTkAgg = None
-        MATPLOTLIB_AVAILABLE = False
+        mpl_config_dir = os.path.join(USER_DIR, "matplotlib")
+        try:
+            os.makedirs(mpl_config_dir, exist_ok=True)
+        except Exception:
+            mpl_config_dir = tempfile.mkdtemp(prefix="garage-matplotlib-")
+        os.environ.setdefault("MPLCONFIGDIR", mpl_config_dir)
 
-if MATPLOTLIB_AVAILABLE:
-    try:
+        import matplotlib
+        matplotlib.use("TkAgg", force=True)
+        from matplotlib.figure import Figure as MplFigure  # type: ignore
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg as MplFigureCanvasTkAgg  # type: ignore
         from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk  # type: ignore
-    except Exception:
+
+        Figure = MplFigure
+        FigureCanvasTkAgg = MplFigureCanvasTkAgg
+        MATPLOTLIB_AVAILABLE = True
+        MATPLOTLIB_ERROR = ""
+        return True
+    except Exception as exc:
+        MATPLOTLIB_AVAILABLE = False
+        Figure = None
+        FigureCanvasTkAgg = None
         NavigationToolbar2Tk = None
+        MATPLOTLIB_ERROR = f"{type(exc).__name__}: {exc}"
+        return False
 
 def read_text_file_safely(path: str) -> str:
     """Lit un fichier texte en UTF-8, retourne une chaîne vide en cas d'échec."""
@@ -202,7 +218,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.4.15"
+APP_TITLE = "Garage v4.4.16"
 ASSETS_DIR = resource_path("assets")
 VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
@@ -989,12 +1005,17 @@ def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_mon
             if 0 <= days_left_for_alert <= 5:
                 return (True, "orange", upcoming_label())
 
-        # Pré-alerte longue : si la fréquence est > 6 mois et que c'est dû dans <= 6 mois → orange
+        # Pré-alerte longue : si la fréquence est > 1 mois, orange seulement
+        # pendant le dernier mois avant l'échéance.
         try:
             pm_int = int(pm) if pm is not None else None
         except Exception:
             pm_int = None
-        if pm_int is not None and pm_int > 6 and months_left is not None and 0 < months_left <= 6:
+        if pm_int is not None and pm_int > 1 and due_date is not None:
+            days_left_for_alert = (due_date - today).days
+            if 0 <= days_left_for_alert <= 31:
+                return (True, "orange", upcoming_label())
+        elif pm_int is not None and pm_int > 1 and months_left is not None and 0 < months_left <= 1:
             return (True, "orange", upcoming_label())
 
         return (True, "green", upcoming_label())
@@ -2113,6 +2134,10 @@ class GarageApp(tk.Tk):
     def _build_general_card(self, r, row: int, col: int, colspan: int):
         vid = int(r["id"])
         title = r["nom"] or f"Véhicule #{vid}"
+        selected = self.active_vehicle_id is not None and int(self.active_vehicle_id) == vid
+        colors = getattr(self, "_ui_colors", {})
+        accent = colors.get("ACCENT", "#66B3FF")
+        panel = colors.get("BG", colors.get("PANEL", ""))
         card = ttk.Frame(self.general_cards, padding=(12, 6))
         card.grid(row=row, column=col, columnspan=colspan, sticky="nsew", padx=8, pady=(0, 4))
         self.general_cards.columnconfigure(col, weight=1)
@@ -2155,10 +2180,13 @@ class GarageApp(tk.Tk):
 
         img = _load_vehicle_photo_tk(r["photo_file"], max_w=270, max_h=165)
         self._general_card_imgs[vid] = img
-        photo = ttk.Label(card, text="(aucune photo)")
-        photo.grid(row=3, column=0, sticky="nw")
+        photo_border = tk.Frame(card, bg=accent if selected else panel, padx=2, pady=2)
+        photo_border.grid(row=3, column=0, sticky="nw")
+        photo = ttk.Label(photo_border, text="(aucune photo)")
+        photo.grid(row=0, column=0, sticky="nw")
         if img:
             photo.config(image=img, text="")
+        photo_border.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
         photo.bind("<Button-1>", lambda e, v=vid: self._select_vehicle_from_general(v))
 
         est = estimate_maintenance_cost_next_months(vid, horizon_months=6)
@@ -2238,6 +2266,10 @@ class GarageApp(tk.Tk):
 
         self._theme_name = name
         self._apply_platform_theme()
+        try:
+            self._refresh_general_overview()
+        except Exception:
+            pass
 
         # petit refresh UI
         try:
@@ -3019,10 +3051,13 @@ class GarageApp(tk.Tk):
         self.graph_area.columnconfigure(0, weight=1)
         self.graph_area.rowconfigure(0, weight=1)
 
-        if not MATPLOTLIB_AVAILABLE or Figure is None or FigureCanvasTkAgg is None:
+        if not _ensure_matplotlib_available() or Figure is None or FigureCanvasTkAgg is None:
+            details = f"\n\nDétail: {MATPLOTLIB_ERROR}" if MATPLOTLIB_ERROR else ""
             ttk.Label(
                 self.graph_area,
-                text="Matplotlib/Tk indisponible. Installe matplotlib et tkinter pour afficher les graphiques.",
+                text=f"Matplotlib/Tk indisponible. Les graphiques ne peuvent pas être affichés.{details}",
+                wraplength=900,
+                justify="left",
             ).grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
             return
 

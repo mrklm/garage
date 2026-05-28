@@ -100,6 +100,9 @@ python3 -m PyInstaller \
   --add-data "assets:assets" \
   --add-data "data:data" \
   --hidden-import=matplotlib.backends.backend_tkagg \
+  --collect-submodules matplotlib.backends \
+  --collect-data matplotlib \
+  --collect-binaries matplotlib \
   --hidden-import=PIL._tkinter_finder \
   --hidden-import=PIL._imagingtk \
   --collect-submodules PIL \
