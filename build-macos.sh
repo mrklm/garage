@@ -9,7 +9,7 @@ set -euo pipefail
 #
 # À lancer à la racine du repo (là où il y a garage.py, assets/, data/, etc.)
 
-VERSION="4.4.11"
+VERSION="4.4.17"
 KEEP_BUILD_DIRS="0"
 MIN_MACOS_VERSION="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 
