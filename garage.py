@@ -567,6 +567,10 @@ def _add_months(d: date, months: int) -> date:
     day = min(d.day, last_day)
     return date(y, m, day)
 
+
+def _format_days(days: int) -> str:
+    return f"{int(days)} jour" if int(days) == 1 else f"{int(days)} jours"
+
 # ----------------- DB API : Véhicules -----------------
 
 def list_vehicles():
@@ -903,19 +907,23 @@ def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_mon
     if pk is not None and last_km is not None:
         km_left = pk - (int(current_km) - int(last_km))
 
+    today = date.today()
     months_left = None
     due_date = None
     if pm is not None:
         d_last = _parse_iso_date(last_date_iso)
         if d_last:
-            months_left = pm - _month_diff(d_last, date.today())
+            months_left = pm - _month_diff(d_last, today)
             due_date = _add_months(d_last, pm)
 
 
     overdue = False
     if km_left is not None and km_left <= 0:
         overdue = True
-    if months_left is not None and months_left <= 0:
+    if due_date is not None:
+        if due_date <= today:
+            overdue = True
+    elif months_left is not None and months_left <= 0:
         overdue = True
 
     if overdue:
@@ -923,14 +931,24 @@ def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_mon
         if km_left is not None and km_left <= 0:
             parts.append(f"{abs(km_left)} km")
 
-        if months_left is not None and months_left <= 0:
+        if due_date is not None and due_date <= today:
+            days_over = (today - due_date).days
+            if 0 <= days_over < 31:
+                if days_over == 0:
+                    parts.append("aujourd’hui")
+                else:
+                    parts.append(_format_days(days_over))
+            else:
+                months_over = _month_diff(due_date, today)
+                parts.append(f"{months_over} mois")
+        elif months_left is not None and months_left <= 0:
             if due_date is not None:
-                days_over = (date.today() - due_date).days
+                days_over = (today - due_date).days
                 if 0 <= days_over < 31:
                     if days_over == 0:
                         parts.append("aujourd’hui")
                     else:
-                        parts.append(f"{days_over} jours")
+                        parts.append(_format_days(days_over))
                 else:
                     parts.append(f"{abs(months_left)} mois")
             else:
@@ -946,11 +964,11 @@ def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_mon
 
         if months_left is not None:
             if due_date is not None:
-                days_left = (due_date - date.today()).days
+                days_left = (due_date - today).days
                 if days_left == 0:
                     parts.append("aujourd’hui")
-                elif 0 < days_left < 31:
-                    parts.append(f"{days_left} jours")
+                elif 0 < days_left <= 31:
+                    parts.append(_format_days(days_left))
                 else:
                     parts.append(f"{months_left} mois")
             else:
@@ -1144,22 +1162,23 @@ def estimate_maintenance_cost_next_months(vehicle_id: int, horizon_months: int =
         if pm <= 0:
             continue
 
+        today = date.today()
+        window_end = _add_months(today, horizon_months)
         last_date_iso, _last_km = get_last_entretien_for_type(vehicle_id, int(t["type_id"]))
         if not last_date_iso:
-            due_in_months = 0
+            due_date = today
         else:
             last_d = _parse_iso_date(last_date_iso)
-            if not last_d:
-                due_in_months = 0
-            else:
-                months_since = _month_diff(last_d, date.today())
-                due_in_months = pm - months_since
+            due_date = today if not last_d else _add_months(last_d, pm)
 
-        if due_in_months > horizon_months:
+        if due_date > window_end:
             expected = 0
         else:
-            first = max(0, due_in_months)
-            expected = 1 + max(0, (horizon_months - first) // pm)
+            next_due = today if due_date <= today else due_date
+            expected = 0
+            while next_due <= window_end:
+                expected += 1
+                next_due = _add_months(next_due, pm)
 
         if expected <= 0:
             continue

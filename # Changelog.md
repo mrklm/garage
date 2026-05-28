@@ -6,6 +6,14 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 ---
 
+## [4.4.12] – 2026-05-28
+
+### Corrigé
+
+- Decomptes de temps d'entretiens fonctionnels.
+
+---
+
 ## [4.4.11] – 2026-05-18
 
 ### Amélioré
