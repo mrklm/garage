@@ -11,6 +11,7 @@ set -euo pipefail
 
 VERSION="4.4.11"
 KEEP_BUILD_DIRS="0"
+MIN_MACOS_VERSION="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -64,6 +65,11 @@ if [[ "$ARCH" != "x86_64" ]]; then
 fi
 ARCH_TAG="x86_64"
 
+# Big Sur est macOS 11.x. Déclarer cette cible évite que les binaires compilés
+# pendant le build héritent par défaut de la version de macOS du poste courant.
+export MACOSX_DEPLOYMENT_TARGET="$MIN_MACOS_VERSION"
+echo "==> Cible macOS minimale: ${MACOSX_DEPLOYMENT_TARGET}"
+
 # --- Fix casse logo.png / Logo.png (cohérence repos + PyInstaller)
 # Objectif: avoir assets/logo.png
 if [[ -f "assets/Logo.png" && ! -f "assets/logo.png" ]]; then
@@ -96,6 +102,7 @@ python3 -m PyInstaller \
   --noconfirm \
   --windowed \
   --name Garage \
+  --target-arch x86_64 \
   --icon assets/logo.icns \
   --add-data "assets:assets" \
   --add-data "data:data" \
