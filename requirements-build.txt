@@ -2,7 +2,7 @@ pyinstaller==6.17.0
 pyinstaller-hooks-contrib==2025.11
 
 # runtime libs (doivent être visibles par PyInstaller)
-pillow==12.0.0
+pillow==10.2.0
 matplotlib==3.10.8
 numpy==2.4.0
 python-dateutil==2.9.0.post0
