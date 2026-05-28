@@ -99,6 +99,11 @@ python3 -m PyInstaller \
   --icon assets/logo.icns \
   --add-data "assets:assets" \
   --add-data "data:data" \
+  --hidden-import=matplotlib.backends.backend_tkagg \
+  --hidden-import=PIL._tkinter_finder \
+  --hidden-import=PIL._imagingtk \
+  --collect-submodules PIL \
+  --collect-binaries PIL \
   garage.py
 
 APP_PATH="dist/Garage.app"

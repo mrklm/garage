@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.4.14 (clean, single-file)
+Garage — v4.4.15 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -202,7 +202,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.4.11"
+APP_TITLE = "Garage v4.4.15"
 ASSETS_DIR = resource_path("assets")
 VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
@@ -921,7 +921,7 @@ def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_mon
     if km_left is not None and km_left <= 0:
         overdue = True
     if due_date is not None:
-        if due_date <= today:
+        if due_date < today:
             overdue = True
     elif months_left is not None and months_left <= 0:
         overdue = True
@@ -931,7 +931,7 @@ def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_mon
         if km_left is not None and km_left <= 0:
             parts.append(f"{abs(km_left)} km")
 
-        if due_date is not None and due_date <= today:
+        if due_date is not None and due_date < today:
             days_over = (today - due_date).days
             if 0 <= days_over < 31:
                 if days_over == 0:
@@ -978,15 +978,26 @@ def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_mon
         if not suffix:
             return (True, "green", "OK")
 
-        # Pré-alerte : si la fréquence est > 6 mois et que c'est dû dans <= 6 mois → orange
+        def upcoming_label() -> str:
+            if suffix == "aujourd’hui":
+                return "À faire aujourd’hui"
+            return f"À faire dans {suffix}".strip()
+
+        # Pré-alerte proche : une échéance dans 5 jours ou moins passe en orange.
+        if due_date is not None:
+            days_left_for_alert = (due_date - today).days
+            if 0 <= days_left_for_alert <= 5:
+                return (True, "orange", upcoming_label())
+
+        # Pré-alerte longue : si la fréquence est > 6 mois et que c'est dû dans <= 6 mois → orange
         try:
             pm_int = int(pm) if pm is not None else None
         except Exception:
             pm_int = None
         if pm_int is not None and pm_int > 6 and months_left is not None and 0 < months_left <= 6:
-            return (True, "orange", f"À faire dans {suffix}".strip())
+            return (True, "orange", upcoming_label())
 
-        return (True, "green", f"À faire dans {suffix}".strip())
+        return (True, "green", upcoming_label())
 
 def list_entretiens_full(vehicle_id: int):
     conn = _connect_db()
