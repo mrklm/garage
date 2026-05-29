@@ -5,7 +5,7 @@ Le format est inspiré de *Keep a Changelog* et le versionnement suit une logiqu
 
 ---
 
-## [4.4.18] – 2026-05-29
+## [4.4.19] – 2026-05-29
 
 ### Feat
 

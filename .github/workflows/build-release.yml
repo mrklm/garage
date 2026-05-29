@@ -6,7 +6,7 @@ on:
       version:
         description: "Version sans le v initial"
         required: true
-        default: "4.4.18-legacy"
+        default: "4.4.19-legacy"
   push:
     tags:
       - "v*-legacy"
@@ -53,80 +53,10 @@ jobs:
             releases/Garage-${{ env.VERSION }}-macOS-x86_64.dmg
             releases/Garage-${{ env.VERSION }}-macOS-x86_64.dmg.sha
 
-  build-linux:
-    name: Linux x86_64
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Resolve version
-        run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-          else
-            echo "VERSION=${{ github.event.inputs.version }}" >> "$GITHUB_ENV"
-          fi
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-venv python3-tk libfuse2 wget xvfb
-
-      - name: Build AppImage and tar.gz
-        run: |
-          chmod +x build_linux.sh
-          xvfb-run -a ./build_linux.sh "$VERSION"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Garage-linux-x86_64
-          path: |
-            releases/Garagev${{ env.VERSION }}-linux-x86_64.Appimage
-            releases/Garagev${{ env.VERSION }}-linux-x86_64.Appimage.sha
-            releases/Garage v${{ env.VERSION }} linux-x86_64.tar.gz
-            releases/Garage v${{ env.VERSION }} linux-x86_64.tar.gz.sha
-            releases/SHA256SUMS-Garage-v${{ env.VERSION }}.txt
-
-  build-windows:
-    name: Windows x86_64
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Resolve version
-        shell: pwsh
-        run: |
-          if ($env:GITHUB_REF_TYPE -eq "tag") {
-            "VERSION=$($env:GITHUB_REF_NAME.TrimStart('v'))" | Out-File -FilePath $env:GITHUB_ENV -Append
-          } else {
-            "VERSION=${{ github.event.inputs.version }}" | Out-File -FilePath $env:GITHUB_ENV -Append
-          }
-
-      - name: Build ZIP
-        shell: pwsh
-        run: .\build-windows.ps1 -Version $env:VERSION
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Garage-windows-x86_64
-          path: |
-            releases/Garage-v${{ env.VERSION }}-windows-x86_64.zip
-            releases/Garage-v${{ env.VERSION }}-windows-x86_64.zip.sha
-
   publish-release:
     name: Publish GitHub release
     needs:
       - build-macos
-      - build-linux
-      - build-windows
     if: github.ref_type == 'tag'
     runs-on: ubuntu-22.04
     steps:
@@ -142,16 +72,6 @@ jobs:
           (
             cd release-artifacts/Garage-legacy-macOS-x86_64
             zip -r "../../release-packages/Garage-${VERSION}-legacy-macOS-x86_64-assets.zip" .
-          )
-
-          (
-            cd release-artifacts/Garage-linux-x86_64
-            zip -r "../../release-packages/Garage-${VERSION}-linux-x86_64-assets.zip" .
-          )
-
-          (
-            cd release-artifacts/Garage-windows-x86_64
-            zip -r "../../release-packages/Garage-${VERSION}-windows-x86_64-assets.zip" .
           )
 
       - name: Attach artifacts to release

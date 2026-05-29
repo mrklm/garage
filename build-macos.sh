@@ -4,12 +4,12 @@ set -euo pipefail
 # build-macos.sh — Garage macOS (Intel x86_64) DMG
 # Usage:
 #   ./build-macos.sh
-#   ./build-macos.sh -v 4.4.18
-#   ./build-macos.sh -v 4.4.18 --keep
+#   ./build-macos.sh -v 4.4.19
+#   ./build-macos.sh -v 4.4.19 --keep
 #
 # À lancer à la racine du repo (là où il y a garage.py, assets/, data/, etc.)
 
-VERSION="4.4.18"
+VERSION="4.4.19"
 KEEP_BUILD_DIRS="0"
 MIN_MACOS_VERSION="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 

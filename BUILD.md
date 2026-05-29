@@ -7,8 +7,8 @@
 
 ## Tags
 
-- Releases modernes : `v4.4.18`
-- Releases legacy macOS : `v4.4.18-legacy`
+- Releases modernes : `v4.4.19`
+- Releases legacy macOS : `v4.4.19-legacy`
 
 ## Compatibilite macOS
 
