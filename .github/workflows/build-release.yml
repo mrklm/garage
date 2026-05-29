@@ -6,10 +6,10 @@ on:
       version:
         description: "Version sans le v initial"
         required: true
-        default: "4.4.11"
+        default: "4.4.18-legacy"
   push:
     tags:
-      - "v*"
+      - "v*-legacy"
 
 permissions:
   contents: write
@@ -19,14 +19,16 @@ env:
 
 jobs:
   build-macos:
-    name: macOS x86_64
-    runs-on: macos-15-intel
+    name: macOS legacy x86_64
+    runs-on: macos-13
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.11"
 
       - name: Resolve version
         run: |
@@ -46,7 +48,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Garage-macOS-x86_64
+          name: Garage-legacy-macOS-x86_64
           path: |
             releases/Garage-${{ env.VERSION }}-macOS-x86_64.dmg
             releases/Garage-${{ env.VERSION }}-macOS-x86_64.dmg.sha
@@ -138,8 +140,8 @@ jobs:
           mkdir -p release-packages
 
           (
-            cd release-artifacts/Garage-macOS-x86_64
-            zip -r "../../release-packages/Garage-${VERSION}-macOS-x86_64-assets.zip" .
+            cd release-artifacts/Garage-legacy-macOS-x86_64
+            zip -r "../../release-packages/Garage-${VERSION}-legacy-macOS-x86_64-assets.zip" .
           )
 
           (

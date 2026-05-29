@@ -3,8 +3,13 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+---
 
+## [4.4.18] – 2026-05-29
 
+### Feat
+
+- Creation d'une branche pour macOSX 11.0.0 (Big Sur)
 
 ---
 
