@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.4.21] – 2026-06-06
+
+### Corrigé
+
+- Correction du build moderne macOS et Linux avec Pillow compatible Python 3.13.
+
+---
+
 ## [4.4.20] – 2026-06-06
 
 ### Modifié

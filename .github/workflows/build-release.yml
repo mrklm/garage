@@ -6,7 +6,7 @@ on:
       version:
         description: "Version sans le v initial"
         required: true
-        default: "4.4.20"
+        default: "4.4.21"
   push:
     tags:
       - "v*"
