@@ -4,7 +4,29 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.4.20] – 2026-06-06
 
+### Modifié
+
+- Mise en place de profils de build macOS moderne et legacy depuis le même code.
+- Ajout de dépendances de build séparées pour macOS legacy.
+- Build multi-OS lancé depuis `main` avec le même code applicatif.
+
+---
+
+## [4.4.19] – 2026-05-29
+
+### Feat
+
+- Creation d'une branche pour macOSX 11.0.0 (Big Sur)
+
+---
+
+## [4.4.17] – 2026-05-28
+
+### Corrigé
+
+- Compatibilité Tk et matplotlib pour macOSX 11.0.0 (Big Sur).
 
 ---
 

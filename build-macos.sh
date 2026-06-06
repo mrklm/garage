@@ -4,18 +4,21 @@ set -euo pipefail
 # build-macos.sh — Garage macOS (Intel x86_64) DMG
 # Usage:
 #   ./build-macos.sh
-#   ./build-macos.sh -v 4.4.11
-#   ./build-macos.sh -v 4.4.11 --keep
+#   ./build-macos.sh -v 4.4.20
+#   ./build-macos.sh -v 4.4.20 --flavor legacy
+#   ./build-macos.sh -v 4.4.20 --keep
 #
 # À lancer à la racine du repo (là où il y a garage.py, assets/, data/, etc.)
 
-VERSION="4.4.17"
+VERSION="4.4.20"
 KEEP_BUILD_DIRS="0"
 MIN_MACOS_VERSION="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
+BUILD_FLAVOR="${BUILD_FLAVOR:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v|--version) VERSION="${2:-}"; shift 2 ;;
+    --flavor) BUILD_FLAVOR="${2:-}"; shift 2 ;;
     --keep) KEEP_BUILD_DIRS="1"; shift ;;
     -h|--help)
       sed -n '1,60p' "$0"
@@ -63,7 +66,11 @@ if [[ "$ARCH" != "x86_64" ]]; then
   # Tu peux choisir de bloquer ici si tu veux:
   # exit 1
 fi
-ARCH_TAG="x86_64"
+if [[ -n "$BUILD_FLAVOR" ]]; then
+  ARCH_TAG="${BUILD_FLAVOR}-x86_64"
+else
+  ARCH_TAG="x86_64"
+fi
 
 # Big Sur est macOS 11.x. Déclarer cette cible évite que les binaires compilés
 # pendant le build héritent par défaut de la version de macOS du poste courant.

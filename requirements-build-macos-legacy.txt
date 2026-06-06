@@ -1,0 +1,8 @@
+pyinstaller==6.5.0
+pyinstaller-hooks-contrib==2024.3
+
+# Runtime libs bundled by PyInstaller for older macOS builds.
+pillow==10.2.0
+matplotlib==3.8.4
+numpy==1.26.4
+python-dateutil==2.9.0.post0
