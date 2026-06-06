@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.4.22] – 2026-06-06
+
+### Modifié
+
+- Retrait du build macOS legacy du workflow GitHub Actions automatique faute de runner `macos-13` disponible.
+- Passage des builds GitHub Actions courants à Python 3.12.
+- Documentation du build macOS legacy comme build local sur ancien macOS ou runner auto-hébergé.
+
+---
+
 ## [4.4.21] – 2026-06-06
 
 ### Corrigé
