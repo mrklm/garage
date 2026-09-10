@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.4.23] – 2026-09-10
+
+### Ajouté
+
+- Ajout d'un export de sauvegarde complet.
+- Copie cohérente de `garage.db` via l'API SQLite backup.
+- Inclusion du dossier `vehicle_photos`.
+- Export dans une archive ZIP choisie par l'utilisateur.
+
+---
+
 ## [4.4.22] – 2026-06-06
 
 ### Modifié
