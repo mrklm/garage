@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.4.23 (clean, single-file)
+Garage — v4.4.24 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -219,7 +219,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.4.23"
+APP_TITLE = "Garage v4.4.24"
 ASSETS_DIR = resource_path("assets")
 VEHICLE_PHOTOS_DIR = os.path.join(USER_DIR, "vehicle_photos")  # photos utilisateurs (hors assets packagés)
 
@@ -313,6 +313,232 @@ def export_backup(zip_path: str) -> None:
         except Exception:
             pass
         raise
+
+
+def _pre_import_backup_filename() -> str:
+    return f"Garage-sauvegarde-avant-import-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}.zip"
+
+
+def _is_safe_zip_member(name: str) -> bool:
+    if not name or "\x00" in name:
+        return False
+    if "\\" in name or ":" in name:
+        return False
+    if name.startswith("/") or name.startswith("\\"):
+        return False
+    if re.match(r"^[A-Za-z]:", name):
+        return False
+
+    stripped = name.rstrip("/")
+    if not stripped:
+        return False
+
+    parts = stripped.split("/")
+    return all(part not in ("", ".", "..") for part in parts)
+
+
+def _is_zip_symlink(info: zipfile.ZipInfo) -> bool:
+    return ((info.external_attr >> 16) & 0o170000) == 0o120000
+
+
+def _safe_extract_path(base_dir: str, relative_path: str) -> str:
+    target = os.path.realpath(os.path.join(base_dir, relative_path))
+    base = os.path.realpath(base_dir)
+    if os.path.commonpath([base, target]) != base:
+        raise ValueError("L'archive contient un chemin dangereux.")
+    return target
+
+
+def _remove_path_if_exists(path: str) -> None:
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path)
+    elif os.path.exists(path):
+        os.remove(path)
+
+
+def _extract_backup_zip_safely(zip_path: str, extract_dir: str) -> tuple[str, str | None]:
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zipf:
+            bad_member = zipf.testzip()
+            if bad_member:
+                raise ValueError(f"L'archive ZIP est corrompue (entrée illisible : {bad_member}).")
+
+            db_info = None
+            has_vehicle_photos = False
+            for info in zipf.infolist():
+                if not _is_safe_zip_member(info.filename):
+                    raise ValueError(f"L'archive contient un chemin non autorisé : {info.filename}")
+                if _is_zip_symlink(info):
+                    raise ValueError(f"L'archive contient un lien symbolique non autorisé : {info.filename}")
+
+                member_name = info.filename.rstrip("/")
+                if member_name == "garage.db":
+                    if info.is_dir():
+                        raise ValueError("L'entrée garage.db de l'archive n'est pas un fichier.")
+                    db_info = info
+                elif member_name == "vehicle_photos":
+                    if not info.is_dir():
+                        raise ValueError("L'entrée vehicle_photos de l'archive n'est pas un dossier.")
+                    has_vehicle_photos = True
+                elif member_name.startswith("vehicle_photos/"):
+                    has_vehicle_photos = True
+
+            if db_info is None:
+                raise ValueError("L'archive ne contient pas de fichier garage.db.")
+
+            db_path = _safe_extract_path(extract_dir, "garage.db")
+            with zipf.open(db_info, "r") as src, open(db_path, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+
+            photos_dir = None
+            if has_vehicle_photos:
+                photos_dir = _safe_extract_path(extract_dir, "vehicle_photos")
+                os.makedirs(photos_dir, exist_ok=True)
+                for info in zipf.infolist():
+                    member_name = info.filename.rstrip("/")
+                    if member_name == "vehicle_photos":
+                        continue
+                    if not member_name.startswith("vehicle_photos/"):
+                        continue
+
+                    rel = member_name[len("vehicle_photos/"):]
+                    if not rel:
+                        continue
+                    target_path = _safe_extract_path(photos_dir, rel)
+                    if info.is_dir():
+                        os.makedirs(target_path, exist_ok=True)
+                    else:
+                        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                        with zipf.open(info, "r") as src, open(target_path, "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+
+            return db_path, photos_dir
+    except zipfile.BadZipFile as exc:
+        raise ValueError("Le fichier sélectionné n'est pas une archive ZIP valide.") from exc
+
+
+def _validate_garage_database(db_path: str) -> None:
+    required_tables = {
+        "vehicules": {"id"},
+        "pleins": {"id", "vehicule_id"},
+        "entretien_types": {"id", "nom"},
+        "vehicule_entretien_types": {"vehicule_id", "type_id"},
+        "entretiens": {"id", "vehicule_id"},
+    }
+
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("PRAGMA integrity_check")
+        integrity_rows = cur.fetchall()
+        if len(integrity_rows) != 1 or str(integrity_rows[0][0]).lower() != "ok":
+            raise ValueError("Le contrôle d'intégrité SQLite a échoué.")
+
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        existing_tables = {row["name"] for row in cur.fetchall()}
+        missing_tables = sorted(set(required_tables) - existing_tables)
+        if missing_tables:
+            raise ValueError("La base SQLite ne ressemble pas à une base Garage.")
+
+        for table, required_columns in required_tables.items():
+            cur.execute(f"PRAGMA table_info({table})")
+            existing_columns = {row["name"] for row in cur.fetchall()}
+            if not required_columns.issubset(existing_columns):
+                raise ValueError("La base SQLite ne contient pas la structure attendue pour Garage.")
+    except sqlite3.DatabaseError as exc:
+        raise ValueError("Le fichier garage.db de l'archive n'est pas une base SQLite valide.") from exc
+    finally:
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
+
+
+def import_backup(zip_path: str) -> str:
+    with tempfile.TemporaryDirectory(prefix="garage-import-verify-") as verify_dir:
+        imported_db, imported_photos = _extract_backup_zip_safely(zip_path, verify_dir)
+        _validate_garage_database(imported_db)
+
+        backups_dir = os.path.join(USER_DIR, "backups")
+        os.makedirs(backups_dir, exist_ok=True)
+        safety_backup_path = os.path.join(backups_dir, _pre_import_backup_filename())
+        export_backup(safety_backup_path)
+
+        operation_dir = tempfile.mkdtemp(prefix=".garage-import-", dir=USER_DIR)
+        rollback_dir = os.path.join(operation_dir, "rollback")
+        staging_dir = os.path.join(operation_dir, "staging")
+        os.makedirs(rollback_dir, exist_ok=True)
+        os.makedirs(staging_dir, exist_ok=True)
+
+        staged_db = os.path.join(staging_dir, "garage.db")
+        staged_photos = os.path.join(staging_dir, "vehicle_photos")
+        shutil.copy2(imported_db, staged_db)
+        if imported_photos and os.path.isdir(imported_photos):
+            shutil.copytree(imported_photos, staged_photos)
+
+        rollback_db = os.path.join(rollback_dir, "garage.db")
+        rollback_photos = os.path.join(rollback_dir, "vehicle_photos")
+        db_moved = False
+        photos_moved = False
+        db_installed = False
+        photos_installed = False
+        cleanup_operation_dir = False
+
+        try:
+            if os.path.exists(DB_FILE):
+                os.replace(DB_FILE, rollback_db)
+                db_moved = True
+            if os.path.exists(VEHICLE_PHOTOS_DIR):
+                os.replace(VEHICLE_PHOTOS_DIR, rollback_photos)
+                photos_moved = True
+
+            os.replace(staged_db, DB_FILE)
+            db_installed = True
+            if os.path.isdir(staged_photos):
+                os.replace(staged_photos, VEHICLE_PHOTOS_DIR)
+                photos_installed = True
+
+            cleanup_operation_dir = True
+            return safety_backup_path
+        except Exception as exc:
+            rollback_errors = []
+            try:
+                if db_moved and os.path.exists(rollback_db):
+                    _remove_path_if_exists(DB_FILE)
+                    os.replace(rollback_db, DB_FILE)
+                elif db_installed:
+                    _remove_path_if_exists(DB_FILE)
+            except Exception as rollback_exc:
+                rollback_errors.append(str(rollback_exc))
+            try:
+                if photos_moved and os.path.exists(rollback_photos):
+                    _remove_path_if_exists(VEHICLE_PHOTOS_DIR)
+                    os.replace(rollback_photos, VEHICLE_PHOTOS_DIR)
+                elif photos_installed:
+                    _remove_path_if_exists(VEHICLE_PHOTOS_DIR)
+            except Exception as rollback_exc:
+                rollback_errors.append(str(rollback_exc))
+
+            if rollback_errors:
+                raise RuntimeError(
+                    "L'importation a échoué et la restauration automatique n'a pas pu être finalisée.\n"
+                    f"Dossier temporaire conservé : {operation_dir}\n"
+                    f"Détail : {exc}"
+                ) from exc
+            cleanup_operation_dir = True
+            raise RuntimeError(
+                "L'importation a échoué. Vos données précédentes ont été restaurées automatiquement.\n"
+                f"Détail : {exc}"
+            ) from exc
+        finally:
+            if cleanup_operation_dir:
+                try:
+                    shutil.rmtree(operation_dir)
+                except Exception:
+                    pass
 
 
 def _columns(cur: sqlite3.Cursor, table: str) -> set[str]:
@@ -1828,6 +2054,13 @@ class GarageApp(tk.Tk):
         )
         self.btn_export_backup.grid(row=0, column=1, padx=(10, 0))
 
+        self.btn_import_backup = ttk.Button(
+            self.help_toggle_bar,
+            text="Importer une sauvegarde",
+            command=self._import_backup_dialog,
+        )
+        self.btn_import_backup.grid(row=0, column=2, padx=(10, 0))
+
     def _set_status(self, txt: str):
         self.status.set(txt)
 
@@ -1860,6 +2093,60 @@ class GarageApp(tk.Tk):
             "La base de données et les photos des véhicules ont été exportées.",
         )
         self._set_status("Sauvegarde exportée.")
+
+    def _import_backup_dialog(self) -> None:
+        path = filedialog.askopenfilename(
+            title="Importer une sauvegarde",
+            filetypes=[
+                ("Archives ZIP", "*.zip"),
+                ("Tous les fichiers", "*.*"),
+            ],
+        )
+        if not path:
+            return
+
+        try:
+            with tempfile.TemporaryDirectory(prefix="garage-import-check-") as check_dir:
+                imported_db, _imported_photos = _extract_backup_zip_safely(path, check_dir)
+                _validate_garage_database(imported_db)
+        except Exception as exc:
+            messagebox.showerror(
+                "Import impossible",
+                "La sauvegarde sélectionnée n'est pas valide.\n\n"
+                f"Détail : {exc}",
+            )
+            return
+
+        confirmed = messagebox.askyesno(
+            "Importer une sauvegarde",
+            "Cette opération remplacera les données actuellement utilisées par Garage\n"
+            "par celles contenues dans la sauvegarde sélectionnée.\n\n"
+            "Les véhicules, pleins, entretiens et photos actuels seront remplacés.\n\n"
+            "Une sauvegarde de sécurité de vos données actuelles sera créée automatiquement\n"
+            "avant l'importation.\n\n"
+            "Voulez-vous vraiment continuer ?",
+            icon="warning",
+            default=messagebox.NO,
+        )
+        if not confirmed:
+            return
+
+        try:
+            import_backup(path)
+        except Exception as exc:
+            messagebox.showerror(
+                "Import impossible",
+                "L'importation n'a pas pu être effectuée.\n\n"
+                f"Détail : {exc}",
+            )
+            return
+
+        messagebox.showinfo(
+            "Importation terminée",
+            "La sauvegarde a été importée avec succès.\n\n"
+            "Redémarrez Garage pour utiliser les données restaurées.",
+        )
+        self._set_status("Sauvegarde importée. Redémarrez Garage.")
 
     def _on_help_toggle(self) -> None:
         """Affiche/masque l'aide. La case est globale (visible sur tous les onglets)."""

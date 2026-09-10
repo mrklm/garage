@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.4.24] – 2026-09-10
+
+### Ajouté
+
+- Importation d’une sauvegarde Garage depuis une archive ZIP.
+- Validation de l’archive et de la base SQLite avant toute modification des données.
+- Création automatique d’une sauvegarde de sécurité avant importation.
+
+### Modifié
+
+- Lors d’une restauration, la base de données et les photos des véhicules sont remplacées par celles de la sauvegarde sélectionnée.
+- En cas d’échec pendant l’importation, les données précédentes sont restaurées automatiquement.
+- Après une restauration réussie, Garage demande un redémarrage pour utiliser les données importées.
+
+---
+
 ## [4.4.23] – 2026-09-10
 
 ### Ajouté
