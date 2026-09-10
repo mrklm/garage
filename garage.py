@@ -153,6 +153,7 @@ import sqlite3
 import shutil
 import tempfile
 import uuid
+import zipfile
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk, messagebox, filedialog
@@ -230,6 +231,88 @@ def _connect_db() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+def _default_backup_filename() -> str:
+    return f"Garage-sauvegarde-{date.today().strftime('%Y-%m-%d')}.zip"
+
+
+def _backup_sqlite_database(src_db: str, dst_db: str) -> None:
+    src = sqlite3.connect(src_db)
+    dst = sqlite3.connect(dst_db)
+    try:
+        src.backup(dst)
+    finally:
+        dst.close()
+        src.close()
+
+
+def _add_directory_to_zip(zipf: zipfile.ZipFile, src_dir: str, arc_root: str, exclude_paths: set[str] | None = None) -> None:
+    exclude_paths = exclude_paths or set()
+
+    def _same_path(path: str) -> bool:
+        try:
+            real = os.path.normcase(os.path.realpath(path))
+        except Exception:
+            real = os.path.normcase(os.path.abspath(path))
+        return real in exclude_paths
+
+    zipf.writestr(arc_root.rstrip("/").replace("\\", "/") + "/", "")
+    for root, dirs, files in os.walk(src_dir):
+        rel_root = os.path.relpath(root, src_dir)
+        if rel_root == ".":
+            rel_root = ""
+
+        dirs[:] = [dirname for dirname in dirs if not _same_path(os.path.join(root, dirname))]
+
+        for dirname in dirs:
+            dir_path = os.path.join(root, dirname)
+            if _same_path(dir_path):
+                continue
+            rel_dir = os.path.normpath(os.path.join(rel_root, dirname)) if rel_root else dirname
+            arcname = os.path.join(arc_root, rel_dir).replace("\\", "/").rstrip("/") + "/"
+            zipf.writestr(arcname, "")
+
+        for filename in files:
+            file_path = os.path.join(root, filename)
+            if _same_path(file_path):
+                continue
+            rel_file = os.path.normpath(os.path.join(rel_root, filename)) if rel_root else filename
+            arcname = os.path.join(arc_root, rel_file).replace("\\", "/")
+            zipf.write(file_path, arcname)
+
+
+def export_backup(zip_path: str) -> None:
+    final_zip_path = os.path.abspath(zip_path)
+    final_dir = os.path.dirname(final_zip_path) or os.getcwd()
+    os.makedirs(final_dir, exist_ok=True)
+
+    fd, tmp_zip_path = tempfile.mkstemp(prefix=".garage-backup-", suffix=".zip", dir=final_dir)
+    os.close(fd)
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="garage-backup-") as tmp_dir:
+            tmp_db_path = os.path.join(tmp_dir, "garage.db")
+            _backup_sqlite_database(DB_FILE, tmp_db_path)
+
+            exclude_paths = {
+                os.path.normcase(os.path.realpath(tmp_zip_path)),
+                os.path.normcase(os.path.realpath(final_zip_path)),
+            }
+
+            with zipfile.ZipFile(tmp_zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
+                zipf.write(tmp_db_path, "garage.db")
+                if os.path.isdir(VEHICLE_PHOTOS_DIR):
+                    _add_directory_to_zip(zipf, VEHICLE_PHOTOS_DIR, "vehicle_photos", exclude_paths)
+
+        os.replace(tmp_zip_path, final_zip_path)
+    except Exception:
+        try:
+            if os.path.exists(tmp_zip_path):
+                os.remove(tmp_zip_path)
+        except Exception:
+            pass
+        raise
 
 
 def _columns(cur: sqlite3.Cursor, table: str) -> set[str]:
@@ -1738,8 +1821,45 @@ class GarageApp(tk.Tk):
         )
         self.chk_show_help.grid(row=0, column=0)
 
+        self.btn_export_backup = ttk.Button(
+            self.help_toggle_bar,
+            text="Exporter une sauvegarde",
+            command=self._export_backup_dialog,
+        )
+        self.btn_export_backup.grid(row=0, column=1, padx=(10, 0))
+
     def _set_status(self, txt: str):
         self.status.set(txt)
+
+    def _export_backup_dialog(self) -> None:
+        path = filedialog.asksaveasfilename(
+            title="Exporter une sauvegarde",
+            defaultextension=".zip",
+            initialfile=_default_backup_filename(),
+            filetypes=[
+                ("Archives ZIP", "*.zip"),
+                ("Tous les fichiers", "*.*"),
+            ],
+        )
+        if not path:
+            return
+
+        try:
+            export_backup(path)
+        except Exception as exc:
+            messagebox.showerror(
+                "Export impossible",
+                "La sauvegarde n'a pas pu être créée.\n\n"
+                f"Détail : {exc}",
+            )
+            return
+
+        messagebox.showinfo(
+            "Sauvegarde créée",
+            "Sauvegarde créée avec succès.\n"
+            "La base de données et les photos des véhicules ont été exportées.",
+        )
+        self._set_status("Sauvegarde exportée.")
 
     def _on_help_toggle(self) -> None:
         """Affiche/masque l'aide. La case est globale (visible sur tous les onglets)."""
