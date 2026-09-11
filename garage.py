@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.2 (clean, single-file)
+Garage — v4.5.3 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -59,6 +59,7 @@ from vehicle_repository import (
     list_vehicles,
     update_vehicle,
 )
+from value_utils import _safe_float, _safe_int
 
 os.makedirs(USER_DIR, exist_ok=True)
 
@@ -178,7 +179,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.2"
+APP_TITLE = "Garage v4.5.3"
 
 
 # ----------------- Helpers -----------------
@@ -596,24 +597,6 @@ def _parse_iso_date(value):
 def _fmt_date(d) -> str:
     dd = _parse_iso_date(d)
     return dd.strftime("%d/%m/%Y") if dd else ""
-
-
-def _safe_int(x):
-    if x is None:
-        return None
-    try:
-        return int(x)
-    except Exception:
-        return None
-
-
-def _safe_float(x):
-    if x is None:
-        return None
-    try:
-        return float(x)
-    except Exception:
-        return None
 
 
 def _fmt_num(x, digits=2) -> str:

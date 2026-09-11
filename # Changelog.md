@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.3] – 2026-09-12
+
+### Modifié
+
+- Extraction des helpers `_safe_int()` et `_safe_float()` dans `value_utils.py`.
+- Centralisation des conversions sécurisées d'entiers et de nombres flottants hors de `garage.py`.
+- Conservation à l'identique du comportement existant des conversions.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.2] – 2026-09-11
 
 ### Modifié
