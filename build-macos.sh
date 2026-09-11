@@ -4,13 +4,13 @@ set -euo pipefail
 # build-macos.sh — Garage macOS (Intel x86_64) DMG
 # Usage:
 #   ./build-macos.sh
-#   ./build-macos.sh -v 4.4.24
-#   ./build-macos.sh -v 4.4.24 --flavor legacy
-#   ./build-macos.sh -v 4.4.24 --keep
+#   ./build-macos.sh -v 4.5.0
+#   ./build-macos.sh -v 4.5.0 --flavor legacy
+#   ./build-macos.sh -v 4.5.0 --keep
 #
 # À lancer à la racine du repo (là où il y a garage.py, assets/, data/, etc.)
 
-VERSION="4.4.24"
+VERSION="4.5.0"
 KEEP_BUILD_DIRS="0"
 MIN_MACOS_VERSION="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 BUILD_FLAVOR="${BUILD_FLAVOR:-}"

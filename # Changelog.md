@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.0] – 2026-09-11
+
+### Modifié
+
+- Début de la réorganisation interne de Garage en modules dédiés.
+- Extraction de la gestion des chemins et des constantes associées dans `app_paths.py`.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.4.24] – 2026-09-10
 
 ### Ajouté
