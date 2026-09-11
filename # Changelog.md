@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.5] – 2026-09-12
+
+### Modifié
+
+- Extraction du CRUD Entretiens dans `maintenance_repository.py`.
+- Déplacement de `list_entretiens_full()`, `get_entretien()`, `insert_entretien()`, `update_entretien()` et `delete_entretien()`.
+- Conservation à l'identique des requêtes SQL, jointures, conversions, snapshots des types d'entretien, commits, fermetures de connexion et valeurs de retour.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.4] – 2026-09-12
 
 ### Modifié
