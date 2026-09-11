@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.2] – 2026-09-11
+
+### Modifié
+
+- Extraction du CRUD des véhicules dans le module `vehicle_repository.py`.
+- Déplacement des opérations de lecture, ajout, modification et suppression des véhicules hors de `garage.py`.
+- Conservation à l’identique du comportement des photos et des suppressions liées aux véhicules.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.1] – 2026-09-11
 
 ### Modifié
