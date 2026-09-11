@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.4] – 2026-09-12
+
+### Modifié
+
+- Extraction du CRUD Pleins dans `fuel_repository.py`.
+- Déplacement de `list_pleins()`, `list_pleins_lieux()`, `get_plein()`, `insert_plein()`, `update_plein()` et `delete_plein()`.
+- Conservation à l'identique des requêtes SQL, conversions, commits, fermetures de connexion et valeurs de retour.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.3] – 2026-09-12
 
 ### Modifié
