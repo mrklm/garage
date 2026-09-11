@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.1] – 2026-09-11
+
+### Modifié
+
+- Extraction de l'initialisation et de la connexion SQLite dans le module `database.py`.
+- Extraction de la gestion du schéma et des migrations SQLite dans `database.py`.
+- Conservation à l'identique de l'ordre d'initialisation de la base de données.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.0] – 2026-09-11
 
 ### Modifié
