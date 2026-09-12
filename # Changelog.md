@@ -3,6 +3,16 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+## [5.0.4] – 2026-09-13
+
+### Modifié
+
+- Fiabilisation de la préparation du DMG macOS en utilisant un espace temporaire de travail dans `build/dmg`.
+- Nettoyage du fichier DMG temporaire en cas d'échec de la création.
+- Aucun changement fonctionnel dans l'application.
+
+---
+
 ## [5.0.3] – 2026-09-12
 
 ### Ajouté

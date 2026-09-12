@@ -7,11 +7,11 @@ set -euo pipefail
 #
 # Usage:
 #   ./build_linux.sh              -> version par défaut
-#   ./build_linux.sh 5.0.3         -> version passée en argument
+#   ./build_linux.sh 5.0.4         -> version passée en argument
 # ----------------------------------------------------
 
 APP_NAME="Garage"
-DEFAULT_VERSION="5.0.3"
+DEFAULT_VERSION="5.0.4"
 VERSION="${1:-$DEFAULT_VERSION}"
 ARCH="$(uname -m)"   # ex: x86_64, aarch64
 
