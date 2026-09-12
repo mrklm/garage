@@ -4,6 +4,29 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.21] – 2026-09-12
+
+### Modifié
+
+- Déplacement de la configuration des types d'entretien de l'onglet
+  principal `Entretiens` vers `Paramètres > Entretien`.
+- Ajout d'un sélecteur de véhicule dédié dans
+  `Paramètres > Entretien`.
+- Synchronisation de ce sélecteur avec le véhicule actif de
+  l'application.
+- Conservation de la création, de la modification, de la suppression
+  et de l'activation des rappels des types d'entretien.
+- Conservation du formulaire et de l'historique des entretiens
+  réalisés dans l'onglet principal `Entretiens`.
+- Synchronisation immédiate des types configurés avec le formulaire
+  de saisie d'un entretien.
+- Ajout de protections minimales pour la gestion des types lorsqu'aucun
+  véhicule n'est enregistré.
+- Aucun changement du stockage SQLite ni de la logique métier des
+  entretiens.
+
+---
+
 ## [4.5.20] – 2026-09-12
 
 ### Modifié

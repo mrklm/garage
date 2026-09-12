@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.20 (clean, single-file)
+Garage — v4.5.21 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -216,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.20"
+APP_TITLE = "Garage v4.5.21"
 
 
 # ----------------- Helpers -----------------
@@ -1215,6 +1215,7 @@ class GarageApp(tk.Tk):
 
         self._build_settings_appearance()
         self._build_settings_data()
+        self._build_settings_maintenance()
         self._build_settings_preconisations()
         self._build_settings_help()
 
@@ -1257,6 +1258,66 @@ class GarageApp(tk.Tk):
             command=self._import_backup_dialog,
         )
         self.btn_import_backup.grid(row=0, column=1, padx=(10, 0))
+
+    def _build_settings_maintenance(self):
+        self.settings_maintenance_tab.columnconfigure(0, weight=1)
+        self.settings_maintenance_tab.rowconfigure(0, weight=0)
+        self.settings_maintenance_tab.rowconfigure(1, weight=1)
+
+        top = ttk.Frame(self.settings_maintenance_tab)
+        top.grid(row=0, column=0, sticky="ew")
+        top.columnconfigure(1, weight=1)
+
+        ttk.Label(top, text="Véhicule :").grid(row=0, column=0, sticky="w")
+        self.settings_maintenance_vehicle_var = tk.StringVar(value="")
+        self.settings_maintenance_vehicle_cb = ttk.Combobox(
+            top,
+            textvariable=self.settings_maintenance_vehicle_var,
+            state="readonly",
+        )
+        self.settings_maintenance_vehicle_cb.grid(row=0, column=1, sticky="ew", padx=(10, 0))
+        self.settings_maintenance_vehicle_cb.bind("<<ComboboxSelected>>", self._on_settings_maintenance_vehicle_change)
+
+        box_type = ttk.Labelframe(self.settings_maintenance_tab, text="Type d'entretien (pour ce véhicule)", padding=10)
+        box_type.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        for c in range(6):
+            box_type.columnconfigure(c, weight=1 if c in (1, 3, 5) else 0)
+
+        ttk.Label(box_type, text="Nom :").grid(row=0, column=0, sticky="w")
+        self.type_name_var = tk.StringVar(value="")
+        ttk.Entry(box_type, textvariable=self.type_name_var).grid(row=0, column=1, sticky="ew", padx=(6, 12))
+        ttk.Button(box_type, text="Créer", command=self._on_type_create).grid(row=0, column=2, sticky="ew")
+        ttk.Button(box_type, text="Modifier", command=self._on_type_update).grid(row=0, column=3, sticky="ew", padx=(10, 0))
+        ttk.Button(box_type, text="Supprimer", command=self._on_type_delete).grid(row=0, column=4, sticky="ew", padx=(10, 0))
+
+        ttk.Label(box_type, text="Fréquence :").grid(row=1, column=0, sticky="w", pady=(10, 0))
+        self.type_km_var = tk.StringVar(value="")
+        self.type_months_var = tk.StringVar(value="")
+        ttk.Label(box_type, text="Km").grid(row=1, column=2, sticky="e", pady=(10, 0))
+        ttk.Entry(box_type, textvariable=self.type_km_var, width=10).grid(row=1, column=3, sticky="w", padx=(6, 12), pady=(10, 0))
+        ttk.Label(box_type, text="Mois").grid(row=1, column=4, sticky="e", pady=(10, 0))
+        ttk.Entry(box_type, textvariable=self.type_months_var, width=8).grid(row=1, column=5, sticky="w", padx=(6, 0), pady=(10, 0))
+
+        box_list = ttk.Frame(box_type)
+        box_list.grid(row=2, column=0, columnspan=6, sticky="nsew", pady=(12, 0))
+        box_list.columnconfigure(0, weight=1)
+        box_type.rowconfigure(2, weight=1)
+        box_list.rowconfigure(0, weight=1)
+
+        self.tree_types = ttk.Treeview(box_list, columns=("rappel", "type", "freq"), show="headings", height=6)
+        self.tree_types.grid(row=0, column=0, sticky="nsew")
+        self.tree_types.heading("rappel", text="Rappel")
+        self.tree_types.heading("type", text="Type d'entretien")
+        self.tree_types.heading("freq", text="Fréquence de l'entretien")
+        self.tree_types.column("rappel", width=70, anchor="center", stretch=False)
+        self.tree_types.column("type", width=360, anchor="w", stretch=True)
+        self.tree_types.column("freq", width=240, anchor="w", stretch=True)
+        self.tree_types.bind("<<TreeviewSelect>>", self._on_type_select)
+        self.tree_types.bind("<Button-1>", self._on_types_click)
+
+        ysb_t = ttk.Scrollbar(box_list, orient="vertical", command=self.tree_types.yview)
+        ysb_t.grid(row=0, column=1, sticky="ns")
+        self.tree_types.configure(yscrollcommand=ysb_t.set)
 
     def _build_settings_preconisations(self):
         self.settings_preconisations_tab.columnconfigure(0, weight=1)
@@ -2418,9 +2479,8 @@ class GarageApp(tk.Tk):
         # Permet au tableau des entretiens (au centre) de s\'étendre, tout en gardant le formulaire visible en bas
         # Répartition verticale : on garantit une hauteur mini pour la liste "Entretiens"
         self.tab_ent.rowconfigure(0, weight=0)               # header
-        self.tab_ent.rowconfigure(1, weight=0)               # types
-        self.tab_ent.rowconfigure(2, weight=1, minsize=140)  # liste entretiens (prioritaire)
-        self.tab_ent.rowconfigure(3, weight=0)               # formulaire
+        self.tab_ent.rowconfigure(1, weight=1, minsize=140)  # liste entretiens (prioritaire)
+        self.tab_ent.rowconfigure(2, weight=0)               # formulaire
 
         header = ttk.Frame(self.tab_ent)
         header.grid(row=0, column=0, sticky="ew")
@@ -2435,51 +2495,8 @@ class GarageApp(tk.Tk):
         self.ent_header_label = ttk.Label(header, text="—", font=("TkDefaultFont", 11, "bold"))
         self.ent_header_label.grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
-        box_type = ttk.Labelframe(self.tab_ent, text="Type d'entretien (pour ce véhicule)", padding=10)
-        box_type.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
-        for c in range(6):
-            box_type.columnconfigure(c, weight=1 if c in (1, 3, 5) else 0)
-
-        ttk.Label(box_type, text="Nom :").grid(row=0, column=0, sticky="w")
-        self.type_name_var = tk.StringVar(value="")
-        ttk.Entry(box_type, textvariable=self.type_name_var).grid(row=0, column=1, sticky="ew", padx=(6, 12))
-        ttk.Button(box_type, text="Créer", command=self._on_type_create).grid(row=0, column=2, sticky="ew")
-        ttk.Button(box_type, text="Modifier", command=self._on_type_update).grid(row=0, column=3, sticky="ew", padx=(10, 0))
-        ttk.Button(box_type, text="Supprimer", command=self._on_type_delete).grid(row=0, column=4, sticky="ew", padx=(10, 0))
-
-        ttk.Label(box_type, text="Fréquence :").grid(row=1, column=0, sticky="w", pady=(10, 0))
-        self.type_km_var = tk.StringVar(value="")
-        self.type_months_var = tk.StringVar(value="")
-        ttk.Label(box_type, text="Km").grid(row=1, column=2, sticky="e", pady=(10, 0))
-        ttk.Entry(box_type, textvariable=self.type_km_var, width=10).grid(row=1, column=3, sticky="w", padx=(6, 12), pady=(10, 0))
-        ttk.Label(box_type, text="Mois").grid(row=1, column=4, sticky="e", pady=(10, 0))
-        ttk.Entry(box_type, textvariable=self.type_months_var, width=8).grid(row=1, column=5, sticky="w", padx=(6, 0), pady=(10, 0))
-
-        box_list = ttk.Frame(box_type)
-        box_list.grid(row=2, column=0, columnspan=6, sticky="nsew", pady=(12, 0))
-        box_list.columnconfigure(0, weight=1)
-        box_type.rowconfigure(2, weight=1)
-        box_list.rowconfigure(0, weight=1)
-
-
-        self.tree_types = ttk.Treeview(box_list, columns=("rappel", "type", "freq"), show="headings", height=6)
-        self.tree_types.grid(row=0, column=0, sticky="nsew")
-        self.tree_types.heading("rappel", text="Rappel")
-        self.tree_types.heading("type", text="Type d'entretien")
-        self.tree_types.heading("freq", text="Fréquence de l'entretien")
-        self.tree_types.column("rappel", width=70, anchor="center", stretch=False)
-        self.tree_types.column("type", width=360, anchor="w", stretch=True)
-        self.tree_types.column("freq", width=240, anchor="w", stretch=True)
-        self.tree_types.bind("<<TreeviewSelect>>", self._on_type_select)
-        self.tree_types.bind("<Button-1>", self._on_types_click)
-
-        ysb_t = ttk.Scrollbar(box_list, orient="vertical", command=self.tree_types.yview)
-        ysb_t.grid(row=0, column=1, sticky="ns")
-        self.tree_types.configure(yscrollcommand=ysb_t.set)
-
-
         list_box = ttk.Labelframe(self.tab_ent, text="Entretiens", padding=10)
-        list_box.grid(row=2, column=0, sticky="nsew", pady=(12, 0))
+        list_box.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
         list_box.columnconfigure(0, weight=1)
         list_box.rowconfigure(0, weight=1, minsize=90)
 
@@ -2519,7 +2536,7 @@ class GarageApp(tk.Tk):
         self.tree_ent.bind("<Double-1>", lambda _e: self._on_edit_entretien())
 
         form = ttk.Labelframe(self.tab_ent, text="Entretien effectué", padding=10)
-        form.grid(row=3, column=0, sticky="ew", pady=(12, 0))
+        form.grid(row=2, column=0, sticky="ew", pady=(12, 0))
         for c in range(6):
             form.columnconfigure(c, weight=1 if c in (1, 3, 5) else 0)
 
@@ -3068,6 +3085,13 @@ class GarageApp(tk.Tk):
         self.active_vehicle_id = self._vehicle_index_to_id[idx]
         self._refresh_all_tabs_after_vehicle_change(source="entretiens")
 
+    def _on_settings_maintenance_vehicle_change(self, _evt=None):
+        idx = self.settings_maintenance_vehicle_cb.current()
+        if idx is None or idx < 0:
+            return
+        self.active_vehicle_id = self._vehicle_index_to_id[idx]
+        self._refresh_all_tabs_after_vehicle_change(source="settings_maintenance")
+
     def _refresh_types_ui(self):
         self.selected_type_id = None
         self.type_name_var.set("")
@@ -3077,6 +3101,9 @@ class GarageApp(tk.Tk):
 
         for item in self.tree_types.get_children():
             self.tree_types.delete(item)
+
+        if self.active_vehicle_id is None:
+            return
 
         for r in list_vehicle_types(self.active_vehicle_id):
             type_id = int(r["type_id"])
@@ -3152,6 +3179,8 @@ class GarageApp(tk.Tk):
         return "break"
 
     def _on_type_create(self):
+        if self.active_vehicle_id is None:
+            return
         name = self.type_name_var.get().strip()
         if not name:
             messagebox.showwarning("Nom manquant", "Entre un nom de type d'entretien.")
@@ -3201,6 +3230,11 @@ class GarageApp(tk.Tk):
         self._set_status("Type supprimé du véhicule.")
 
     def _refresh_type_choices_for_new_entretien(self):
+        if self.active_vehicle_id is None:
+            self._type_name_to_id = {}
+            self.new_type_cb["values"] = []
+            self.new_type.set("")
+            return
         rows = list_vehicle_types(self.active_vehicle_id)
         names = [r["type_name"] for r in rows]
         self._type_name_to_id = {r["type_name"]: int(r["type_id"]) for r in rows}
@@ -3337,7 +3371,7 @@ class GarageApp(tk.Tk):
     def _show_empty_state(self):
         """État UI quand la base est vide (aucun véhicule)."""
         # Mettre les listes déroulantes à vide si elles existent
-        for attr in ("veh_vehicle_cb", "pl_vehicle_cb", "ent_vehicle_cb", "graph_vehicle_cb", "settings_preco_vehicle_cb"):
+        for attr in ("veh_vehicle_cb", "pl_vehicle_cb", "ent_vehicle_cb", "graph_vehicle_cb", "settings_preco_vehicle_cb", "settings_maintenance_vehicle_cb"):
             cb = getattr(self, attr, None)
             if cb is not None:
                 try:
@@ -3380,6 +3414,11 @@ class GarageApp(tk.Tk):
             self._refresh_preconisations()
         except Exception:
             pass
+        try:
+            self._refresh_types_ui()
+            self._refresh_type_choices_for_new_entretien()
+        except Exception:
+            pass
 
     def _refresh_all(self):
         self.vehicles_rows = list_vehicles()
@@ -3407,6 +3446,7 @@ class GarageApp(tk.Tk):
         self.ent_vehicle_cb["values"] = labels
         self.graph_vehicle_cb["values"] = labels
         self.settings_preco_vehicle_cb["values"] = labels
+        self.settings_maintenance_vehicle_cb["values"] = labels
 
         self._refresh_all_tabs_after_vehicle_change(source="init")
 
@@ -3432,6 +3472,8 @@ class GarageApp(tk.Tk):
             self.graph_vehicle_cb.current(idx)
         if source != "settings_preconisations":
             self.settings_preco_vehicle_cb.current(idx)
+        if source != "settings_maintenance":
+            self.settings_maintenance_vehicle_cb.current(idx)
 
         try:
             self.general_empty_frame.grid_remove()
