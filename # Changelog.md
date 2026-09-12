@@ -4,6 +4,18 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.14] – 2026-09-12
+
+### Modifié
+
+- Création de `graph_repository.py` pour isoler les lectures SQLite utilisées par les graphiques.
+- Extraction des quatre requêtes de lecture utilisées pour la consommation, le prix du litre et les coûts d'entretien.
+- Conservation dans `garage.py` des calculs statistiques, transformations de données et rendus Matplotlib.
+- Conservation à l'identique des requêtes SQL, paramètres et ordres de tri.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.13] – 2026-09-12
 
 ### Modifié

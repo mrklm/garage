@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.13 (clean, single-file)
+Garage — v4.5.14 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -59,6 +59,12 @@ from fuel_repository import (
     list_pleins,
     list_pleins_lieux,
     update_plein,
+)
+from graph_repository import (
+    list_fill_consumption_points,
+    list_fuel_price_points,
+    list_maintenance_cost_by_month,
+    list_maintenance_cost_points,
 )
 from maintenance_repository import (
     delete_entretien,
@@ -210,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.13"
+APP_TITLE = "Garage v4.5.14"
 
 
 # ----------------- Helpers -----------------
@@ -2746,19 +2752,7 @@ class GarageApp(tk.Tk):
 
         WINDOW_KM = 200  # bloc de distance pour calcul représentatif
 
-        conn = _connect_db()
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT date_iso, km, litres
-            FROM pleins
-            WHERE vehicule_id = ? AND km IS NOT NULL AND litres IS NOT NULL
-            ORDER BY km ASC, date_iso ASC, id ASC
-            """,
-            (int(self.active_vehicle_id),),
-        )
-        rows = cur.fetchall()
-        conn.close()
+        rows = list_fill_consumption_points(self.active_vehicle_id)
 
         if not rows or len(rows) < 2:
             ax.text(0.5, 0.5, "Pas assez de pleins (>= 2).", ha="center", va="center",
@@ -2868,20 +2862,7 @@ class GarageApp(tk.Tk):
         else:
             self._title_in_ax(ax, "Prix du litre dans le temps")
 
-        conn = _connect_db()
-
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT date_iso, prix_litre
-            FROM pleins
-            WHERE vehicule_id = ? AND date_iso IS NOT NULL AND prix_litre IS NOT NULL
-            ORDER BY date_iso ASC, id ASC
-            """,
-            (int(self.active_vehicle_id),),
-        )
-        rows = cur.fetchall()
-        conn.close()
+        rows = list_fuel_price_points(self.active_vehicle_id)
 
         if not rows:
             ax.text(0.5, 0.5, "Aucun plein avec prix/L à tracer.", ha="center", va="center",
@@ -2920,19 +2901,7 @@ class GarageApp(tk.Tk):
         self._apply_dark_style(ax)
         self._title_in_ax(ax, "Coût entretien (€/an)")
 
-        conn = _connect_db()
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT date_iso, cout, kind, intervention, details
-            FROM entretiens
-            WHERE vehicule_id = ? AND date_iso IS NOT NULL AND cout IS NOT NULL
-            ORDER BY date_iso ASC, id ASC
-            """,
-            (int(self.active_vehicle_id),),
-        )
-        rows = cur.fetchall()
-        conn.close()
+        rows = list_maintenance_cost_points(self.active_vehicle_id)
 
         if not rows:
             ax.text(
@@ -3048,20 +3017,7 @@ class GarageApp(tk.Tk):
         ax.set_ylim(bottom=0)
 
     def _plot_entretien_cost_per_month(self, ax):
-        conn = _connect_db()
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT SUBSTR(date_iso, 1, 7) AS ym, SUM(cout) AS total
-            FROM entretiens
-            WHERE vehicule_id = ? AND date_iso IS NOT NULL AND cout IS NOT NULL
-            GROUP BY SUBSTR(date_iso, 1, 7)
-            ORDER BY ym ASC
-            """,
-            (int(self.active_vehicle_id),),
-        )
-        rows = cur.fetchall()
-        conn.close()
+        rows = list_maintenance_cost_by_month(self.active_vehicle_id)
 
         if not rows:
             ax.text(0.5, 0.5, "Aucun entretien avec coût à tracer.", ha="center", va="center")
