@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.9] – 2026-09-12
+
+### Modifié
+
+- Création de `statistics_service.py` pour isoler les calculs statistiques de l'interface principale.
+- Déplacement de `conso_moy_l100()` depuis `garage.py` vers `statistics_service.py`.
+- Conservation à l'identique de la requête SQL, des conversions, des conditions de retour et du calcul de consommation moyenne.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.8] – 2026-09-12
 
 ### Modifié
