@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.9 (clean, single-file)
+Garage — v4.5.10 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -70,6 +70,7 @@ from maintenance_repository import (
     list_entretiens_full,
     update_entretien,
 )
+from maintenance_service import last_km_any
 from maintenance_type_repository import (
     create_type_for_vehicle,
     delete_type_from_vehicle,
@@ -211,7 +212,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.9"
+APP_TITLE = "Garage v4.5.10"
 
 
 # ----------------- Helpers -----------------
@@ -720,23 +721,6 @@ def _add_months(d: date, months: int) -> date:
 
 def _format_days(days: int) -> str:
     return f"{int(days)} jour" if int(days) == 1 else f"{int(days)} jours"
-
-# ----------------- DB API : Types / Entretiens -----------------
-
-def last_km_any(vehicle_id: int):
-    conn = _connect_db()
-    cur = conn.cursor()
-    cur.execute("SELECT MAX(km) AS m FROM pleins WHERE vehicule_id=?", (int(vehicle_id),))
-    m1 = _safe_int(cur.fetchone()["m"])
-    cur.execute("SELECT MAX(km) AS m FROM entretiens WHERE vehicule_id=?", (int(vehicle_id),))
-    m2 = _safe_int(cur.fetchone()["m"])
-    conn.close()
-    if m1 is None:
-        return m2
-    if m2 is None:
-        return m1
-    return max(m1, m2)
-
 
 def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_months):
     """Calcule (is_ok, color, label) pour un rappel.

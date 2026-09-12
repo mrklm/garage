@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.10] – 2026-09-12
+
+### Modifié
+
+- Création de `maintenance_service.py` pour isoler progressivement la logique métier liée aux entretiens.
+- Déplacement de `last_km_any()` depuis `garage.py` vers `maintenance_service.py`.
+- Conservation à l'identique des requêtes SQL, conversions et règles de sélection du dernier kilométrage connu.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.9] – 2026-09-12
 
 ### Modifié
