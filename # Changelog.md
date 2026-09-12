@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.17] – 2026-09-12
+
+### Modifié
+
+- Déplacement du sélecteur de thème de l'onglet `Général` vers `Paramètres > Apparence`.
+- Conservation à l'identique du comportement de changement de thème.
+- Création d'une méthode dédiée `_build_settings_appearance()` pour construire les réglages d'apparence.
+- Aucun autre déplacement fonctionnel dans ce jalon.
+
+---
+
 ## [4.5.16] – 2026-09-12
 
 ### Ajouté

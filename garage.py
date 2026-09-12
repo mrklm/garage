@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.16 (clean, single-file)
+Garage — v4.5.17 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -216,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.16"
+APP_TITLE = "Garage v4.5.17"
 
 
 # ----------------- Helpers -----------------
@@ -1243,6 +1243,30 @@ class GarageApp(tk.Tk):
             tab.columnconfigure(0, weight=1)
             tab.rowconfigure(0, weight=1)
 
+        self._build_settings_appearance()
+
+    def _build_settings_appearance(self):
+        box = ttk.Frame(self.settings_appearance_tab)
+        box.grid(row=0, column=0, sticky="nw")
+
+        ttk.Label(box, text="Thème :").grid(row=0, column=0, sticky="w")
+
+        theme_values = getattr(self, "_theme_names", ["Midnight Garage"])
+        current = getattr(self, "_theme_name", theme_values[0])
+
+        self.theme_var = tk.StringVar(value=current)
+        self.theme_cb = ttk.Combobox(
+            box,
+            textvariable=self.theme_var,
+            values=theme_values,
+            state="readonly",
+            width=27,
+        )
+        self.theme_cb.grid(row=0, column=1, padx=(8, 0), sticky="w")
+        self._set_combobox_dropdown_width(self.theme_cb, 60)
+
+        self.theme_cb.bind("<<ComboboxSelected>>", self._on_theme_change)
+
     def _set_status(self, txt: str):
         self.status.set(txt)
 
@@ -1587,29 +1611,6 @@ class GarageApp(tk.Tk):
         head = ttk.Frame(self.tab_general)
         head.grid(row=0, column=0, sticky="ew")
         head.columnconfigure(0, weight=1)
-
-        # --- Zone gauche : sélecteur de thème ---
-        theme_bar = ttk.Frame(head)
-        theme_bar.grid(row=0, column=1, sticky="e", padx=(0, 8))
-
-
-        ttk.Label(theme_bar, text="Thème :").grid(row=0, column=0, sticky="w")
-
-        theme_values = getattr(self, "_theme_names", ["Midnight Garage"])
-        current = getattr(self, "_theme_name", theme_values[0])
-
-        self.theme_var = tk.StringVar(value=current)
-        self.theme_cb = ttk.Combobox(
-            theme_bar,
-            textvariable=self.theme_var,
-            values=theme_values,
-            state="readonly",
-            width=27,
-        )
-        self.theme_cb.grid(row=0, column=1, padx=(8, 0), sticky="e")
-        self._set_combobox_dropdown_width(self.theme_cb, 60)
-
-        self.theme_cb.bind("<<ComboboxSelected>>", self._on_theme_change)
 
         # --- Zone droite : navigation pages (ton code existant) ---
         nav = ttk.Frame(head)
