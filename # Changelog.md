@@ -4,6 +4,30 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.22] – 2026-09-12
+
+### Modifié
+
+- Déplacement de la gestion des véhicules de l'onglet principal
+  `Véhicules` vers `Paramètres > Véhicules`.
+- Conservation de la sélection, de l'ajout, de la modification et de
+  la suppression des véhicules dans leur nouvel emplacement.
+- Conservation de la gestion des photos et des informations techniques
+  des véhicules.
+- Conservation des attributs et mécanismes existants de synchronisation
+  avec le véhicule actif.
+- Synchronisation des changements de véhicule avec les autres sections
+  de l'application.
+- Adaptation de l'état vide de `Général` pour orienter la création du
+  premier véhicule vers `Paramètres > Véhicules`.
+- Conservation temporaire de l'onglet principal `Véhicules`, désormais
+  sans contenu fonctionnel, en vue de sa suppression dans un jalon
+  séparé.
+- Aucun changement du stockage SQLite ni de la logique métier des
+  véhicules.
+
+---
+
 ## [4.5.21] – 2026-09-12
 
 ### Modifié

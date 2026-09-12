@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.21 (clean, single-file)
+Garage — v4.5.22 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -216,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.21"
+APP_TITLE = "Garage v4.5.22"
 
 
 # ----------------- Helpers -----------------
@@ -1213,11 +1213,85 @@ class GarageApp(tk.Tk):
             tab.columnconfigure(0, weight=1)
             tab.rowconfigure(0, weight=1)
 
+        self._build_settings_vehicles()
         self._build_settings_appearance()
         self._build_settings_data()
         self._build_settings_maintenance()
         self._build_settings_preconisations()
         self._build_settings_help()
+
+    def _build_settings_vehicles(self):
+        self.settings_vehicles_tab.columnconfigure(0, weight=1)
+        self.settings_vehicles_tab.rowconfigure(0, weight=0)
+        self.settings_vehicles_tab.rowconfigure(1, weight=0)
+        self.settings_vehicles_tab.rowconfigure(2, weight=1)
+
+        top = ttk.Frame(self.settings_vehicles_tab)
+        top.grid(row=0, column=0, sticky="ew")
+        top.columnconfigure(1, weight=1)
+
+        ttk.Label(top, text="Véhicule :").grid(row=0, column=0, sticky="w")
+        self.veh_vehicle_var = tk.StringVar(value="")
+        self.veh_vehicle_cb = ttk.Combobox(top, textvariable=self.veh_vehicle_var, state="readonly")
+        self.veh_vehicle_cb.grid(row=0, column=1, sticky="ew", padx=(10, 0))
+        self.veh_vehicle_cb.bind("<<ComboboxSelected>>", self._on_veh_vehicle_change)
+
+        btns = ttk.Frame(self.settings_vehicles_tab)
+        btns.grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Button(btns, text="Ajouter", command=self._veh_add_mode).grid(row=0, column=0, padx=(0, 8))
+        ttk.Button(btns, text="Modifier", command=self._veh_edit_mode).grid(row=0, column=1, padx=(0, 8))
+        ttk.Button(btns, text="Supprimer", command=self._veh_delete).grid(row=0, column=2)
+        self.veh_btn_save_top = ttk.Button(btns, text="Enregistrer", command=self._veh_save)
+        self.veh_btn_save_top.grid(row=0, column=3, padx=(8, 0))
+
+        body = ttk.Frame(self.settings_vehicles_tab)
+        body.grid(row=2, column=0, sticky="nsew", pady=(12, 0))
+        body.columnconfigure(1, weight=1)
+
+        photo_box = ttk.Labelframe(body, text="Photo", padding=10)
+        photo_box.grid(row=0, column=0, sticky="nw")
+        self.veh_photo_label = ttk.Label(photo_box, text="(aucune photo)")
+        self.veh_photo_label.grid(row=0, column=0, sticky="nw")
+        self.veh_photo_hint = ttk.Label(photo_box, text="")
+        self.veh_photo_hint.grid(row=2, column=0, sticky="w", pady=(6, 0))
+
+        pick = ttk.Frame(photo_box)
+        pick.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        ttk.Label(pick, text="Sélectionner une photo :").grid(row=0, column=0, sticky="w")
+        ttk.Button(pick, text="Parcourir", command=self._veh_pick_photo).grid(row=0, column=1, sticky="w", padx=(10, 0))
+
+        form = ttk.Labelframe(body, text="Détails tech", padding=10)
+        form.grid(row=0, column=1, sticky="nw")
+
+        self.veh_vars = {
+            "nom": tk.StringVar(value=""),
+            "marque": tk.StringVar(value=""),
+            "modele": tk.StringVar(value=""),
+            "motorisation": tk.StringVar(value=""),
+            "energie": tk.StringVar(value=""),
+            "annee": tk.StringVar(value=""),
+            "immatriculation": tk.StringVar(value=""),
+            "dernier_km": tk.StringVar(value=""),
+        }
+        self.veh_entries = {}
+
+        fields = [
+            ("Nom", "nom"),
+            ("Marque", "marque"),
+            ("Modele", "modele"),
+            ("Motorisation", "motorisation"),
+            ("Énergie", "energie"),
+            ("Année", "annee"),
+            ("Immat", "immatriculation"),
+            ("Dernier Km", "dernier_km"),
+        ]
+        for i, (lab, key) in enumerate(fields):
+            ttk.Label(form, text=lab + " :").grid(row=i, column=0, sticky="e", padx=(0, 10), pady=4)
+            e = ttk.Entry(form, textvariable=self.veh_vars[key], width=38)
+            e.grid(row=i, column=1, sticky="w", pady=4)
+            self.veh_entries[key] = e
+
+        self._veh_set_mode("view")
 
     def _build_settings_appearance(self):
         box = ttk.Frame(self.settings_appearance_tab)
@@ -1722,7 +1796,7 @@ class GarageApp(tk.Tk):
 
         empty_msg = (
             "Aucun véhicule enregistré.\n\n"
-            "Pour commencer, ajoutez un véhicule dans l'onglet Véhicules.\n\n"
+            "Pour commencer, ajoutez un véhicule dans Paramètres > Véhicules.\n\n"
             "L'aide est disponible dans Paramètres > Aide."
         )
         self.general_empty_label = ttk.Label(
@@ -1933,73 +2007,7 @@ class GarageApp(tk.Tk):
     # ---------- Véhicules ----------
     def _build_vehicules_tab(self):
         self.tab_vehicules.columnconfigure(0, weight=1)
-
-        top = ttk.Frame(self.tab_vehicules)
-        top.grid(row=0, column=0, sticky="ew")
-        top.columnconfigure(1, weight=1)
-
-        ttk.Label(top, text="Véhicule :").grid(row=0, column=0, sticky="w")
-        self.veh_vehicle_var = tk.StringVar(value="")
-        self.veh_vehicle_cb = ttk.Combobox(top, textvariable=self.veh_vehicle_var, state="readonly")
-        self.veh_vehicle_cb.grid(row=0, column=1, sticky="ew", padx=(10, 0))
-        self.veh_vehicle_cb.bind("<<ComboboxSelected>>", self._on_veh_vehicle_change)
-
-        btns = ttk.Frame(self.tab_vehicules)
-        btns.grid(row=1, column=0, sticky="w", pady=(10, 0))
-        ttk.Button(btns, text="Ajouter", command=self._veh_add_mode).grid(row=0, column=0, padx=(0, 8))
-        ttk.Button(btns, text="Modifier", command=self._veh_edit_mode).grid(row=0, column=1, padx=(0, 8))
-        ttk.Button(btns, text="Supprimer", command=self._veh_delete).grid(row=0, column=2)
-        self.veh_btn_save_top = ttk.Button(btns, text="Enregistrer", command=self._veh_save)
-        self.veh_btn_save_top.grid(row=0, column=3, padx=(8, 0))
-
-        body = ttk.Frame(self.tab_vehicules)
-        body.grid(row=2, column=0, sticky="nsew", pady=(12, 0))
-        body.columnconfigure(1, weight=1)
-
-        photo_box = ttk.Labelframe(body, text="Photo", padding=10)
-        photo_box.grid(row=0, column=0, sticky="nw")
-        self.veh_photo_label = ttk.Label(photo_box, text="(aucune photo)")
-        self.veh_photo_label.grid(row=0, column=0, sticky="nw")
-        self.veh_photo_hint = ttk.Label(photo_box, text="")
-        self.veh_photo_hint.grid(row=2, column=0, sticky="w", pady=(6, 0))
-
-        pick = ttk.Frame(photo_box)
-        pick.grid(row=1, column=0, sticky="ew", pady=(10, 0))
-        ttk.Label(pick, text="Sélectionner une photo :").grid(row=0, column=0, sticky="w")
-        ttk.Button(pick, text="Parcourir", command=self._veh_pick_photo).grid(row=0, column=1, sticky="w", padx=(10, 0))
-
-        form = ttk.Labelframe(body, text="Détails tech", padding=10)
-        form.grid(row=0, column=1, sticky="nw")
-
-        self.veh_vars = {
-            "nom": tk.StringVar(value=""),
-            "marque": tk.StringVar(value=""),
-            "modele": tk.StringVar(value=""),
-            "motorisation": tk.StringVar(value=""),
-            "energie": tk.StringVar(value=""),
-            "annee": tk.StringVar(value=""),
-            "immatriculation": tk.StringVar(value=""),
-            "dernier_km": tk.StringVar(value=""),
-        }
-        self.veh_entries = {}
-
-        fields = [
-            ("Nom", "nom"),
-            ("Marque", "marque"),
-            ("Modele", "modele"),
-            ("Motorisation", "motorisation"),
-            ("Énergie", "energie"),
-            ("Année", "annee"),
-            ("Immat", "immatriculation"),
-            ("Dernier Km", "dernier_km"),
-        ]
-        for i, (lab, key) in enumerate(fields):
-            ttk.Label(form, text=lab + " :").grid(row=i, column=0, sticky="e", padx=(0, 10), pady=4)
-            e = ttk.Entry(form, textvariable=self.veh_vars[key], width=38)
-            e.grid(row=i, column=1, sticky="w", pady=4)
-            self.veh_entries[key] = e
-
-        self._veh_set_mode("view")
+        self.tab_vehicules.rowconfigure(0, weight=1)
 
     def _on_veh_vehicle_change(self, _evt=None):
         idx = self.veh_vehicle_cb.current()
