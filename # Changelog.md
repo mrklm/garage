@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.6] – 2026-09-12
+
+### Modifié
+
+- Extraction de la gestion des types d'entretien dans `maintenance_type_repository.py`.
+- Déplacement de `list_vehicle_types()`, `create_type_for_vehicle()`, `update_type()`, `delete_type_from_vehicle()` et `set_vehicle_type_enabled()`.
+- Conservation à l'identique des requêtes SQL, conversions, associations véhicule/type, activation des rappels et règles de suppression des types encore référencés.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.5] – 2026-09-12
 
 ### Modifié
