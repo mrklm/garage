@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.26 (clean, single-file)
+Garage — v4.5.27 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -217,7 +217,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.26"
+APP_TITLE = "Garage v4.5.27"
 
 
 # ----------------- Helpers -----------------
@@ -1312,7 +1312,6 @@ class GarageApp(tk.Tk):
             "energie": tk.StringVar(value=""),
             "annee": tk.StringVar(value=""),
             "immatriculation": tk.StringVar(value=""),
-            "dernier_km": tk.StringVar(value=""),
         }
         self.veh_entries = {}
 
@@ -1324,7 +1323,6 @@ class GarageApp(tk.Tk):
             ("Énergie", "energie"),
             ("Année", "annee"),
             ("Immat", "immatriculation"),
-            ("Dernier Km", "dernier_km"),
         ]
         for i, (lab, key) in enumerate(fields):
             ttk.Label(form, text=lab + " :").grid(row=i, column=0, sticky="e", padx=(0, 10), pady=4)
@@ -2101,11 +2099,8 @@ class GarageApp(tk.Tk):
         editable = mode in ("add", "edit")
         state = "normal" if editable else "readonly"
 
-        for k, ent in self.veh_entries.items():
-            if k == "dernier_km":
-                ent.config(state="readonly")
-            else:
-                ent.config(state=state)
+        for ent in self.veh_entries.values():
+            ent.config(state=state)
         if hasattr(self, "veh_btn_save_top"):
             self.veh_btn_save_top.state(["!disabled"] if editable else ["disabled"])
         if hasattr(self, "veh_btn_cancel_top"):
@@ -2341,7 +2336,6 @@ class GarageApp(tk.Tk):
         self.veh_vars["energie"].set(r["energie"] or "")
         self.veh_vars["annee"].set("" if r["annee"] is None else str(r["annee"]))
         self.veh_vars["immatriculation"].set(r["immatriculation"] or "")
-        self.veh_vars["dernier_km"].set(str(last_km_any(self.active_vehicle_id) or ""))
 
         img = _load_vehicle_photo_tk(r["photo_file"], max_w=288, max_h=176)
         self._veh_photo_img = img

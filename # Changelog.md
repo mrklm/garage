@@ -3,6 +3,23 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+## [4.5.27] – 2026-09-12
+
+### Modifié
+
+- Suppression du champ readonly `Dernier Km` de la fiche
+  `Paramètres > Véhicules`.
+- Le kilométrage reste déterminé automatiquement à partir de
+  l'historique des pleins et des entretiens.
+- Conservation de l'affichage `Dernier km` dans les cartes de la page
+  `Général`.
+- Conservation de `last_km_any()` et de son utilisation par les
+  fonctionnalités existantes.
+- Un nouveau véhicule sans plein ni entretien possède simplement un
+  kilométrage inconnu jusqu'à sa première saisie.
+- Aucun changement du schéma SQLite, des repositories ou des services.
+
+---
 
 ## [4.5.26] – 2026-09-12
 
