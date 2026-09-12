@@ -3,6 +3,21 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+## [4.5.30] – 2026-09-12
+
+### Modifié
+
+- Fiabilisation de la création du DMG macOS dans les builds automatisés.
+- Utilisation d'un fichier DMG temporaire avant déplacement vers le
+  dossier `releases`.
+- Démontage ciblé d'un éventuel volume Garage résiduel avant création.
+- Ajout de tentatives limitées autour de `hdiutil create` afin de gérer
+  les erreurs transitoires `Resource busy` observées sur GitHub Actions.
+- Aucun changement du build PyInstaller, des fonctionnalités de
+  l'application ou du schéma SQLite.
+
+---
+
 ## [4.5.29] – 2026-09-12
 
 ### Modifié

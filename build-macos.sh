@@ -4,13 +4,13 @@ set -euo pipefail
 # build-macos.sh — Garage macOS (Intel x86_64) DMG
 # Usage:
 #   ./build-macos.sh
-#   ./build-macos.sh -v 4.5.29
-#   ./build-macos.sh -v 4.5.29 --flavor legacy
-#   ./build-macos.sh -v 4.5.29 --keep
+#   ./build-macos.sh -v 4.5.30
+#   ./build-macos.sh -v 4.5.30 --flavor legacy
+#   ./build-macos.sh -v 4.5.30 --keep
 #
 # À lancer à la racine du repo (là où il y a garage.py, assets/, data/, etc.)
 
-VERSION="4.5.29"
+VERSION="4.5.30"
 KEEP_BUILD_DIRS="0"
 MIN_MACOS_VERSION="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 BUILD_FLAVOR="${BUILD_FLAVOR:-}"
@@ -156,17 +156,39 @@ ln -s /Applications "$STAGE_DIR/Applications"
 
 # Volume name (ce que tu vois dans Finder quand tu montes le DMG)
 VOL_NAME="Garage ${VERSION}"
+TMP_DMG_PATH="${STAGE_DIR}/${DMG_NAME}"
 
-# On écrase si existe
+# Évite les conflits si un ancien volume Garage du même build est encore monté.
+if [[ -d "/Volumes/${VOL_NAME}" ]]; then
+  echo "==> Démontage ancien volume: /Volumes/${VOL_NAME}"
+  hdiutil detach "/Volumes/${VOL_NAME}" -quiet || true
+  sleep 2
+fi
+
+# On écrase uniquement le DMG cible exact si présent.
 rm -f "$DMG_PATH"
 
-# DMG compressé (UDZO)
-hdiutil create \
-  -volname "$VOL_NAME" \
-  -srcfolder "$STAGE_DIR" \
-  -ov \
-  -format UDZO \
-  "$DMG_PATH" >/dev/null
+# DMG compressé (UDZO). En CI, hdiutil peut répondre "Resource busy" de façon
+# transitoire : on limite donc le retry à la création du DMG.
+for attempt in 1 2 3; do
+  echo "==> hdiutil create tentative ${attempt}/3"
+  rm -f "$TMP_DMG_PATH"
+  if hdiutil create \
+    -volname "$VOL_NAME" \
+    -srcfolder "$STAGE_DIR" \
+    -ov \
+    -format UDZO \
+    "$TMP_DMG_PATH" >/dev/null; then
+    mv "$TMP_DMG_PATH" "$DMG_PATH"
+    break
+  fi
+
+  if [[ "$attempt" == "3" ]]; then
+    echo "Erreur: création DMG impossible après 3 tentatives." >&2
+    exit 1
+  fi
+  sleep 3
+done
 
 # --- SHA256 à côté (pratique pour release GitHub)
 if command -v shasum >/dev/null 2>&1; then
