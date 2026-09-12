@@ -3,6 +3,20 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+## [5.0.1] – 2026-09-12
+
+### Ajouté
+
+- Persistance du thème de couleur sélectionné entre les lancements de l'application.
+- Ajout d'un profil de build dédié à macOS High Sierra 10.13.6 Intel x86_64.
+
+### Modifié
+
+- Le thème enregistré est restauré automatiquement au démarrage, avec retour silencieux au thème par défaut si la préférence est absente ou invalide.
+- Documentation du processus de build manuel High Sierra et de ses dépendances dédiées.
+
+---
+
 ## [5.0.0] – 2026-09-12
 
 ### Ajouté

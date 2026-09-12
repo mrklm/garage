@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v5.0.0 (clean, single-file)
+Garage — v5.0.1 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -31,6 +31,7 @@ from __future__ import annotations
 
 
 # --- Initialisation base de données (modèle -> garage.db) ---
+import json
 import os
 import shutil
 import sqlite3
@@ -194,7 +195,8 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v5.0.0"
+APP_TITLE = "Garage v5.0.1"
+PREFS_FILE = os.path.join(USER_DIR, "preferences.json")
 
 
 # ----------------- Helpers -----------------
@@ -887,7 +889,11 @@ class GarageApp(tk.Tk):
 
         self._theme_name = "Midnight Garage"
 
-        self._apply_platform_theme() 
+        self._apply_platform_theme()
+        saved_theme = self._load_theme_preference()
+        if saved_theme:
+            self._theme_name = saved_theme
+            self._apply_platform_theme()
 
         # Fonts
         _base = tkfont.nametofont("TkDefaultFont")
@@ -930,6 +936,33 @@ class GarageApp(tk.Tk):
 
         self._build_ui()
         self._refresh_all()
+
+    def _load_theme_preference(self):
+        try:
+            with open(PREFS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return None
+
+        if not isinstance(data, dict):
+            return None
+
+        theme_name = data.get("theme")
+        if not isinstance(theme_name, str):
+            return None
+
+        theme_name = theme_name.strip()
+        if theme_name in getattr(self, "_theme_names", ()):
+            return theme_name
+
+        return None
+
+    def _save_theme_preference(self):
+        try:
+            with open(PREFS_FILE, "w", encoding="utf-8") as f:
+                json.dump({"theme": self._theme_name}, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
 
     def _apply_platform_theme(self) -> None:
         import sys
@@ -2042,8 +2075,13 @@ class GarageApp(tk.Tk):
         name = self.theme_var.get().strip()
         if not name:
             return
+        if name not in getattr(self, "_theme_names", ()):
+            self._theme_name = "Midnight Garage"
+            self._apply_platform_theme()
+            return
 
         self._theme_name = name
+        self._save_theme_preference()
         self._apply_platform_theme()
         try:
             self._refresh_general_overview()
