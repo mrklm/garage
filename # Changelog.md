@@ -4,6 +4,29 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.25] – 2026-09-12
+
+### Ajouté
+
+- Ajout de deux actions rapides `+ Plein` et `+ Entretien` sur chaque
+  carte véhicule de la page `Général`.
+- Sélection automatique du véhicule correspondant à la carte avant
+  l'ouverture du formulaire demandé.
+- Accès direct au formulaire de nouveau plein depuis `Général`.
+- Accès direct au formulaire de nouvel entretien depuis `Général`.
+
+### Modifié
+
+- Synchronisation des actions rapides avec le mécanisme central du
+  véhicule actif.
+- Réinitialisation du formulaire cible lors de l'utilisation d'une
+  action rapide afin de préparer une nouvelle saisie.
+- Conservation de la navigation principale introduite en v4.5.24.
+- Aucun changement du stockage SQLite ni de la logique métier des
+  pleins et des entretiens.
+
+---
+
 ## [4.5.24] – 2026-09-12
 
 ### Modifié

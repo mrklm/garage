@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.24 (clean, single-file)
+Garage — v4.5.25 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -216,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.24"
+APP_TITLE = "Garage v4.5.25"
 
 
 # ----------------- Helpers -----------------
@@ -2021,6 +2021,41 @@ class GarageApp(tk.Tk):
 
         if shown == 0:
             ttk.Label(reminders, text="(Rappels désactivés pour ce véhicule)", font=self.font_rem_item).grid(row=1, column=0, sticky="w")
+
+        actions = ttk.Frame(card)
+        actions.grid(row=6, column=0, columnspan=2, sticky="e", pady=(8, 0))
+        ttk.Button(
+            actions,
+            text="+ Plein",
+            command=lambda v=vid: self._quick_add_plein(v),
+        ).grid(row=0, column=0, padx=(0, 8))
+        ttk.Button(
+            actions,
+            text="+ Entretien",
+            command=lambda v=vid: self._quick_add_entretien(v),
+        ).grid(row=0, column=1)
+
+    def _quick_add_plein(self, vehicle_id: int):
+        self.active_vehicle_id = int(vehicle_id)
+        self._refresh_all_tabs_after_vehicle_change(source="general_click")
+        self._show_pleins()
+        self.new_pl_date.set("")
+        self.new_pl_km.set("")
+        self.new_pl_litres.set("")
+        self.new_pl_prix.set("")
+        self.new_pl_total.set("")
+        self.new_pl_lieu.set("")
+
+    def _quick_add_entretien(self, vehicle_id: int):
+        self.active_vehicle_id = int(vehicle_id)
+        self._refresh_all_tabs_after_vehicle_change(source="general_click")
+        self._show_entretiens()
+        self.new_date.set("")
+        self.new_km.set("")
+        self.new_cost.set("")
+        self.new_by.set("")
+        self.new_vbat.set("")
+        self.new_details.set("")
 
     # bouton combobox selecteur de themes
 
