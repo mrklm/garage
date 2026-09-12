@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.13] – 2026-09-12
+
+### Modifié
+
+- Déplacement de `_format_days()` et `compute_reminder_status()` depuis `garage.py` vers `maintenance_service.py`.
+- Regroupement de la logique métier des rappels d'entretien dans le service dédié.
+- Conservation à l'identique des règles de kilométrage, de périodicité, de retard, de pré-alerte, des couleurs et des textes affichés.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.12] – 2026-09-12
 
 ### Modifié
