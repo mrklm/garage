@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.15] – 2026-09-12
+
+### Ajouté
+
+- Ajout d'un nouvel onglet principal `Paramètres` dans l'interface.
+- Préparation de la future réorganisation de l'interface v5.
+- Conservation temporaire de tous les onglets et fonctionnalités existants.
+- Aucun déplacement fonctionnel dans ce jalon.
+
+---
+
 ## [4.5.14] – 2026-09-12
 
 ### Modifié

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.14 (clean, single-file)
+Garage — v4.5.15 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -216,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.14"
+APP_TITLE = "Garage v4.5.15"
 
 
 # ----------------- Helpers -----------------
@@ -1165,6 +1165,7 @@ class GarageApp(tk.Tk):
         self.tab_pleins = ttk.Frame(self.nb, padding=10)
         self.tab_ent = ttk.Frame(self.nb, padding=10)
         self.tab_graphs = ttk.Frame(self.nb, padding=10)
+        self.tab_settings = ttk.Frame(self.nb, padding=10)
 
         self.nb.add(self.tab_general, text="Général")
         self.nb.add(self.tab_vehicules, text="Véhicules")
@@ -1172,11 +1173,13 @@ class GarageApp(tk.Tk):
         self.nb.add(self.tab_ent, text="Entretiens")
 
         self.nb.add(self.tab_graphs, text="Graphiques")
+        self.nb.add(self.tab_settings, text="Paramètres")
         self._build_general_tab()
         self._build_vehicules_tab()
         self._build_pleins_tab()
         self._build_entretiens_tab()
         self._build_graphs_tab()
+        self._build_settings_tab()
 
         # --- Aide : case à cocher globale (toujours visible, centrée sous les onglets) ---
         self.show_help_var = tk.BooleanVar(value=False)
@@ -1207,6 +1210,19 @@ class GarageApp(tk.Tk):
             command=self._import_backup_dialog,
         )
         self.btn_import_backup.grid(row=0, column=2, padx=(10, 0))
+
+    def _build_settings_tab(self):
+        self.tab_settings.columnconfigure(0, weight=1)
+        self.tab_settings.rowconfigure(0, weight=1)
+
+        box = ttk.Frame(self.tab_settings)
+        box.grid(row=0, column=0, sticky="nsew")
+        box.columnconfigure(0, weight=1)
+
+        ttk.Label(
+            box,
+            text="Les paramètres seront regroupés ici ultérieurement.",
+        ).grid(row=0, column=0, sticky="nw")
 
     def _set_status(self, txt: str):
         self.status.set(txt)
