@@ -3,6 +3,33 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+## [4.5.29] – 2026-09-12
+
+### Modifié
+
+- Mise à jour complète de l'aide utilisateur pour correspondre à la
+  nouvelle organisation de Garage.
+- Documentation de la navigation principale et des différentes sections
+  de Paramètres.
+- Mise à jour de l'aide concernant les pleins, entretiens, rappels,
+  préconisations, sauvegardes et apparence.
+- Suppression de l'ancien mécanisme de copie de AIDE.md dans le dossier
+  utilisateur ; l'aide embarquée devient la source utilisée par
+  l'application.
+- Fiabilisation du workflow GitHub Actions de release pour macOS, Linux
+  et Windows.
+- Publication directe des artefacts finaux et de leurs fichiers de
+  contrôle, sans archives intermédiaires par système.
+- Harmonisation des dépendances de build Windows avec
+  requirements-build.txt.
+- Suppression d'un effet de bord du build macOS qui pouvait modifier la
+  casse du fichier logo dans le dépôt.
+- Documentation de la release standard multi-plateforme et séparation
+  du futur build macOS High Sierra.
+- Aucun changement du schéma SQLite.
+
+---
+
 ## [4.5.28] – 2026-09-12
 
 ### Modifié

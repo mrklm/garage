@@ -131,29 +131,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: release-artifacts
-
-      - name: Package artifacts by OS
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          mkdir -p release-packages
-
-          (
-            cd release-artifacts/Garage-macOS-modern-x86_64
-            zip -r "../../release-packages/Garage-${VERSION}-macOS-modern-x86_64-assets.zip" .
-          )
-
-          (
-            cd release-artifacts/Garage-linux-x86_64
-            zip -r "../../release-packages/Garage-${VERSION}-linux-x86_64-assets.zip" .
-          )
-
-          (
-            cd release-artifacts/Garage-windows-x86_64
-            zip -r "../../release-packages/Garage-${VERSION}-windows-x86_64-assets.zip" .
-          )
+          merge-multiple: true
 
       - name: Attach artifacts to release
         uses: softprops/action-gh-release@v2
         with:
           name: Garage ${{ github.ref_name }}
-          files: release-packages/*
+          files: release-artifacts/*

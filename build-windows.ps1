@@ -1,9 +1,9 @@
-<#  build-windows.ps1 — Garage (Windows) v4.5.28
+<#  build-windows.ps1 — Garage (Windows) v4.5.29
     Script de build Windows (portable) pour un repo multi-OS.
 
     Usage (PowerShell, a la racine du repo) :
       .\build-windows.ps1
-      .\build-windows.ps1 -Version 4.5.28
+      .\build-windows.ps1 -Version 4.5.29
       .\build-windows.ps1 -AppsDir "$env:USERPROFILE\Apps"
       .\build-windows.ps1 -KeepBuildDirs
 
@@ -14,7 +14,7 @@
 
 [CmdletBinding()]
 param(
-  [string]$Version = "4.5.28",
+  [string]$Version = "4.5.29",
   [switch]$KeepBuildDirs,
   [string]$AppsDir = ""
 )
@@ -32,6 +32,7 @@ $Root      = (Get-Location).Path
 $GaragePy  = Join-Path $Root "garage.py"
 $AssetsDir = Join-Path $Root "assets"
 $DataDir   = Join-Path $Root "data"
+$ReqBuild  = Join-Path $Root "requirements-build.txt"
 
 $IconIco = Join-Path $AssetsDir "logo.ico"
 $LogoPng = Join-Path $AssetsDir "logo.png"
@@ -56,6 +57,7 @@ Info "Verification des fichiers requis..."
 if (!(Test-Path $GaragePy))  { Fail "garage.py introuvable a la racine." }
 if (!(Test-Path $AssetsDir)) { Fail "Dossier assets/ introuvable." }
 if (!(Test-Path $DataDir))   { Fail "Dossier data/ introuvable." }
+if (!(Test-Path $ReqBuild))  { Fail "Manquant: requirements-build.txt" }
 
 if (!(Test-Path $IconIco)) { Fail "Manquant: assets\logo.ico" }
 if (!(Test-Path $LogoPng)) { Fail "Manquant: assets\logo.png" }
@@ -78,7 +80,7 @@ Info "Activation du venv..."
 
 Info "Installation / mise a jour des dependances build..."
 & $VenvPy -m pip install --upgrade pip | Out-Host
-& $VenvPy -m pip install pillow matplotlib pyinstaller | Out-Host
+& $VenvPy -m pip install -r $ReqBuild | Out-Host
 Ok "Dependances OK."
 
 # --- 3) Nettoyage build/dist/spec ---

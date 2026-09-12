@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.28 (clean, single-file)
+Garage — v4.5.29 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
 - Photos véhicules : dossier utilisateur (vehicle_photos)
-- Aide : AIDE.md copiée dans le dossier utilisateur si absente
+- Aide : AIDE.md embarqué dans les ressources de l'application
 
 Conventions d’emplacement :
 - macOS : ~/Library/Application Support/Garage
@@ -35,7 +35,6 @@ import os
 import shutil
 import sqlite3
 import sys
-from pathlib import Path
 
 from app_paths import (
     ASSETS_DIR,
@@ -43,7 +42,6 @@ from app_paths import (
     DB_FILE,
     USER_DIR,
     VEHICLE_PHOTOS_DIR,
-    _resource_path,
     resource_path,
 )
 from database import (
@@ -102,29 +100,8 @@ from value_utils import _safe_float, _safe_int
 os.makedirs(USER_DIR, exist_ok=True)
 
 
-def ensure_help_file(user_dir: Path) -> Path:
-    """Copie l'aide packagée vers USER_DIR si absente.
-
-    Retourne le chemin du fichier d'aide (dans USER_DIR si possible,
-    sinon le chemin ressource embarqué).
-    """
-    dst = user_dir / "AIDE.md"
-    if dst.exists():
-        return dst
-
-    src = Path(_resource_path("assets", "AIDE.md"))
-    try:
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
-        return dst
-    except Exception:
-        # Si la copie échoue, on ne bloque pas l'app.
-        return src
-
-
-# Assure DB + aide au démarrage (sans rien écraser)
+# Assure la base de données au démarrage.
 ensure_database()
-HELP_FILE = ensure_help_file(Path(USER_DIR))
 # --- AIDE (style) ---
 HELP_FONT_FAMILY = "TkDefaultFont"  # Police de TK pour eviter le ghost des emojis ésseulés
 HELP_FONT_SIZE = 20                 # Taille de la police de l'aide
@@ -217,7 +194,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.28"
+APP_TITLE = "Garage v4.5.29"
 
 
 # ----------------- Helpers -----------------

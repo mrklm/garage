@@ -4,13 +4,13 @@ set -euo pipefail
 # build-macos.sh — Garage macOS (Intel x86_64) DMG
 # Usage:
 #   ./build-macos.sh
-#   ./build-macos.sh -v 4.5.28
-#   ./build-macos.sh -v 4.5.28 --flavor legacy
-#   ./build-macos.sh -v 4.5.28 --keep
+#   ./build-macos.sh -v 4.5.29
+#   ./build-macos.sh -v 4.5.29 --flavor legacy
+#   ./build-macos.sh -v 4.5.29 --keep
 #
 # À lancer à la racine du repo (là où il y a garage.py, assets/, data/, etc.)
 
-VERSION="4.5.28"
+VERSION="4.5.29"
 KEEP_BUILD_DIRS="0"
 MIN_MACOS_VERSION="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 BUILD_FLAVOR="${BUILD_FLAVOR:-}"
@@ -77,15 +77,8 @@ fi
 export MACOSX_DEPLOYMENT_TARGET="$MIN_MACOS_VERSION"
 echo "==> Cible macOS minimale: ${MACOSX_DEPLOYMENT_TARGET}"
 
-# --- Fix casse logo.png / Logo.png (cohérence repos + PyInstaller)
-# Objectif: avoir assets/logo.png
-if [[ -f "assets/Logo.png" && ! -f "assets/logo.png" ]]; then
-  echo "Renommage: assets/Logo.png -> assets/logo.png"
-  mv -f "assets/Logo.png" "assets/logo.png"
-fi
-
 if [[ ! -f "assets/logo.png" ]]; then
-  echo "Note: assets/logo.png introuvable (ce n'est pas bloquant pour le build, mais tu voulais la cohérence)." >&2
+  echo "Note: assets/logo.png introuvable (ce n'est pas bloquant pour le build)." >&2
 fi
 
 # --- Icone .icns
