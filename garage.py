@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.25 (clean, single-file)
+Garage — v4.5.26 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -96,6 +96,7 @@ from vehicle_repository import (
     list_vehicles,
     update_vehicle,
 )
+from vehicle_photo_cleanup import cleanup_orphan_vehicle_photos
 from value_utils import _safe_float, _safe_int
 
 os.makedirs(USER_DIR, exist_ok=True)
@@ -216,7 +217,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.25"
+APP_TITLE = "Garage v4.5.26"
 
 
 # ----------------- Helpers -----------------
@@ -930,6 +931,7 @@ class GarageApp(tk.Tk):
             raise SystemExit(1)
 
         _ensure_schema()
+        cleanup_orphan_vehicle_photos()
         _ensure_assets_dir()
 
         self.vehicles_rows = list_vehicles()

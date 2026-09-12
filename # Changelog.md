@@ -4,6 +4,29 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.26] – 2026-09-12
+
+### Ajouté
+
+- Ajout d'un nettoyage automatique et silencieux des photos véhicule
+  orphelines au démarrage de l'application.
+- Suppression limitée aux fichiers gérés par Garage correspondant au
+  format `V<ID>.png` et non référencés par un véhicule existant.
+
+### Modifié
+
+- Vérification des références `photo_file` après l'initialisation du
+  schéma SQLite et avant le chargement des véhicules.
+- Conservation des fichiers non gérés par Garage, des sous-dossiers et
+  des liens symboliques.
+- Une erreur de nettoyage ne bloque pas le démarrage de l'application.
+- Les sauvegardes exportées après démarrage ne contiennent plus les
+  anciennes photos orphelines supprimées.
+- Aucun changement du schéma SQLite, de l'interface ou du mécanisme
+  d'import/export.
+
+---
+
 ## [4.5.25] – 2026-09-12
 
 ### Ajouté
