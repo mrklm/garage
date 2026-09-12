@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.12] – 2026-09-12
+
+### Modifié
+
+- Déplacement de `estimate_maintenance_cost_next_months()` depuis `garage.py` vers `maintenance_service.py`.
+- Regroupement progressif de la logique métier d'entretien dans le service dédié.
+- Conservation à l'identique des règles d'échéance, du calcul des occurrences et de l'estimation des coûts.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.11] – 2026-09-12
 
 ### Modifié
