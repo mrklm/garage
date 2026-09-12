@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.16] – 2026-09-12
+
+### Ajouté
+
+- Ajout d'un Notebook secondaire dans l'onglet `Paramètres`.
+- Création des sections `Véhicules`, `Entretien`, `Préconisations`, `Apparence`, `Données` et `Aide`.
+- Préparation de la migration progressive des fonctions existantes vers `Paramètres`.
+- Aucun déplacement fonctionnel dans ce jalon.
+
+---
+
 ## [4.5.15] – 2026-09-12
 
 ### Ajouté

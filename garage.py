@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.15 (clean, single-file)
+Garage — v4.5.16 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -216,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.15"
+APP_TITLE = "Garage v4.5.16"
 
 
 # ----------------- Helpers -----------------
@@ -1215,14 +1215,33 @@ class GarageApp(tk.Tk):
         self.tab_settings.columnconfigure(0, weight=1)
         self.tab_settings.rowconfigure(0, weight=1)
 
-        box = ttk.Frame(self.tab_settings)
-        box.grid(row=0, column=0, sticky="nsew")
-        box.columnconfigure(0, weight=1)
+        self.settings_nb = ttk.Notebook(self.tab_settings)
+        self.settings_nb.grid(row=0, column=0, sticky="nsew")
 
-        ttk.Label(
-            box,
-            text="Les paramètres seront regroupés ici ultérieurement.",
-        ).grid(row=0, column=0, sticky="nw")
+        self.settings_vehicles_tab = ttk.Frame(self.settings_nb, padding=10)
+        self.settings_maintenance_tab = ttk.Frame(self.settings_nb, padding=10)
+        self.settings_preconisations_tab = ttk.Frame(self.settings_nb, padding=10)
+        self.settings_appearance_tab = ttk.Frame(self.settings_nb, padding=10)
+        self.settings_data_tab = ttk.Frame(self.settings_nb, padding=10)
+        self.settings_help_tab = ttk.Frame(self.settings_nb, padding=10)
+
+        self.settings_nb.add(self.settings_vehicles_tab, text="Véhicules")
+        self.settings_nb.add(self.settings_maintenance_tab, text="Entretien")
+        self.settings_nb.add(self.settings_preconisations_tab, text="Préconisations")
+        self.settings_nb.add(self.settings_appearance_tab, text="Apparence")
+        self.settings_nb.add(self.settings_data_tab, text="Données")
+        self.settings_nb.add(self.settings_help_tab, text="Aide")
+
+        for tab in (
+            self.settings_vehicles_tab,
+            self.settings_maintenance_tab,
+            self.settings_preconisations_tab,
+            self.settings_appearance_tab,
+            self.settings_data_tab,
+            self.settings_help_tab,
+        ):
+            tab.columnconfigure(0, weight=1)
+            tab.rowconfigure(0, weight=1)
 
     def _set_status(self, txt: str):
         self.status.set(txt)
