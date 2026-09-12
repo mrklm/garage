@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.6 (clean, single-file)
+Garage — v4.5.7 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -61,8 +61,11 @@ from fuel_repository import (
     update_plein,
 )
 from maintenance_repository import (
+    _recent_cost_for_type,
     delete_entretien,
     get_entretien,
+    get_last_battery_voltage,
+    get_last_entretien_for_type,
     insert_entretien,
     list_entretiens_full,
     update_entretien,
@@ -201,7 +204,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.6"
+APP_TITLE = "Garage v4.5.7"
 
 
 # ----------------- Helpers -----------------
@@ -782,25 +785,6 @@ def last_km_any(vehicle_id: int):
     return max(m1, m2)
 
 
-def get_last_entretien_for_type(vehicle_id: int, type_id: int):
-    """Retourne (date_iso, km) du dernier entretien pour ce type sur ce véhicule."""
-    conn = _connect_db()
-    cur = conn.cursor()
-    cur.execute(
-        """SELECT date_iso, km
-           FROM entretiens
-           WHERE vehicule_id=? AND type_id=?
-           ORDER BY date_iso DESC, km DESC, id DESC
-           LIMIT 1""",
-        (int(vehicle_id), int(type_id)),
-    )
-    r = cur.fetchone()
-    conn.close()
-    if not r:
-        return (None, None)
-    return (r["date_iso"], r["km"])
-
-
 def compute_reminder_status(vehicle_id: int, type_id: int, period_km, period_months):
     """Calcule (is_ok, color, label) pour un rappel.
 
@@ -951,54 +935,6 @@ def conso_moy_l100(vehicle_id: int):
     if dist <= 0:
         return None
     return (lsum / dist) * 100.0
-
-
-def get_last_battery_voltage(vehicle_id: int):
-    """Retourne le dernier voltage batterie (float) renseigné dans les entretiens, ou None."""
-    conn = _connect_db()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT battery_voltage
-        FROM entretiens
-        WHERE vehicule_id = ? AND battery_voltage IS NOT NULL
-        ORDER BY date_iso DESC, km DESC, id DESC
-        LIMIT 1
-        """,
-        (int(vehicle_id),),
-    )
-    r = cur.fetchone()
-    conn.close()
-    if not r:
-        return None
-    try:
-        return float(r["battery_voltage"])
-    except Exception:
-        return None
-
-
-def _recent_cost_for_type(vehicle_id: int, type_id: int):
-    """Coût le plus récent (non NULL) pour un type d'entretien sur un véhicule."""
-    conn = _connect_db()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT cout
-        FROM entretiens
-        WHERE vehicule_id = ? AND type_id = ? AND cout IS NOT NULL
-        ORDER BY date_iso DESC, km DESC, id DESC
-        LIMIT 1
-        """,
-        (int(vehicle_id), int(type_id)),
-    )
-    r = cur.fetchone()
-    conn.close()
-    if not r:
-        return None
-    try:
-        return float(r["cout"])
-    except Exception:
-        return None
 
 
 def estimate_maintenance_cost_next_months(vehicle_id: int, horizon_months: int = 6):

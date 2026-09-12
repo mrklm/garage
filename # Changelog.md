@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.7] – 2026-09-12
+
+### Modifié
+
+- Extraction de trois lectures SQLite liées aux entretiens dans `maintenance_repository.py`.
+- Déplacement de `get_last_entretien_for_type()`, `get_last_battery_voltage()` et `_recent_cost_for_type()`.
+- Conservation à l'identique des requêtes SQL, conversions, valeurs de retour et appelants existants.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.6] – 2026-09-12
 
 ### Modifié

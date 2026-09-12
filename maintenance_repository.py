@@ -73,3 +73,70 @@ def delete_entretien(entretien_id: int):
     cur.execute("DELETE FROM entretiens WHERE id=?", (int(entretien_id),))
     conn.commit()
     conn.close()
+
+
+def get_last_entretien_for_type(vehicle_id: int, type_id: int):
+    """Retourne (date_iso, km) du dernier entretien pour ce type sur ce véhicule."""
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT date_iso, km
+           FROM entretiens
+           WHERE vehicule_id=? AND type_id=?
+           ORDER BY date_iso DESC, km DESC, id DESC
+           LIMIT 1""",
+        (int(vehicle_id), int(type_id)),
+    )
+    r = cur.fetchone()
+    conn.close()
+    if not r:
+        return (None, None)
+    return (r["date_iso"], r["km"])
+
+
+def get_last_battery_voltage(vehicle_id: int):
+    """Retourne le dernier voltage batterie (float) renseigné dans les entretiens, ou None."""
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT battery_voltage
+        FROM entretiens
+        WHERE vehicule_id = ? AND battery_voltage IS NOT NULL
+        ORDER BY date_iso DESC, km DESC, id DESC
+        LIMIT 1
+        """,
+        (int(vehicle_id),),
+    )
+    r = cur.fetchone()
+    conn.close()
+    if not r:
+        return None
+    try:
+        return float(r["battery_voltage"])
+    except Exception:
+        return None
+
+
+def _recent_cost_for_type(vehicle_id: int, type_id: int):
+    """Coût le plus récent (non NULL) pour un type d'entretien sur un véhicule."""
+    conn = _connect_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT cout
+        FROM entretiens
+        WHERE vehicule_id = ? AND type_id = ? AND cout IS NOT NULL
+        ORDER BY date_iso DESC, km DESC, id DESC
+        LIMIT 1
+        """,
+        (int(vehicle_id), int(type_id)),
+    )
+    r = cur.fetchone()
+    conn.close()
+    if not r:
+        return None
+    try:
+        return float(r["cout"])
+    except Exception:
+        return None
