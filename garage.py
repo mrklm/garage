@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.18 (clean, single-file)
+Garage — v4.5.19 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -216,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.18"
+APP_TITLE = "Garage v4.5.19"
 
 
 # ----------------- Helpers -----------------
@@ -1181,22 +1181,6 @@ class GarageApp(tk.Tk):
         self._build_graphs_tab()
         self._build_settings_tab()
 
-        # --- Aide : case à cocher globale (toujours visible, centrée sous les onglets) ---
-        self.show_help_var = tk.BooleanVar(value=False)
-        self.show_help_label = tk.StringVar(value="Afficher l\'Aide")
-
-        self.help_toggle_bar = ttk.Frame(self)
-        self.help_toggle_bar.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 6))
-        self.help_toggle_bar.columnconfigure(0, weight=1)
-
-        self.chk_show_help = ttk.Checkbutton(
-            self.help_toggle_bar,
-            textvariable=self.show_help_label,
-            variable=self.show_help_var,
-            command=self._on_help_toggle,
-        )
-        self.chk_show_help.grid(row=0, column=0)
-
     def _build_settings_tab(self):
         self.tab_settings.columnconfigure(0, weight=1)
         self.tab_settings.rowconfigure(0, weight=1)
@@ -1231,6 +1215,7 @@ class GarageApp(tk.Tk):
 
         self._build_settings_appearance()
         self._build_settings_data()
+        self._build_settings_help()
 
     def _build_settings_appearance(self):
         box = ttk.Frame(self.settings_appearance_tab)
@@ -1271,6 +1256,38 @@ class GarageApp(tk.Tk):
             command=self._import_backup_dialog,
         )
         self.btn_import_backup.grid(row=0, column=1, padx=(10, 0))
+
+    def _build_settings_help(self):
+        self.settings_help_tab.columnconfigure(0, weight=1)
+        self.settings_help_tab.rowconfigure(0, weight=0)
+        self.settings_help_tab.rowconfigure(1, weight=1)
+
+        self.help_logo_label = ttk.Label(self.settings_help_tab, text="")
+        self.help_logo_label.grid(row=0, column=0, sticky="n", pady=(0, 10))
+
+        help_text_frame = ttk.Frame(self.settings_help_tab)
+        help_text_frame.grid(row=1, column=0, sticky="nsew")
+        help_text_frame.columnconfigure(0, weight=1)
+        help_text_frame.rowconfigure(0, weight=1)
+
+        help_scroll = ttk.Scrollbar(help_text_frame, orient="vertical")
+        help_scroll.grid(row=0, column=1, sticky="ns")
+
+        self.help_text = tk.Text(
+            help_text_frame,
+            wrap="word",
+            bg=HELP_BG,
+            fg=HELP_TEXT_COLOR,
+            bd=0,
+            highlightthickness=0,
+            font=(HELP_FONT_FAMILY, HELP_FONT_SIZE),
+            yscrollcommand=help_scroll.set,
+        )
+        self.help_text.grid(row=0, column=0, sticky="nsew")
+        help_scroll.config(command=self.help_text.yview)
+
+        self._load_logo_image()
+        self._load_help_into_widget()
 
     def _set_status(self, txt: str):
         self.status.set(txt)
@@ -1358,52 +1375,6 @@ class GarageApp(tk.Tk):
             "Redémarrez Garage pour utiliser les données restaurées.",
         )
         self._set_status("Sauvegarde importée. Redémarrez Garage.")
-
-    def _on_help_toggle(self) -> None:
-        """Affiche/masque l'aide. La case est globale (visible sur tous les onglets)."""
-
-        # Si l'aide est demandée, on bascule sur l'onglet Général.
-        if self.show_help_var.get():
-            try:
-                self.nb.select(self.tab_general)
-            except Exception:
-                pass
-
-        self._apply_help_visibility()
-
-    def _apply_help_visibility(self) -> None:
-        """Applique l'état d'affichage de l'aide dans l'onglet Général."""
-        show = bool(self.show_help_var.get())
-        if not hasattr(self, "help_frame") or not hasattr(self, "general_cards"):
-            return
-
-        if show:
-            # Afficher l'aide
-            try:
-                self.help_frame.grid()
-            except Exception:
-                pass
-            try:
-                self.general_cards.grid_remove()
-            except Exception:
-                pass
-            self._load_help_into_widget()
-        else:
-            # Masquer l'aide
-            try:
-                self.help_frame.grid_remove()
-            except Exception:
-                pass
-            try:
-                self.general_cards.grid()
-            except Exception:
-                pass
-            # Rafraîchir l'aperçu général si des véhicules existent
-            if getattr(self, "vehicles_rows", None):
-                try:
-                    self._refresh_general_overview()
-                except Exception:
-                    pass
 
     def _read_help_md(self) -> str:
         """Lit AIDE.md (à la racine de l'app) et nettoie le bloc <img> en tête si présent."""
@@ -1605,7 +1576,7 @@ class GarageApp(tk.Tk):
 
     # ---------- Général ----------
     def _build_general_tab(self):
-        """Construit l'onglet Général (cartes + panneau Aide superposé)."""
+        """Construit l'onglet Général (cartes + état vide)."""
         self.general_page = 0
 
         self.tab_general.columnconfigure(0, weight=1)
@@ -1637,47 +1608,26 @@ class GarageApp(tk.Tk):
         self.general_cards.columnconfigure(1, weight=1)
         self.general_cards.rowconfigure(0, weight=1)
 
-        # Zone aide (superposée, affichée/masquée via checkbox)
-        self.help_frame = ttk.Frame(self.tab_general)
-        self.help_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 0))
-        self.help_frame.columnconfigure(0, weight=1)
-        self.help_frame.rowconfigure(1, weight=1)
+        self.general_empty_frame = ttk.Frame(self.tab_general)
+        self.general_empty_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 0))
+        self.general_empty_frame.columnconfigure(0, weight=1)
+        self.general_empty_frame.rowconfigure(0, weight=1)
 
-        # Logo (ligne 0, ne s'étire pas)
-        self.help_logo_label = ttk.Label(self.help_frame, text="")
-        self.help_logo_label.grid(row=0, column=0, sticky="n", pady=(0, 10))
-
-        # --- Zone texte + scrollbar (ligne 1, s'étire) ---
-        help_text_frame = ttk.Frame(self.help_frame)
-        help_text_frame.grid(row=1, column=0, sticky="nsew")
-
-        help_text_frame.columnconfigure(0, weight=1)
-        help_text_frame.rowconfigure(1, weight=1)
-
-        help_scroll = ttk.Scrollbar(help_text_frame, orient="vertical")
-        help_scroll.grid(row=0, column=1, sticky="ns")
-
-        self.help_text = tk.Text(
-            help_text_frame,
-            wrap="word",
-            bg=HELP_BG,
-            fg=HELP_TEXT_COLOR,
-            bd=0,
-            highlightthickness=0,
-            font=(HELP_FONT_FAMILY, HELP_FONT_SIZE),
-            yscrollcommand=help_scroll.set,
+        empty_msg = (
+            "Aucun véhicule enregistré.\n\n"
+            "Pour commencer, ajoutez un véhicule dans l'onglet Véhicules.\n\n"
+            "L'aide est disponible dans Paramètres > Aide."
         )
-        self.help_text.grid(row=0, column=0, sticky="nsew")
-        help_scroll.config(command=self.help_text.yview)
+        self.general_empty_label = ttk.Label(
+            self.general_empty_frame,
+            text=empty_msg,
+            anchor="center",
+            justify="center",
+        )
+        self.general_empty_label.grid(row=0, column=0, sticky="nsew")
 
-        # Remplit logo + aide
-        self._load_logo_image()
-        self._load_help_into_widget()
-
-
-        # Par défaut, on masque l'aide (on affiche les cartes)
         try:
-            self.help_frame.grid_remove()
+            self.general_empty_frame.grid_remove()
         except Exception:
             pass
     def _general_prev_page(self):
@@ -3391,15 +3341,15 @@ class GarageApp(tk.Tk):
         except Exception:
             pass
 
-        # Basculer sur l'onglet Général et afficher l'aide automatiquement
+        # Basculer sur l'onglet Général et afficher l'état vide.
         try:
             self.nb.select(self.tab_general)
         except Exception:
             pass
 
         try:
-            self.show_help_var.set(True)
-            self._apply_help_visibility()
+            self.general_cards.grid_remove()
+            self.general_empty_frame.grid()
         except Exception:
             pass
 
@@ -3451,6 +3401,12 @@ class GarageApp(tk.Tk):
             self.ent_vehicle_cb.current(idx)
         if source != "graphs":
             self.graph_vehicle_cb.current(idx)
+
+        try:
+            self.general_empty_frame.grid_remove()
+            self.general_cards.grid()
+        except Exception:
+            pass
 
         r = get_vehicle(self.active_vehicle_id)
         title = f"Véhicule #{self.active_vehicle_id}"

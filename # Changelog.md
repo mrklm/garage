@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.19] – 2026-09-12
+
+### Modifié
+
+- Déplacement de l'Aide vers `Paramètres > Aide`.
+- Suppression du contrôle global `Afficher l'Aide` et de sa barre sous les onglets principaux.
+- Suppression de l'ancien panneau d'Aide superposé aux cartes de l'onglet `Général`.
+- Ajout d'un état vide dédié dans `Général` lorsqu'aucun véhicule n'est enregistré.
+- Conservation du contenu, du défilement et du logo de l'Aide dans son nouvel emplacement.
+- Ajustement du layout de l'Aide afin de conserver l'affichage complet du logo.
+- Aucun changement de logique métier ou de lecture de `AIDE.md`.
+
+---
+
 ## [4.5.18] – 2026-09-12
 
 ### Modifié
