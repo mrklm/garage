@@ -4,6 +4,21 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.18] – 2026-09-12
+
+### Modifié
+
+- Déplacement des commandes `Exporter une sauvegarde` et
+  `Importer une sauvegarde` vers `Paramètres > Données`.
+- Création d'une méthode dédiée `_build_settings_data()` pour
+  construire les commandes de gestion des sauvegardes.
+- Conservation à l'identique de la logique d'exportation et
+  d'importation des données.
+- Conservation du contrôle d'Aide dans la barre globale.
+- Aucun autre déplacement fonctionnel dans ce jalon.
+
+---
+
 ## [4.5.17] – 2026-09-12
 
 ### Modifié

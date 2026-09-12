@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.17 (clean, single-file)
+Garage — v4.5.18 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -216,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.17"
+APP_TITLE = "Garage v4.5.18"
 
 
 # ----------------- Helpers -----------------
@@ -1197,20 +1197,6 @@ class GarageApp(tk.Tk):
         )
         self.chk_show_help.grid(row=0, column=0)
 
-        self.btn_export_backup = ttk.Button(
-            self.help_toggle_bar,
-            text="Exporter une sauvegarde",
-            command=self._export_backup_dialog,
-        )
-        self.btn_export_backup.grid(row=0, column=1, padx=(10, 0))
-
-        self.btn_import_backup = ttk.Button(
-            self.help_toggle_bar,
-            text="Importer une sauvegarde",
-            command=self._import_backup_dialog,
-        )
-        self.btn_import_backup.grid(row=0, column=2, padx=(10, 0))
-
     def _build_settings_tab(self):
         self.tab_settings.columnconfigure(0, weight=1)
         self.tab_settings.rowconfigure(0, weight=1)
@@ -1244,6 +1230,7 @@ class GarageApp(tk.Tk):
             tab.rowconfigure(0, weight=1)
 
         self._build_settings_appearance()
+        self._build_settings_data()
 
     def _build_settings_appearance(self):
         box = ttk.Frame(self.settings_appearance_tab)
@@ -1266,6 +1253,24 @@ class GarageApp(tk.Tk):
         self._set_combobox_dropdown_width(self.theme_cb, 60)
 
         self.theme_cb.bind("<<ComboboxSelected>>", self._on_theme_change)
+
+    def _build_settings_data(self):
+        box = ttk.Frame(self.settings_data_tab)
+        box.grid(row=0, column=0, sticky="nw")
+
+        self.btn_export_backup = ttk.Button(
+            box,
+            text="Exporter une sauvegarde",
+            command=self._export_backup_dialog,
+        )
+        self.btn_export_backup.grid(row=0, column=0)
+
+        self.btn_import_backup = ttk.Button(
+            box,
+            text="Importer une sauvegarde",
+            command=self._import_backup_dialog,
+        )
+        self.btn_import_backup.grid(row=0, column=1, padx=(10, 0))
 
     def _set_status(self, txt: str):
         self.status.set(txt)

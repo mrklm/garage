@@ -21,5 +21,5 @@ GitHub-hosted `macos-13` runners are not reliable enough for the legacy profile.
 
 ```bash
 python3 -m pip install -r requirements-build-macos-legacy.txt
-MACOSX_DEPLOYMENT_TARGET=11.0 ./build-macos.sh -v 4.5.17 --flavor legacy
+MACOSX_DEPLOYMENT_TARGET=11.0 ./build-macos.sh -v 4.5.18 --flavor legacy
 ```
