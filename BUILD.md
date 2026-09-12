@@ -35,7 +35,7 @@ GitHub-hosted `macos-13` runners are not reliable enough for the legacy profile.
 
 ```bash
 python3 -m pip install -r requirements-build-macos-legacy.txt
-MACOSX_DEPLOYMENT_TARGET=11.0 ./build-macos.sh -v 5.0.2 --flavor legacy
+MACOSX_DEPLOYMENT_TARGET=11.0 ./build-macos.sh -v 5.0.3 --flavor legacy
 ```
 
 High Sierra compatibility must be built and published separately from the standard macOS/Linux/Windows release, with a clearly distinct artifact name such as `high-sierra` or `legacy`.
@@ -48,12 +48,12 @@ It is built manually on a real macOS 10.13.6 Intel x86_64 machine with Python 3.
 
 ```bash
 python3 -m pip install -r requirements-build-macos-high-sierra.txt
-MACOSX_DEPLOYMENT_TARGET=10.13 ./build-macos.sh -v 5.0.2 --flavor high-sierra
+MACOSX_DEPLOYMENT_TARGET=10.13 ./build-macos.sh -v 5.0.3 --flavor high-sierra
 ```
 
 This produces High Sierra-specific artifacts:
 
-- `Garage-5.0.2-macOS-high-sierra-x86_64.dmg`
-- `Garage-5.0.2-macOS-high-sierra-x86_64.dmg.sha`
+- `Garage-5.0.3-macOS-high-sierra-x86_64.dmg`
+- `Garage-5.0.3-macOS-high-sierra-x86_64.dmg.sha`
 
 These artifacts must be published in a separate GitHub release. They are not part of the standard GitHub Actions macOS/Linux/Windows pipeline.

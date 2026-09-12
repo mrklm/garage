@@ -3,6 +3,21 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+## [5.0.3] – 2026-09-12
+
+### Ajouté
+
+- Ajout de réglages d'échelle maximale pour les graphiques dans `Paramètres > Apparence`.
+- Possibilité de définir une limite haute pour la consommation, le prix du litre et le coût d'entretien annuel.
+
+### Modifié
+
+- Les réglages d'échelle des graphiques sont enregistrés dans les préférences utilisateur.
+- Les champs vides ou invalides conservent l'échelle automatique.
+- Aucun changement des données, des calculs ou des requêtes SQL des graphiques.
+
+---
+
 ## [5.0.2] – 2026-09-12
 
 ### Modifié

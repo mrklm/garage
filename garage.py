@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v5.0.2 (clean, single-file)
+Garage — v5.0.3 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -195,7 +195,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v5.0.2"
+APP_TITLE = "Garage v5.0.3"
 PREFS_FILE = os.path.join(USER_DIR, "preferences.json")
 
 
@@ -937,15 +937,27 @@ class GarageApp(tk.Tk):
         self._build_ui()
         self._refresh_all()
 
-    def _load_theme_preference(self):
+    def _load_preferences(self):
         try:
             with open(PREFS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception:
-            return None
+            return {}
 
         if not isinstance(data, dict):
-            return None
+            return {}
+
+        return data
+
+    def _save_preferences(self, data):
+        try:
+            with open(PREFS_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    def _load_theme_preference(self):
+        data = self._load_preferences()
 
         theme_name = data.get("theme")
         if not isinstance(theme_name, str):
@@ -957,12 +969,68 @@ class GarageApp(tk.Tk):
 
         return None
 
-    def _save_theme_preference(self):
+    def _load_text_preference(self, key):
+        data = self._load_preferences()
+        value = data.get(key, "")
+        if not isinstance(value, str):
+            return ""
+        return value.strip()
+
+    def _save_text_preference(self, key, value):
+        data = self._load_preferences()
+        if value:
+            data[key] = value
+        else:
+            data.pop(key, None)
+        self._save_preferences(data)
+
+    def _graph_scale_limit(self, var_name):
+        var = getattr(self, var_name, None)
+        if var is None:
+            return None
+
+        raw = var.get().strip().replace(",", ".")
+        if not raw:
+            return None
+
         try:
-            with open(PREFS_FILE, "w", encoding="utf-8") as f:
-                json.dump({"theme": self._theme_name}, f, ensure_ascii=False, indent=2)
+            value = float(raw)
+        except Exception:
+            return None
+
+        if value <= 0:
+            return None
+
+        return value
+
+    def _apply_graph_scale_limit(self, ax, var_name, bottom=None):
+        limit = self._graph_scale_limit(var_name)
+        if limit is None:
+            return
+
+        if bottom is None:
+            ax.set_ylim(top=limit)
+        else:
+            ax.set_ylim(bottom=bottom, top=limit)
+
+    def _on_graph_scale_change(self, _evt=None):
+        values = {
+            "graph_scale_conso_l100": self.graph_scale_conso_var.get().strip(),
+            "graph_scale_price_litre": self.graph_scale_price_var.get().strip(),
+            "graph_scale_maintenance_year": self.graph_scale_maintenance_var.get().strip(),
+        }
+        for key, value in values.items():
+            self._save_text_preference(key, value)
+
+        try:
+            self._refresh_graph()
         except Exception:
             pass
+
+    def _save_theme_preference(self):
+        data = self._load_preferences()
+        data["theme"] = self._theme_name
+        self._save_preferences(data)
 
     def _apply_platform_theme(self) -> None:
         import sys
@@ -1363,6 +1431,25 @@ class GarageApp(tk.Tk):
         self._set_combobox_dropdown_width(self.theme_cb, 60)
 
         self.theme_cb.bind("<<ComboboxSelected>>", self._on_theme_change)
+
+        graph_box = ttk.Labelframe(self.settings_appearance_tab, text="Graphiques", padding=10)
+        graph_box.grid(row=1, column=0, sticky="nw", pady=(14, 0))
+
+        self.graph_scale_conso_var = tk.StringVar(value=self._load_text_preference("graph_scale_conso_l100"))
+        self.graph_scale_price_var = tk.StringVar(value=self._load_text_preference("graph_scale_price_litre"))
+        self.graph_scale_maintenance_var = tk.StringVar(value=self._load_text_preference("graph_scale_maintenance_year"))
+
+        graph_fields = [
+            ("Échelle max conso L/100 :", self.graph_scale_conso_var),
+            ("Échelle max prix/L :", self.graph_scale_price_var),
+            ("Échelle max entretien €/an :", self.graph_scale_maintenance_var),
+        ]
+        for row, (label, var) in enumerate(graph_fields):
+            ttk.Label(graph_box, text=label).grid(row=row, column=0, sticky="w", pady=(0 if row == 0 else 8, 0))
+            entry = ttk.Entry(graph_box, textvariable=var, width=12)
+            entry.grid(row=row, column=1, sticky="w", padx=(8, 0), pady=(0 if row == 0 else 8, 0))
+            entry.bind("<Return>", self._on_graph_scale_change)
+            entry.bind("<FocusOut>", self._on_graph_scale_change)
 
     def _build_settings_data(self):
         box = ttk.Frame(self.settings_data_tab)
@@ -2956,6 +3043,7 @@ class GarageApp(tk.Tk):
                 fontsize=8,
                 color="#bbbbbb",
             )
+        self._apply_graph_scale_limit(ax, "graph_scale_conso_var")
 
     def _plot_price_per_litre(self, ax):
         self._apply_dark_style(ax)
@@ -3017,6 +3105,7 @@ class GarageApp(tk.Tk):
         for tick in ax.get_xticklabels():
             tick.set_rotation(20)
             tick.set_ha("right")
+        self._apply_graph_scale_limit(ax, "graph_scale_price_var")
 
 
 
@@ -3139,6 +3228,7 @@ class GarageApp(tk.Tk):
 
         # Un peu d'air en bas pour les labels
         ax.set_ylim(bottom=0)
+        self._apply_graph_scale_limit(ax, "graph_scale_maintenance_var", bottom=0)
 
     def _plot_entretien_cost_per_month(self, ax):
         rows = list_maintenance_cost_by_month(self.active_vehicle_id)
