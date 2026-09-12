@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.23] – 2026-09-12
+
+### Modifié
+
+- Suppression de l'ancien onglet principal `Véhicules`, devenu inutile
+  après le déplacement de sa gestion vers `Paramètres > Véhicules`.
+- Simplification de la navigation principale, désormais organisée en
+  `Général`, `Pleins`, `Entretiens`, `Graphiques` et `Paramètres`.
+- Conservation à l'identique de la gestion des véhicules dans
+  `Paramètres > Véhicules`.
+- Conservation des mécanismes existants de sélection et de
+  synchronisation du véhicule actif.
+- Aucun changement du stockage SQLite ni de la logique métier des
+  véhicules.
+
+---
+
 ## [4.5.22] – 2026-09-12
 
 ### Modifié

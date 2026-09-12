@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.22 (clean, single-file)
+Garage — v4.5.23 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -216,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.22"
+APP_TITLE = "Garage v4.5.23"
 
 
 # ----------------- Helpers -----------------
@@ -1161,21 +1161,18 @@ class GarageApp(tk.Tk):
         self.nb.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         self.tab_general = ttk.Frame(self.nb, padding=10)
-        self.tab_vehicules = ttk.Frame(self.nb, padding=10)
         self.tab_pleins = ttk.Frame(self.nb, padding=10)
         self.tab_ent = ttk.Frame(self.nb, padding=10)
         self.tab_graphs = ttk.Frame(self.nb, padding=10)
         self.tab_settings = ttk.Frame(self.nb, padding=10)
 
         self.nb.add(self.tab_general, text="Général")
-        self.nb.add(self.tab_vehicules, text="Véhicules")
         self.nb.add(self.tab_pleins, text="Pleins")
         self.nb.add(self.tab_ent, text="Entretiens")
 
         self.nb.add(self.tab_graphs, text="Graphiques")
         self.nb.add(self.tab_settings, text="Paramètres")
         self._build_general_tab()
-        self._build_vehicules_tab()
         self._build_pleins_tab()
         self._build_entretiens_tab()
         self._build_graphs_tab()
@@ -2005,10 +2002,6 @@ class GarageApp(tk.Tk):
 
 
     # ---------- Véhicules ----------
-    def _build_vehicules_tab(self):
-        self.tab_vehicules.columnconfigure(0, weight=1)
-        self.tab_vehicules.rowconfigure(0, weight=1)
-
     def _on_veh_vehicle_change(self, _evt=None):
         idx = self.veh_vehicle_cb.current()
         if idx is None or idx < 0:
