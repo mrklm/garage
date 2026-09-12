@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.8] – 2026-09-12
+
+### Modifié
+
+- Extraction de la gestion des préconisations dans `preconisation_repository.py`.
+- Déplacement de `list_preconisations()`, `insert_preconisation()`, `update_preconisation()` et `delete_preconisation()`.
+- Conservation à l'identique des requêtes SQL, validations, horodatage, conversions, commits, fermetures de connexion et valeurs de retour.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.7] – 2026-09-12
 
 ### Modifié

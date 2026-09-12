@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.7 (clean, single-file)
+Garage — v4.5.8 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -76,6 +76,12 @@ from maintenance_type_repository import (
     list_vehicle_types,
     set_vehicle_type_enabled,
     update_type,
+)
+from preconisation_repository import (
+    delete_preconisation,
+    insert_preconisation,
+    list_preconisations,
+    update_preconisation,
 )
 from vehicle_repository import (
     delete_vehicle,
@@ -204,7 +210,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.7"
+APP_TITLE = "Garage v4.5.8"
 
 
 # ----------------- Helpers -----------------
@@ -713,60 +719,6 @@ def _add_months(d: date, months: int) -> date:
 
 def _format_days(days: int) -> str:
     return f"{int(days)} jour" if int(days) == 1 else f"{int(days)} jours"
-
-# ----------------- DB API : Préconisations constructeur -----------------
-
-def list_preconisations(vehicle_id: int):
-    conn = _connect_db()
-    cur = conn.cursor()
-    cur.execute(
-        """SELECT id, texte, created_at
-           FROM preconisations
-           WHERE vehicule_id = ?
-           ORDER BY id DESC""",
-        (int(vehicle_id),),
-    )
-    rows = cur.fetchall()
-    conn.close()
-    return rows
-
-
-def insert_preconisation(vehicle_id: int, texte: str):
-    txt = (texte or "").strip()
-    if not txt:
-        raise ValueError("Texte vide.")
-    conn = _connect_db()
-    cur = conn.cursor()
-    cur.execute(
-        """INSERT INTO preconisations(vehicule_id, texte, created_at)
-           VALUES (?, ?, ?)""",
-        (int(vehicle_id), txt, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-    )
-    conn.commit()
-    conn.close()
-
-
-def update_preconisation(preco_id: int, texte: str):
-    txt = (texte or "").strip()
-    if not txt:
-        raise ValueError("Texte vide.")
-    conn = _connect_db()
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE preconisations SET texte=? WHERE id=?",
-        (txt, int(preco_id)),
-    )
-    conn.commit()
-    conn.close()
-
-
-def delete_preconisation(preco_id: int):
-    conn = _connect_db()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM preconisations WHERE id=?", (int(preco_id),))
-    conn.commit()
-    conn.close()
-
 
 # ----------------- DB API : Types / Entretiens -----------------
 
