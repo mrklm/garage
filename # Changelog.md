@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.20] – 2026-09-12
+
+### Modifié
+
+- Déplacement des préconisations constructeur de l'onglet principal
+  `Véhicules` vers `Paramètres > Préconisations`.
+- Ajout d'un sélecteur de véhicule dédié dans
+  `Paramètres > Préconisations`.
+- Synchronisation de ce sélecteur avec le véhicule actif de
+  l'application.
+- Conservation des fonctions existantes d'ajout, de modification et
+  de suppression des préconisations.
+- Conservation à l'identique du stockage SQLite et de la logique
+  métier des préconisations.
+- Aucun autre déplacement fonctionnel dans ce jalon.
+
+---
+
 ## [4.5.19] – 2026-09-12
 
 ### Modifié

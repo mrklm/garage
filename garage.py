@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.19 (clean, single-file)
+Garage — v4.5.20 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -216,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.19"
+APP_TITLE = "Garage v4.5.20"
 
 
 # ----------------- Helpers -----------------
@@ -1215,6 +1215,7 @@ class GarageApp(tk.Tk):
 
         self._build_settings_appearance()
         self._build_settings_data()
+        self._build_settings_preconisations()
         self._build_settings_help()
 
     def _build_settings_appearance(self):
@@ -1256,6 +1257,51 @@ class GarageApp(tk.Tk):
             command=self._import_backup_dialog,
         )
         self.btn_import_backup.grid(row=0, column=1, padx=(10, 0))
+
+    def _build_settings_preconisations(self):
+        self.settings_preconisations_tab.columnconfigure(0, weight=1)
+        self.settings_preconisations_tab.rowconfigure(0, weight=0)
+        self.settings_preconisations_tab.rowconfigure(1, weight=1)
+
+        top = ttk.Frame(self.settings_preconisations_tab)
+        top.grid(row=0, column=0, sticky="ew")
+        top.columnconfigure(1, weight=1)
+
+        ttk.Label(top, text="Véhicule :").grid(row=0, column=0, sticky="w")
+        self.settings_preco_vehicle_var = tk.StringVar(value="")
+        self.settings_preco_vehicle_cb = ttk.Combobox(
+            top,
+            textvariable=self.settings_preco_vehicle_var,
+            state="readonly",
+        )
+        self.settings_preco_vehicle_cb.grid(row=0, column=1, sticky="ew", padx=(10, 0))
+        self.settings_preco_vehicle_cb.bind("<<ComboboxSelected>>", self._on_settings_preco_vehicle_change)
+
+        preco_box = ttk.Labelframe(self.settings_preconisations_tab, text="Préconisations constructeur", padding=10)
+        preco_box.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        preco_box.columnconfigure(0, weight=1)
+        preco_box.rowconfigure(1, weight=1)
+
+        add_line = ttk.Frame(preco_box)
+        add_line.grid(row=0, column=0, sticky="ew")
+        add_line.columnconfigure(1, weight=1)
+
+        ttk.Button(add_line, text="+", width=3, command=self._preco_add).grid(row=0, column=0, sticky="w")
+        self.preco_entry_var = tk.StringVar(value="")
+        ttk.Entry(add_line, textvariable=self.preco_entry_var).grid(row=0, column=1, sticky="ew", padx=(8, 0))
+
+        self.preco_list = tk.Listbox(preco_box, height=6)
+        self.preco_list.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
+        self.preco_list.bind("<<ListboxSelect>>", self._on_preco_select)
+
+        actions_p = ttk.Frame(preco_box)
+        actions_p.grid(row=2, column=0, sticky="e", pady=(10, 0))
+        ttk.Button(actions_p, text="Enregistrer", command=self._preco_save).grid(row=0, column=0, padx=(0, 8))
+        ttk.Button(actions_p, text="Modifier", command=self._preco_update).grid(row=0, column=1, padx=(0, 8))
+        ttk.Button(actions_p, text="Supprimer", command=self._preco_delete).grid(row=0, column=2)
+
+        self.preco_selected_id = None
+        self._preco_rows = []
 
     def _build_settings_help(self):
         self.settings_help_tab.columnconfigure(0, weight=1)
@@ -1864,36 +1910,6 @@ class GarageApp(tk.Tk):
         form = ttk.Labelframe(body, text="Détails tech", padding=10)
         form.grid(row=0, column=1, sticky="nw")
 
-        # ---- Préconisations constructeur (notes libres) ----
-        body.rowconfigure(1, weight=1)
-
-        preco_box = ttk.Labelframe(body, text="Préconisations constructeur", padding=10)
-        preco_box.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
-        preco_box.columnconfigure(0, weight=1)
-        preco_box.rowconfigure(1, weight=1)
-
-        add_line = ttk.Frame(preco_box)
-        add_line.grid(row=0, column=0, sticky="ew")
-        add_line.columnconfigure(1, weight=1)
-
-        ttk.Button(add_line, text="+", width=3, command=self._preco_add).grid(row=0, column=0, sticky="w")
-        self.preco_entry_var = tk.StringVar(value="")
-        ttk.Entry(add_line, textvariable=self.preco_entry_var).grid(row=0, column=1, sticky="ew", padx=(8, 0))
-
-        # Liste sélectionnable (chaque ligne = une préco)
-        self.preco_list = tk.Listbox(preco_box, height=6)
-        self.preco_list.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
-        self.preco_list.bind("<<ListboxSelect>>", self._on_preco_select)
-
-        actions_p = ttk.Frame(preco_box)
-        actions_p.grid(row=2, column=0, sticky="e", pady=(10, 0))
-        ttk.Button(actions_p, text="Enregistrer", command=self._preco_save).grid(row=0, column=0, padx=(0, 8))
-        ttk.Button(actions_p, text="Modifier", command=self._preco_update).grid(row=0, column=1, padx=(0, 8))
-        ttk.Button(actions_p, text="Supprimer", command=self._preco_delete).grid(row=0, column=2)
-
-        self.preco_selected_id = None
-        self._preco_rows = []
-
         self.veh_vars = {
             "nom": tk.StringVar(value=""),
             "marque": tk.StringVar(value=""),
@@ -1931,6 +1947,13 @@ class GarageApp(tk.Tk):
         self.active_vehicle_id = self._vehicle_index_to_id[idx]
         self._veh_set_mode("view")
         self._refresh_all_tabs_after_vehicle_change(source="vehicules")
+
+    def _on_settings_preco_vehicle_change(self, _evt=None):
+        idx = self.settings_preco_vehicle_cb.current()
+        if idx is None or idx < 0:
+            return
+        self.active_vehicle_id = self._vehicle_index_to_id[idx]
+        self._refresh_all_tabs_after_vehicle_change(source="settings_preconisations")
 
     def _veh_set_mode(self, mode: str):
         self._veh_mode = mode
@@ -3314,7 +3337,7 @@ class GarageApp(tk.Tk):
     def _show_empty_state(self):
         """État UI quand la base est vide (aucun véhicule)."""
         # Mettre les listes déroulantes à vide si elles existent
-        for attr in ("veh_vehicle_cb", "pl_vehicle_cb", "ent_vehicle_cb", "graph_vehicle_cb"):
+        for attr in ("veh_vehicle_cb", "pl_vehicle_cb", "ent_vehicle_cb", "graph_vehicle_cb", "settings_preco_vehicle_cb"):
             cb = getattr(self, attr, None)
             if cb is not None:
                 try:
@@ -3353,6 +3376,11 @@ class GarageApp(tk.Tk):
         except Exception:
             pass
 
+        try:
+            self._refresh_preconisations()
+        except Exception:
+            pass
+
     def _refresh_all(self):
         self.vehicles_rows = list_vehicles()
         if not self.vehicles_rows:
@@ -3378,6 +3406,7 @@ class GarageApp(tk.Tk):
         self.pl_vehicle_cb["values"] = labels
         self.ent_vehicle_cb["values"] = labels
         self.graph_vehicle_cb["values"] = labels
+        self.settings_preco_vehicle_cb["values"] = labels
 
         self._refresh_all_tabs_after_vehicle_change(source="init")
 
@@ -3401,6 +3430,8 @@ class GarageApp(tk.Tk):
             self.ent_vehicle_cb.current(idx)
         if source != "graphs":
             self.graph_vehicle_cb.current(idx)
+        if source != "settings_preconisations":
+            self.settings_preco_vehicle_cb.current(idx)
 
         try:
             self.general_empty_frame.grid_remove()
