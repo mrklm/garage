@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.11] – 2026-09-12
+
+### Modifié
+
+- Création de `date_utils.py` pour centraliser les helpers génériques de manipulation des dates.
+- Déplacement de `_parse_iso_date()`, `_month_diff()` et `_add_months()` depuis `garage.py` vers `date_utils.py`.
+- Conservation à l'identique du parsing des dates, du calcul des mois entiers et de la gestion des ajouts de mois et fins de mois.
+- Aucun changement fonctionnel ou visuel.
+
+---
+
 ## [4.5.10] – 2026-09-12
 
 ### Modifié
