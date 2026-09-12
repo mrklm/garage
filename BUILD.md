@@ -34,7 +34,7 @@ GitHub-hosted `macos-13` runners are not reliable enough for the legacy profile.
 
 ```bash
 python3 -m pip install -r requirements-build-macos-legacy.txt
-MACOSX_DEPLOYMENT_TARGET=11.0 ./build-macos.sh -v 4.5.30 --flavor legacy
+MACOSX_DEPLOYMENT_TARGET=11.0 ./build-macos.sh -v 5.0.0 --flavor legacy
 ```
 
 High Sierra compatibility must be built and published separately from the standard macOS/Linux/Windows release, with a clearly distinct artifact name such as `high-sierra` or `legacy`.

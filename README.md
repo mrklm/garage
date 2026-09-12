@@ -2,7 +2,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
 ![License](https://img.shields.io/badge/license-GPLv3-blue)
-![Version](https://img.shields.io/badge/version-4.5.30-green)
+![Version](https://img.shields.io/badge/version-5.0.0-green)
 
 
 **Garage** est une application simple et autonome pour suivre les informations essentielles de vos véhicules.
@@ -43,18 +43,23 @@ https://github.com/mrklm/garage/releases
 ### Applications standalone (recommandé)
 
 - **Linux**  
-  - `Garagev4.5.30-linux-x86_64.Appimage`
-  - `Garagev4.5.30-linux-x86_64.Appimage.sha`
-  - `Garage v4.5.30 linux-x86_64.tar.gz`
-  - `Garage v4.5.30 linux-x86_64.tar.gz.sha`
+  - `Garagev5.0.0-linux-x86_64.Appimage`
+  - `Garagev5.0.0-linux-x86_64.Appimage.sha`
+  - `Garage v5.0.0 linux-x86_64.tar.gz`
+  - `Garage v5.0.0 linux-x86_64.tar.gz.sha`
+  - `SHA256SUMS-Garage-v5.0.0.txt`
 
 - **macOS**  
-  - `Garage-4.5.30-macOS-x86_64.dmg `
-  - `Garage-4.5.30-macOS-x86_64.dmg.sha`
+  - `Garage-5.0.0-macOS-x86_64.dmg`
+  - `Garage-5.0.0-macOS-x86_64.dmg.sha`
 
 - **Windows**  
-  - `Garage-v4.5.30-windows-x86_64.zip`
-  - `Garage-v4.5.30-windows-x86_64.zip.sha`
+  - `Garage-v5.0.0-windows-x86_64.zip`
+  - `Garage-v5.0.0-windows-x86_64.zip.sha`
+
+La release standard contient les builds macOS moderne, Linux et Windows.
+Une version macOS High Sierra sera publiée séparément lorsqu'elle sera disponible.
+Elle ne fait pas partie de la release standard.
 
 ---
 
@@ -63,15 +68,15 @@ https://github.com/mrklm/garage/releases
 ### Option 1 — AppImage (recommandé)
 
 ```bash
-chmod +x Garagev4.5.30-linux-x86_64.Appimage
-./Garagev4.5.30-linux-x86_64.Appimage
+chmod +x Garagev5.0.0-linux-x86_64.Appimage
+./Garagev5.0.0-linux-x86_64.Appimage
 ```
 
 ### Option 2 — Archive `.tar.gz`
 
 ```bash
-tar -xzf "Garage v4.5.30 linux-x86_64.tar.gz"
-cd "Garage v4.5.30 linux-x86_64"
+tar -xzf "Garage v5.0.0 linux-x86_64.tar.gz"
+cd "Garage v5.0.0 linux-x86_64"
 ./Garage
 ```
 
@@ -81,11 +86,30 @@ cd "Garage v4.5.30 linux-x86_64"
 
 Garage utilise une **base de données persistante**.
 
-Lors du premier lancement, la base est automatiquement créée dans :
+Garage stocke ses données utilisateur dans le dossier Garage propre à votre système :
 
 ```text
-~/.local/share/Garage/garage.db
+Linux   : ~/.local/share/Garage
+          ou $XDG_DATA_HOME/Garage si XDG_DATA_HOME est défini
+
+macOS   : ~/Library/Application Support/Garage
+
+Windows : %APPDATA%\Garage
 ```
+
+La base principale est `garage.db`.
+Les photos des véhicules sont stockées dans le sous-dossier `vehicle_photos`.
+
+Lors du premier lancement, la base est automatiquement créée si elle n'existe pas.
+
+### Sauvegarde / restauration
+
+Garage propose une fonction intégrée dans `Paramètres > Données`.
+
+- `Exporter une sauvegarde` crée une archive ZIP contenant les données Garage et les photos des véhicules.
+- `Importer une sauvegarde` restaure les données et les photos depuis l'archive sélectionnée.
+- Une sauvegarde de sécurité est créée automatiquement avant import.
+- Après une restauration réussie, Garage demande un redémarrage.
 
 ---
 
@@ -94,8 +118,11 @@ Lors du premier lancement, la base est automatiquement créée dans :
 ### Prérequis
 - Python 3.10+
 - Tkinter
-- SQLite
-- Pillow (recommandé)
+- SQLite, généralement fourni avec Python
+- Pillow
+- Matplotlib
+- NumPy
+- python-dateutil
 
 ### 1. Cloner le dépôt
 ```bash
@@ -107,11 +134,17 @@ cd garage
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
-### 3. Lancer l’application
+### 3. Lancer l’application sur macOS / Linux
 ```bash
+python3 garage.py
+```
+
+Sous Windows, utilisez généralement :
+
+```powershell
 python garage.py
 ```
 

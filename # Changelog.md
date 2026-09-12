@@ -3,6 +3,29 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+## [5.0.0] – 2026-09-12
+
+### Ajouté
+
+- Nouvelle organisation de l'interface autour d'une navigation principale simplifiée.
+- Ajout de la section `Paramètres` regroupant les réglages et fonctions de gestion.
+- Ajout d'actions rapides `+ Plein` et `+ Entretien` depuis les cartes de la page `Général`.
+- Ajout du nettoyage automatique des photos véhicule orphelines au démarrage.
+
+### Modifié
+
+- Réorganisation interne majeure du code en modules dédiés, repositories et services.
+- Extraction progressive des accès SQLite hors de `garage.py`.
+- Déplacement de la gestion des véhicules, types d'entretien, préconisations, apparence, données et aide dans `Paramètres`.
+- Conservation des pleins, entretiens, graphiques et vue générale dans la navigation principale.
+- Simplification de la fiche véhicule avec kilométrage déterminé automatiquement depuis l'historique.
+- Amélioration du dimensionnement de l'interface sur macOS, Linux et Windows.
+- Mise à jour complète de l'aide utilisateur et du README.
+- Fiabilisation de la release automatique macOS, Linux et Windows.
+- Aucun changement incompatible du schéma SQLite ni des chemins de données utilisateur.
+
+---
+
 ## [4.5.30] – 2026-09-12
 
 ### Modifié
