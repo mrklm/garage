@@ -3,6 +3,26 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+## [4.5.28] – 2026-09-12
+
+### Modifié
+
+- Correction du dimensionnement de la fenêtre principale pour les
+  écrans de résolution 1366×768.
+- Taille initiale adaptée de `1400x950` à `1280x680` et taille minimale
+  ajustée de `1180x720` à `1100x620`.
+- Réduction de la largeur demandée par le tableau `Entretiens`, sans
+  suppression de colonne ni de fonctionnalité.
+- Adaptation des colonnes extensibles du tableau `Entretiens` afin
+  qu'elles utilisent plus efficacement l'espace disponible.
+- Correction de la taille demandée par la zone de texte de
+  `Paramètres > Aide`, qui s'adapte désormais à l'espace disponible.
+- Conservation du logo, du contenu d'aide, du défilement et de
+  l'organisation actuelle de l'interface.
+- Aucun changement du schéma SQLite, des repositories ou des services.
+
+---
+
 ## [4.5.27] – 2026-09-12
 
 ### Modifié

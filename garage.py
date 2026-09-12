@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.27 (clean, single-file)
+Garage — v4.5.28 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -217,7 +217,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.27"
+APP_TITLE = "Garage v4.5.28"
 
 
 # ----------------- Helpers -----------------
@@ -923,8 +923,8 @@ class GarageApp(tk.Tk):
         self.font_info2_bold = tkfont.Font(family=_fam, size=_sz + 2, weight="bold")
 
         self.title(APP_TITLE)
-        self.geometry("1400x950")
-        self.minsize(1180, 720)
+        self.geometry("1280x680")
+        self.minsize(1100, 620)
 
         if not os.path.exists(DB_FILE):
             messagebox.showerror("DB introuvable", f"Impossible de trouver :\n{DB_FILE}\n\nLa base est créée automatiquement dans le dossier de données utilisateur.")
@@ -1495,6 +1495,8 @@ class GarageApp(tk.Tk):
 
         self.help_text = tk.Text(
             help_text_frame,
+            width=1,
+            height=1,
             wrap="word",
             bg=HELP_BG,
             fg=HELP_TEXT_COLOR,
@@ -2589,10 +2591,11 @@ class GarageApp(tk.Tk):
             "id": "ID", "date": "Date", "km": "Km", "type": "Type d'entretien",
             "kind": "Type intervention", "cout": "Coût €", "by": "Effectué par", "vbat": "Vbat", "details": "Détails"
         }
-        widths = {"id": 70, "date": 90, "km": 90, "type": 230, "kind": 170, "cout": 90, "by": 180, "vbat": 80, "details": 420}
+        widths = {"id": 50, "date": 90, "km": 80, "type": 170, "kind": 150, "cout": 80, "by": 130, "vbat": 60, "details": 300}
+        minwidths = {"id": 50, "date": 90, "km": 80, "type": 140, "kind": 140, "cout": 80, "by": 100, "vbat": 60, "details": 240}
         for c in cols:
             self.tree_ent.heading(c, text=heads[c])
-            self.tree_ent.column(c, width=widths[c], anchor="w", stretch=True)
+            self.tree_ent.column(c, width=widths[c], minwidth=minwidths[c], anchor="w", stretch=c in ("type", "kind", "by", "details"))
 
         ysb = ttk.Scrollbar(tv_frame, orient="vertical", command=self.tree_ent.yview)
         ysb.grid(row=0, column=1, sticky="ns")
