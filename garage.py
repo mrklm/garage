@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v4.5.23 (clean, single-file)
+Garage — v4.5.24 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -216,7 +216,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v4.5.23"
+APP_TITLE = "Garage v4.5.24"
 
 
 # ----------------- Helpers -----------------
@@ -1157,26 +1157,68 @@ class GarageApp(tk.Tk):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
-        self.nb = ttk.Notebook(self)
-        self.nb.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.main_shell = ttk.Frame(self)
+        self.main_shell.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.main_shell.columnconfigure(0, weight=1)
+        self.main_shell.rowconfigure(1, weight=1)
 
-        self.tab_general = ttk.Frame(self.nb, padding=10)
-        self.tab_pleins = ttk.Frame(self.nb, padding=10)
-        self.tab_ent = ttk.Frame(self.nb, padding=10)
-        self.tab_graphs = ttk.Frame(self.nb, padding=10)
-        self.tab_settings = ttk.Frame(self.nb, padding=10)
+        self.main_nav_bar = ttk.Frame(self.main_shell)
+        self.main_nav_bar.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        self.main_nav_bar.columnconfigure(4, weight=1)
 
-        self.nb.add(self.tab_general, text="Général")
-        self.nb.add(self.tab_pleins, text="Pleins")
-        self.nb.add(self.tab_ent, text="Entretiens")
+        self.btn_nav_general = ttk.Button(self.main_nav_bar, text="Général", command=self._show_general)
+        self.btn_nav_pleins = ttk.Button(self.main_nav_bar, text="Pleins", command=self._show_pleins)
+        self.btn_nav_ent = ttk.Button(self.main_nav_bar, text="Entretiens", command=self._show_entretiens)
+        self.btn_nav_graphs = ttk.Button(self.main_nav_bar, text="Graphiques", command=self._show_graphs)
+        self.btn_nav_settings = ttk.Button(self.main_nav_bar, text="Paramètres", command=self._show_settings)
 
-        self.nb.add(self.tab_graphs, text="Graphiques")
-        self.nb.add(self.tab_settings, text="Paramètres")
+        self.btn_nav_general.grid(row=0, column=0, sticky="w", padx=(0, 6))
+        self.btn_nav_pleins.grid(row=0, column=1, sticky="w", padx=(0, 6))
+        self.btn_nav_ent.grid(row=0, column=2, sticky="w", padx=(0, 6))
+        self.btn_nav_graphs.grid(row=0, column=3, sticky="w")
+        self.btn_nav_settings.grid(row=0, column=5, sticky="e")
+
+        self.main_page_area = ttk.Frame(self.main_shell)
+        self.main_page_area.grid(row=1, column=0, sticky="nsew")
+        self.main_page_area.columnconfigure(0, weight=1)
+        self.main_page_area.rowconfigure(0, weight=1)
+
+        self.tab_general = ttk.Frame(self.main_page_area, padding=10)
+        self.tab_pleins = ttk.Frame(self.main_page_area, padding=10)
+        self.tab_ent = ttk.Frame(self.main_page_area, padding=10)
+        self.tab_graphs = ttk.Frame(self.main_page_area, padding=10)
+        self.tab_settings = ttk.Frame(self.main_page_area, padding=10)
+
+        for page in (
+            self.tab_general,
+            self.tab_pleins,
+            self.tab_ent,
+            self.tab_graphs,
+            self.tab_settings,
+        ):
+            page.grid(row=0, column=0, sticky="nsew")
+
         self._build_general_tab()
         self._build_pleins_tab()
         self._build_entretiens_tab()
         self._build_graphs_tab()
         self._build_settings_tab()
+        self.tab_general.tkraise()
+
+    def _show_general(self):
+        self.tab_general.tkraise()
+
+    def _show_pleins(self):
+        self.tab_pleins.tkraise()
+
+    def _show_entretiens(self):
+        self.tab_ent.tkraise()
+
+    def _show_graphs(self):
+        self.tab_graphs.tkraise()
+
+    def _show_settings(self):
+        self.tab_settings.tkraise()
 
     def _build_settings_tab(self):
         self.tab_settings.columnconfigure(0, weight=1)
@@ -3401,7 +3443,7 @@ class GarageApp(tk.Tk):
 
         # Basculer sur l'onglet Général et afficher l'état vide.
         try:
-            self.nb.select(self.tab_general)
+            self.tab_general.tkraise()
         except Exception:
             pass
 

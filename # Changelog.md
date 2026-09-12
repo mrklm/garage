@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
 
+## [4.5.24] – 2026-09-12
+
+### Modifié
+
+- Remplacement de la navigation principale par une barre dédiée avec
+  accès à `Général`, `Pleins`, `Entretiens`, `Graphiques` et
+  `Paramètres`.
+- Positionnement de l'accès `Paramètres` à droite de la barre de
+  navigation principale.
+- Remplacement du Notebook principal par des pages permanentes
+  superposées et affichées avec `tkraise()`.
+- Conservation du Notebook secondaire et des sous-sections de
+  `Paramètres`.
+- Conservation de l'état des pages et des sous-sections lors des
+  changements de navigation.
+- Aucun changement de la logique métier, du stockage SQLite ou des
+  repositories/services.
+
+---
+
 ## [4.5.23] – 2026-09-12
 
 ### Modifié
