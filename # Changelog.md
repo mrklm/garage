@@ -3,6 +3,16 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+## [5.0.5] – 2026-09-13
+
+### Modifié
+
+- Correction du nom du fichier DMG temporaire utilisé pendant le build macOS.
+- Conservation d'une extension `.dmg` pour le fichier temporaire afin de fiabiliser le déplacement vers le dossier `releases`.
+- Aucun changement fonctionnel dans l'application.
+
+---
+
 ## [5.0.4] – 2026-09-13
 
 ### Modifié

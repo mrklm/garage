@@ -4,13 +4,13 @@ set -euo pipefail
 # build-macos.sh — Garage macOS (Intel x86_64) DMG
 # Usage:
 #   ./build-macos.sh
-#   ./build-macos.sh -v 5.0.4
-#   ./build-macos.sh -v 5.0.4 --flavor legacy
-#   ./build-macos.sh -v 5.0.4 --keep
+#   ./build-macos.sh -v 5.0.5
+#   ./build-macos.sh -v 5.0.5 --flavor legacy
+#   ./build-macos.sh -v 5.0.5 --keep
 #
 # À lancer à la racine du repo (là où il y a garage.py, assets/, data/, etc.)
 
-VERSION="5.0.4"
+VERSION="5.0.5"
 KEEP_BUILD_DIRS="0"
 MIN_MACOS_VERSION="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 BUILD_FLAVOR="${BUILD_FLAVOR:-}"
@@ -160,7 +160,7 @@ ln -s /Applications "$STAGE_DIR/Applications"
 
 # Volume name (ce que tu vois dans Finder quand tu montes le DMG)
 VOL_NAME="Garage ${VERSION}"
-TMP_DMG_PATH="${DMG_WORK_DIR}/${DMG_NAME}.tmp"
+TMP_DMG_PATH="${DMG_WORK_DIR}/tmp-${DMG_NAME}"
 
 # Évite les conflits si un ancien volume Garage du même build est encore monté.
 if [[ -d "/Volumes/${VOL_NAME}" ]]; then

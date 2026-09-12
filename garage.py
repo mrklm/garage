@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v5.0.4 (clean, single-file)
+Garage — v5.0.5 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -195,7 +195,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v5.0.4"
+APP_TITLE = "Garage v5.0.5"
 PREFS_FILE = os.path.join(USER_DIR, "preferences.json")
 
 
