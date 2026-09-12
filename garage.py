@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Garage — v5.0.1 (clean, single-file)
+Garage — v5.0.2 (clean, single-file)
 
 Données utilisateur :
 - Base de données : garage.db dans le dossier utilisateur
@@ -195,7 +195,7 @@ def read_text_file_safely(path: str) -> str:
     except Exception:
         return ""
 
-APP_TITLE = "Garage v5.0.1"
+APP_TITLE = "Garage v5.0.2"
 PREFS_FILE = os.path.join(USER_DIR, "preferences.json")
 
 
@@ -2849,6 +2849,7 @@ class GarageApp(tk.Tk):
         ax.yaxis.label.set_color("#dddddd")
         # Grille discrète
         ax.grid(True, axis="y", linestyle=":", linewidth=0.6, alpha=0.30)
+        ax.margins(y=0.15)
         # Spines
         for sp in ax.spines.values():
             sp.set_color("#777777")

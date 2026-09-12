@@ -3,6 +3,15 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+## [5.0.2] – 2026-09-12
+
+### Modifié
+
+- Ajout d'une marge verticale automatique aux graphiques afin d'améliorer la lisibilité des échelles.
+- Aucun changement des données, des calculs ou des requêtes SQL des graphiques.
+
+---
+
 ## [5.0.1] – 2026-09-12
 
 ### Ajouté

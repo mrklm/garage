@@ -2,7 +2,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
 ![License](https://img.shields.io/badge/license-GPLv3-blue)
-![Version](https://img.shields.io/badge/version-5.0.1-green)
+![Version](https://img.shields.io/badge/version-5.0.2-green)
 
 
 **Garage** est une application simple et autonome pour suivre les informations essentielles de vos véhicules.
@@ -43,19 +43,19 @@ https://github.com/mrklm/garage/releases
 ### Applications standalone (recommandé)
 
 - **Linux**  
-  - `Garagev5.0.1-linux-x86_64.Appimage`
-  - `Garagev5.0.1-linux-x86_64.Appimage.sha`
-  - `Garage v5.0.1 linux-x86_64.tar.gz`
-  - `Garage v5.0.1 linux-x86_64.tar.gz.sha`
-  - `SHA256SUMS-Garage-v5.0.1.txt`
+  - `Garagev5.0.2-linux-x86_64.Appimage`
+  - `Garagev5.0.2-linux-x86_64.Appimage.sha`
+  - `Garage v5.0.2 linux-x86_64.tar.gz`
+  - `Garage v5.0.2 linux-x86_64.tar.gz.sha`
+  - `SHA256SUMS-Garage-v5.0.2.txt`
 
 - **macOS**  
-  - `Garage-5.0.1-macOS-x86_64.dmg`
-  - `Garage-5.0.1-macOS-x86_64.dmg.sha`
+  - `Garage-5.0.2-macOS-x86_64.dmg`
+  - `Garage-5.0.2-macOS-x86_64.dmg.sha`
 
 - **Windows**  
-  - `Garage-v5.0.1-windows-x86_64.zip`
-  - `Garage-v5.0.1-windows-x86_64.zip.sha`
+  - `Garage-v5.0.2-windows-x86_64.zip`
+  - `Garage-v5.0.2-windows-x86_64.zip.sha`
 
 La release standard contient les builds macOS moderne, Linux et Windows.
 Une version macOS High Sierra sera publiée séparément lorsqu'elle sera disponible.
@@ -68,15 +68,15 @@ Elle ne fait pas partie de la release standard.
 ### Option 1 — AppImage (recommandé)
 
 ```bash
-chmod +x Garagev5.0.1-linux-x86_64.Appimage
-./Garagev5.0.1-linux-x86_64.Appimage
+chmod +x Garagev5.0.2-linux-x86_64.Appimage
+./Garagev5.0.2-linux-x86_64.Appimage
 ```
 
 ### Option 2 — Archive `.tar.gz`
 
 ```bash
-tar -xzf "Garage v5.0.1 linux-x86_64.tar.gz"
-cd "Garage v5.0.1 linux-x86_64"
+tar -xzf "Garage v5.0.2 linux-x86_64.tar.gz"
+cd "Garage v5.0.2 linux-x86_64"
 ./Garage
 ```
 
