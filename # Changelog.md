@@ -3,6 +3,16 @@
 Toutes les modifications notables de ce projet sont documentées dans ce fichier.  
 Le format est inspiré de *Keep a Changelog* et le versionnement suit une logique sémantique pragmatique.
 
+## [5.0.6] – 2026-09-13
+
+### Modifié
+
+- Exclusion des contrôles périodiques de l'estimation des coûts d'entretien à venir.
+- Les contrôles restent présents dans les rappels et l'historique, mais leurs coûts éventuels ne sont plus projetés comme dépenses récurrentes.
+- Aucun changement du schéma SQLite ni des données enregistrées.
+
+---
+
 ## [5.0.5] – 2026-09-13
 
 ### Modifié

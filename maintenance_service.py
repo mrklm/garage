@@ -169,6 +169,10 @@ def estimate_maintenance_cost_next_months(vehicle_id: int, horizon_months: int =
     any_included = False
 
     for t in list_vehicle_types(vehicle_id):
+        type_name = (t["type_name"] or "").strip().lower()
+        if type_name.startswith("contrôle") or type_name == "tension batterie":
+            continue
+
         enabled = 1
         try:
             enabled = int(t["enabled"]) if t["enabled"] is not None else 1
